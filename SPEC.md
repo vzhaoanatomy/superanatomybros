@@ -51,7 +51,7 @@ Coins are seeded from the active world's vocab list and cycle through it.
 
 ## Quiz mechanics (the educational core)
 - **Coin Quiz:** touching any coin opens an overlay: definition prompt + 4 term
-  options. Correct = +100 and collected. Wrong = -50, coin bounces away, brief
+  options. Correct = +15 and collected. Wrong = -10, coin bounces away, brief
   invulnerability so it can't instantly re-trigger. HUD formats negative scores cleanly.
 - **Enemy encounter:** collision opens a definition-match overlay. Correct defeats the
   enemy; wrong costs a life.

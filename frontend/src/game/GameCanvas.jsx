@@ -36,6 +36,8 @@ const RIGHT_KEYS = new Set(['ArrowRight', 'KeyD']);
 const DOWN_KEYS = new Set(['ArrowDown', 'KeyS']);
 const INVULN_MS = 1200;
 const COIN_BOUNCE_MS = 800;
+const COIN_CORRECT_POINTS = 15;
+const COIN_WRONG_PENALTY = 10;
 const GLIDE_FALL_SPEED = 1.6;
 const GROUND_POUND_SPEED = 24;
 const GROUND_POUND_RADIUS = 90;
@@ -342,10 +344,10 @@ export default function GameCanvas({ characterId, onQuit }) {
               coin.collected = true;
               state.coinsCollected += 1;
               const combo = character.ability === 'coinCombo' && state.coinsCollected % 5 === 0;
-              state.score += combo ? 20 : 10;
+              state.score += combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
             } else {
               recordWrong(coin.termId);
-              state.score -= 50;
+              state.score -= COIN_WRONG_PENALTY;
               coin.bounceUntil = performance.now() + COIN_BOUNCE_MS;
             }
           });
