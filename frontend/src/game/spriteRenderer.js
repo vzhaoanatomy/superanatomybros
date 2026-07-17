@@ -29,6 +29,18 @@ export function drawCoin(ctx, coin) {
   ctx.fill();
 }
 
+export function drawDoor(ctx, door) {
+  if (door.passed) return;
+  ctx.fillStyle = '#5b3fa0';
+  ctx.fillRect(door.x, door.y, door.width, door.height);
+  ctx.fillStyle = '#8e6bff';
+  ctx.fillRect(door.x + 4, door.y + 4, door.width - 8, door.height - 8);
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(door.x + door.width / 2, door.y + door.height / 2, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 export function drawFlag(ctx, flag) {
   ctx.fillStyle = '#8a8a8a';
   ctx.fillRect(flag.x, flag.y, 6, flag.height);

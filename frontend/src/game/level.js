@@ -1,4 +1,5 @@
 import { TILE } from './constants';
+import { WORLD1_VOCAB } from './vocab';
 
 const GROUND_Y = 460;
 
@@ -52,13 +53,35 @@ export function buildPlaceholderLevel() {
     width: 20,
     height: 20,
     collected: false,
+    termId: WORLD1_VOCAB[i % WORLD1_VOCAB.length].id,
+    pending: false,
+    bounceUntil: 0,
   }));
 
   const enemies = [
     { id: 'enemy-0', x: 900, minX: 850, maxX: 1350, y: GROUND_Y - 34, width: 34, height: 34, vx: -2.2, alive: true },
     { id: 'enemy-1', x: 1700, minX: 1550, maxX: 1950, y: GROUND_Y - 34, width: 34, height: 34, vx: 2.2, alive: true },
     { id: 'enemy-2', x: 2500, minX: 2160, maxX: 3150, y: GROUND_Y - 34, width: 34, height: 34, vx: -2.2, alive: true },
-  ];
+  ].map((enemy, i) => ({
+    ...enemy,
+    startX: enemy.x,
+    termId: WORLD1_VOCAB[(i * 3 + 1) % WORLD1_VOCAB.length].id,
+    pending: false,
+  }));
+
+  // Tall enough that no jump (including Vee's super jump) can clear it —
+  // it's a real gate, not a hop-over obstacle. Height is removed from the
+  // solid-collision list once passed.
+  const DOOR_HEIGHT = 320;
+  const door = {
+    x: 1300,
+    y: GROUND_Y - DOOR_HEIGHT,
+    width: 24,
+    height: DOOR_HEIGHT,
+    passed: false,
+    pending: false,
+    termId: WORLD1_VOCAB[5].id,
+  };
 
   const width = 3200;
 
@@ -69,6 +92,7 @@ export function buildPlaceholderLevel() {
     platforms,
     coins,
     enemies,
+    door,
     flag: { x: width - 100, y: GROUND_Y - 200, width: 20, height: 200 },
   };
 }
