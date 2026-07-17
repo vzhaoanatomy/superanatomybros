@@ -11,11 +11,28 @@ import {
   PLAYER_HEIGHT,
 } from './constants';
 import { buildPlaceholderLevel } from './level';
+import { getCharacter } from './characters';
+import {
+  drawBackground,
+  drawPlatform,
+  drawCoin,
+  drawFlag,
+  drawGoomba,
+  drawPlayer,
+  drawHUD,
+} from './spriteRenderer';
 
 const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const LEFT_KEYS = new Set(['ArrowLeft', 'KeyA']);
 const RIGHT_KEYS = new Set(['ArrowRight', 'KeyD']);
+const DOWN_KEYS = new Set(['ArrowDown', 'KeyS']);
 const INVULN_MS = 1200;
+const GLIDE_FALL_SPEED = 1.6;
+const GROUND_POUND_SPEED = 24;
+const GROUND_POUND_RADIUS = 90;
+// Peak jump height scales with velocity^2 under constant gravity, so to get a
+// jump that's 20% *higher* (not 20% faster launch), scale velocity by sqrt(1.2).
+const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 
 function aabbOverlap(a, b) {
   return (
@@ -54,7 +71,7 @@ function resolveVertical(player, platforms) {
 
 // Game loop mounts once; pause/overlay state is read from refs (not React
 // state) so future quiz overlays never force a re-mount. See CLAUDE.md rule 1.
-export default function GameCanvas() {
+export default function GameCanvas({ characterId, onQuit }) {
   const canvasRef = useRef(null);
   const pausedRef = useRef(false);
   const keysRef = useRef(new Set());
@@ -63,6 +80,7 @@ export default function GameCanvas() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const level = buildPlaceholderLevel();
+    const character = getCharacter(characterId);
 
     const player = {
       x: level.spawn.x,
@@ -74,6 +92,7 @@ export default function GameCanvas() {
       onGround: false,
       facing: 1,
       invulnerableUntil: 0,
+      pounding: false,
     };
 
     const state = {
@@ -83,6 +102,8 @@ export default function GameCanvas() {
       coinsCollected: 0,
       levelComplete: false,
       message: '',
+      gliding: false,
+      pounding: false,
     };
 
     function respawnPlayer() {
@@ -90,6 +111,7 @@ export default function GameCanvas() {
       player.y = level.spawn.y;
       player.vx = 0;
       player.vy = 0;
+      player.pounding = false;
       player.invulnerableUntil = performance.now() + INVULN_MS;
     }
 
@@ -103,7 +125,7 @@ export default function GameCanvas() {
     }
 
     function handleKeyDown(e) {
-      if (JUMP_KEYS.has(e.code) || LEFT_KEYS.has(e.code) || RIGHT_KEYS.has(e.code)) {
+      if (JUMP_KEYS.has(e.code) || LEFT_KEYS.has(e.code) || RIGHT_KEYS.has(e.code) || DOWN_KEYS.has(e.code)) {
         e.preventDefault();
       }
       keysRef.current.add(e.code);
@@ -114,31 +136,66 @@ export default function GameCanvas() {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 
+    function groundPoundImpact() {
+      for (const enemy of level.enemies) {
+        if (!enemy.alive) continue;
+        const dx = enemy.x + enemy.width / 2 - (player.x + player.width / 2);
+        const dy = enemy.y + enemy.height / 2 - (player.y + player.height / 2);
+        if (Math.hypot(dx, dy) <= GROUND_POUND_RADIUS) {
+          enemy.alive = false;
+          state.score += 50;
+        }
+      }
+    }
+
     function updatePhysics() {
       const keys = keysRef.current;
       const left = [...LEFT_KEYS].some((k) => keys.has(k));
       const right = [...RIGHT_KEYS].some((k) => keys.has(k));
       const jumpHeld = [...JUMP_KEYS].some((k) => keys.has(k));
+      const downHeld = [...DOWN_KEYS].some((k) => keys.has(k));
 
-      if (left && !right) {
-        player.vx = -RUN_SPEED;
-        player.facing = -1;
-      } else if (right && !left) {
-        player.vx = RUN_SPEED;
-        player.facing = 1;
-      } else {
-        player.vx = 0;
+      if (!player.pounding) {
+        if (left && !right) {
+          player.vx = -RUN_SPEED;
+          player.facing = -1;
+        } else if (right && !left) {
+          player.vx = RUN_SPEED;
+          player.facing = 1;
+        } else {
+          player.vx = 0;
+        }
       }
 
-      if (jumpHeld && player.onGround) {
-        player.vy = JUMP_VELOCITY;
+      const jumpVelocity = character.ability === 'superJump' ? JUMP_VELOCITY * SUPER_JUMP_MULTIPLIER : JUMP_VELOCITY;
+
+      if (jumpHeld && player.onGround && !player.pounding) {
+        player.vy = jumpVelocity;
         player.onGround = false;
       }
       if (!jumpHeld && player.vy < JUMP_CUTOFF_VELOCITY) {
         player.vy = JUMP_CUTOFF_VELOCITY;
       }
 
+      if (
+        character.ability === 'groundPound' &&
+        downHeld &&
+        !player.onGround &&
+        !player.pounding
+      ) {
+        player.pounding = true;
+        player.vx = 0;
+        player.vy = GROUND_POUND_SPEED;
+      }
+      state.pounding = player.pounding;
+
       player.vy = Math.min(player.vy + GRAVITY, MAX_FALL_SPEED);
+
+      state.gliding = false;
+      if (character.ability === 'glide' && jumpHeld && !player.onGround && player.vy > 0 && !player.pounding) {
+        player.vy = Math.min(player.vy, GLIDE_FALL_SPEED);
+        state.gliding = true;
+      }
 
       player.x += player.vx;
       player.x = Math.max(0, Math.min(player.x, level.width - player.width));
@@ -146,6 +203,11 @@ export default function GameCanvas() {
 
       player.y += player.vy;
       resolveVertical(player, level.platforms);
+
+      if (player.pounding && player.onGround) {
+        player.pounding = false;
+        groundPoundImpact();
+      }
 
       if (player.y > CANVAS_HEIGHT + 300) {
         loseLife();
@@ -161,9 +223,9 @@ export default function GameCanvas() {
 
         if (aabbOverlap(player, enemy)) {
           const stomping = player.vy > 0 && player.y + player.height - player.vy <= enemy.y + 12;
-          if (stomping) {
+          if (player.pounding || stomping) {
             enemy.alive = false;
-            player.vy = JUMP_VELOCITY * 0.55;
+            if (!player.pounding) player.vy = JUMP_VELOCITY * 0.55;
             state.score += 50;
           } else if (performance.now() > player.invulnerableUntil) {
             loseLife();
@@ -176,7 +238,8 @@ export default function GameCanvas() {
         if (aabbOverlap(player, coin)) {
           coin.collected = true;
           state.coinsCollected += 1;
-          state.score += 10;
+          const combo = character.ability === 'coinCombo' && state.coinsCollected % 5 === 0;
+          state.score += combo ? 20 : 10;
         }
       }
 
@@ -192,55 +255,31 @@ export default function GameCanvas() {
     }
 
     function draw() {
-      ctx.fillStyle = '#1c2b4a';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
 
       ctx.save();
       ctx.translate(-state.camera, 0);
 
-      ctx.fillStyle = '#4a3323';
-      for (const p of level.platforms) {
-        ctx.fillRect(p.x, p.y, p.width, p.height);
-      }
-
-      ctx.fillStyle = '#ffd23f';
-      for (const coin of level.coins) {
-        if (coin.collected) continue;
-        ctx.beginPath();
-        ctx.arc(coin.x + coin.width / 2, coin.y + coin.height / 2, coin.width / 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      ctx.fillStyle = '#c1392b';
+      for (const p of level.platforms) drawPlatform(ctx, p);
+      for (const coin of level.coins) drawCoin(ctx, coin);
       for (const enemy of level.enemies) {
-        if (!enemy.alive) continue;
-        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+        if (enemy.alive) drawGoomba(ctx, enemy);
       }
+      drawFlag(ctx, level.flag);
 
-      ctx.fillStyle = '#2ecc71';
-      ctx.fillRect(level.flag.x, level.flag.y, level.flag.width, level.flag.height);
-
-      const flashing = performance.now() < player.invulnerableUntil && Math.floor(performance.now() / 100) % 2 === 0;
-      ctx.fillStyle = flashing ? '#89aaff' : '#3355ff';
-      ctx.fillRect(player.x, player.y, player.width, player.height);
+      const now = performance.now();
+      const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
+      drawPlayer(ctx, player, characterId, { flashing });
 
       ctx.restore();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '20px monospace';
-      ctx.fillText(`Score: ${state.score}`, 16, 30);
-      ctx.fillText(`Lives: ${state.lives}`, 16, 56);
-      ctx.fillText(`Coins: ${state.coinsCollected}/${level.coins.length}`, 16, 82);
-      ctx.font = '14px monospace';
-      ctx.fillText('Arrows/WASD to move, Space/Up to jump (tap for a short hop)', 16, CANVAS_HEIGHT - 16);
-
-      if (state.levelComplete) {
-        ctx.font = 'bold 40px monospace';
-        ctx.fillStyle = '#ffd23f';
-        ctx.textAlign = 'center';
-        ctx.fillText(state.message, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-        ctx.textAlign = 'left';
-      }
+      drawHUD(ctx, {
+        state,
+        level,
+        character,
+        canvasWidth: CANVAS_WIDTH,
+        canvasHeight: CANVAS_HEIGHT,
+      });
     }
 
     let rafId;
@@ -258,14 +297,21 @@ export default function GameCanvas() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [characterId]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
-      style={{ display: 'block', margin: '0 auto', background: '#000', imageRendering: 'pixelated' }}
-    />
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        style={{ display: 'block', margin: '0 auto', background: '#000', imageRendering: 'pixelated' }}
+      />
+      {onQuit && (
+        <button type="button" onClick={onQuit} style={{ marginTop: 12 }}>
+          ◀ Change Character
+        </button>
+      )}
+    </div>
   );
 }

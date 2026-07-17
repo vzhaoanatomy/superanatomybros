@@ -31,12 +31,24 @@ export function buildPlaceholderLevel() {
     { x: 2850, y: 340, width: 140, height: TILE * 0.6 },
   );
 
+  // Each coin floats ~24px above the platform (or ground) it sits near, so a
+  // standing player's body genuinely overlaps it — flush with a platform's
+  // surface means zero real AABB overlap for a standing player.
   const coins = [
-    340, 640, 980, 1180, 1640, 1880, 2340, 2590, 2890, 3050,
-  ].map((x, i) => ({
+    { x: 340, y: 316 },
+    { x: 640, y: 236 },
+    { x: 980, y: 336 },
+    { x: 1180, y: 236 },
+    { x: 1640, y: 316 },
+    { x: 1880, y: 216 },
+    { x: 2340, y: 336 },
+    { x: 2590, y: 236 },
+    { x: 2890, y: 316 },
+    { x: 3050, y: 430 },
+  ].map(({ x, y }, i) => ({
     id: `coin-${i}`,
     x,
-    y: 300 - (i % 3) * 40,
+    y,
     width: 20,
     height: 20,
     collected: false,
