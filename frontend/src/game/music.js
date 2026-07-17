@@ -1,0 +1,171 @@
+// Procedural chiptune background music via the Web Audio API — no audio
+// files, just oscillators. Square lead + triangle harmony (an octave below)
+// + sawtooth bass + a simple kick/snare pulse, ~170 BPM. Six short chord-
+// progression "sections" are picked in a non-consecutive order so the loop
+// doesn't feel like the same 4 bars over and over.
+
+const BPM = 170;
+const BEAT_SEC = 60 / BPM;
+const STEP_SEC = BEAT_SEC / 2; // eighth notes
+const STEPS_PER_SECTION = 16;
+const LOOKAHEAD_SEC = 0.1;
+const SCHEDULE_INTERVAL_MS = 25;
+
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const freqCache = {};
+
+function noteFreq(name) {
+  if (freqCache[name]) return freqCache[name];
+  const match = name.match(/^([A-G]#?)(\d)$/);
+  const [, pitch, octaveStr] = match;
+  const octave = parseInt(octaveStr, 10);
+  const semitoneFromA4 = NOTE_NAMES.indexOf(pitch) - NOTE_NAMES.indexOf('A') + (octave - 4) * 12;
+  const freq = 440 * Math.pow(2, semitoneFromA4 / 12);
+  freqCache[name] = freq;
+  return freq;
+}
+
+function transposeOctave(name, delta) {
+  const match = name.match(/^([A-G]#?)(\d)$/);
+  const [, pitch, octaveStr] = match;
+  return `${pitch}${parseInt(octaveStr, 10) + delta}`;
+}
+
+// Chord voicings in octave 4 — root, third, fifth, octave.
+const CHORDS = {
+  C: ['C4', 'E4', 'G4', 'C5'],
+  Am: ['A3', 'C4', 'E4', 'A4'],
+  F: ['F3', 'A3', 'C4', 'F4'],
+  G: ['G3', 'B3', 'D4', 'G4'],
+};
+
+// Each section: a 4-chord progression (one chord per 4-step group) plus an
+// arpeggio index pattern applied within each group.
+const SECTIONS = {
+  A: { progression: ['C', 'F', 'G', 'C'], pattern: [0, 1, 2, 3] },
+  B: { progression: ['Am', 'F', 'C', 'G'], pattern: [0, 2, 1, 3] },
+  C: { progression: ['F', 'G', 'Am', 'C'], pattern: [2, 1, 0, 3] },
+  D: { progression: ['C', 'G', 'Am', 'F'], pattern: [0, 1, 3, 2] },
+  E: { progression: ['G', 'C', 'F', 'G'], pattern: [3, 2, 1, 0] },
+  F: { progression: ['Am', 'G', 'F', 'G'], pattern: [0, 3, 1, 2] },
+};
+const SECTION_KEYS = Object.keys(SECTIONS);
+
+let audioCtx = null;
+let playing = false;
+let schedulerTimer = null;
+let nextStepTime = 0;
+let currentStep = 0;
+let currentSectionKey = null;
+let recentSections = [];
+
+function ensureContext() {
+  if (!audioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioCtx();
+  }
+  return audioCtx;
+}
+
+function pickNextSection() {
+  let choice;
+  do {
+    choice = SECTION_KEYS[Math.floor(Math.random() * SECTION_KEYS.length)];
+  } while (recentSections.includes(choice) && recentSections.length < SECTION_KEYS.length - 1);
+  recentSections.push(choice);
+  if (recentSections.length > 2) recentSections.shift();
+  return choice;
+}
+
+function playTone(ctx, freq, startTime, duration, type, peakGain) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.linearRampToValueAtTime(peakGain, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+
+function playKick(ctx, startTime) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(120, startTime);
+  osc.frequency.exponentialRampToValueAtTime(40, startTime + 0.12);
+  gain.gain.setValueAtTime(0.5, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + 0.16);
+}
+
+function playSnare(ctx, startTime) {
+  const bufferSize = Math.floor(ctx.sampleRate * 0.1);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.28, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
+  noise.connect(gain).connect(ctx.destination);
+  noise.start(startTime);
+}
+
+function scheduleStep(step, time) {
+  const ctx = audioCtx;
+  const section = SECTIONS[currentSectionKey];
+  const groupIndex = Math.floor(step / 4);
+  const chord = CHORDS[section.progression[groupIndex]];
+  const chordTone = chord[section.pattern[step % 4]];
+
+  const leadNote = transposeOctave(chordTone, 1);
+  playTone(ctx, noteFreq(leadNote), time, STEP_SEC * 0.9, 'square', 0.11);
+  playTone(ctx, noteFreq(transposeOctave(leadNote, -1)), time, STEP_SEC * 0.9, 'triangle', 0.07);
+
+  if (step % 4 === 0) {
+    const rootNote = transposeOctave(chord[0], -1);
+    playTone(ctx, noteFreq(rootNote), time, STEP_SEC * 4 * 0.95, 'sawtooth', 0.08);
+  }
+  if (step === 0 || step === 8) playKick(ctx, time);
+  if (step === 4 || step === 12) playSnare(ctx, time);
+}
+
+function scheduler() {
+  const ctx = audioCtx;
+  while (nextStepTime < ctx.currentTime + LOOKAHEAD_SEC) {
+    scheduleStep(currentStep, nextStepTime);
+    nextStepTime += STEP_SEC;
+    currentStep++;
+    if (currentStep >= STEPS_PER_SECTION) {
+      currentStep = 0;
+      currentSectionKey = pickNextSection();
+    }
+  }
+}
+
+export function isMusicPlaying() {
+  return playing;
+}
+
+export function toggleMusic() {
+  if (playing) {
+    playing = false;
+    if (schedulerTimer) clearInterval(schedulerTimer);
+    schedulerTimer = null;
+  } else {
+    const ctx = ensureContext();
+    if (ctx.state === 'suspended') ctx.resume();
+    playing = true;
+    currentStep = 0;
+    currentSectionKey = pickNextSection();
+    nextStepTime = ctx.currentTime + 0.05;
+    schedulerTimer = setInterval(scheduler, SCHEDULE_INTERVAL_MS);
+  }
+  return playing;
+}

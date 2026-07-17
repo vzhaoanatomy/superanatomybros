@@ -47,8 +47,8 @@ export function drawBackground(ctx, width, height, palette, camera = 0, groundY 
   tileAcross(ctx, width, camera, 0.3, 170 * scale, (cx) => drawTree(ctx, cx, groundY, scale, palette?.hills ?? '#2e7d46'));
 }
 
-const BRICK_W = 32;
-const BRICK_H = 16;
+const BRICK_W = 40;
+const BRICK_H = 20;
 
 function drawBlock(ctx, platform, palette) {
   const { x, y, width, height } = platform;
@@ -468,62 +468,3 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
   }
 }
 
-function formatClock(seconds) {
-  const s = Math.max(0, Math.ceil(seconds));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, '0')}`;
-}
-
-// Outlined text reads against any world's sky color without needing an
-// opaque backdrop panel — the panel was capping the visible sky and making
-// the play area feel boxed in.
-function hudText(ctx, text, x, y, fillColor) {
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = fillColor;
-  ctx.fillText(text, x, y);
-}
-
-export function drawHUD(ctx, { state, level, character, world, canvasWidth, canvasHeight }) {
-  const ink = '#2a1a0f';
-
-  ctx.font = '20px monospace';
-  hudText(ctx, `Score: ${state.score}`, 16, 30, ink);
-  hudText(ctx, `Lives: ${state.lives}`, 16, 56, ink);
-  hudText(ctx, `Coins: ${state.coinsCollected}/${level.coins.length}`, 16, 82, ink);
-
-  const fraction = state.timeRemaining / state.durationSeconds;
-  let timeColor = '#1a7a3c';
-  if (fraction < 0.2) {
-    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 120);
-    timeColor = `rgba(200, 30, 30, ${pulse.toFixed(2)})`;
-  } else if (fraction < 0.5) {
-    timeColor = '#b8860b';
-  }
-  hudText(ctx, `Time: ${formatClock(state.timeRemaining)}`, 200, 30, timeColor);
-
-  ctx.font = '14px monospace';
-  hudText(ctx, world.name, 200, 52, '#3a2a1a');
-
-  hudText(ctx, `${character.name} — ${character.abilityName}`, 16, 106, ink);
-  if (character.ability === 'coinCombo') {
-    hudText(ctx, `Combo: ${state.coinsCollected % 5}/5`, 16, 124, ink);
-  } else if (character.ability === 'groundPound' && state.pounding) {
-    hudText(ctx, 'GROUND POUND!', 16, 124, '#b8860b');
-  } else if (character.ability === 'glide' && state.gliding) {
-    hudText(ctx, 'Gliding...', 16, 124, '#1a5a8f');
-  }
-
-  ctx.font = '14px monospace';
-  hudText(ctx, 'Arrows/WASD to move, Space/Up to jump, Down for ability', 16, canvasHeight - 16, ink);
-
-  if (state.levelComplete) {
-    ctx.font = 'bold 40px monospace';
-    ctx.fillStyle = '#ffd23f';
-    ctx.textAlign = 'center';
-    ctx.fillText(state.message, canvasWidth / 2, canvasHeight / 2);
-    ctx.textAlign = 'left';
-  }
-}

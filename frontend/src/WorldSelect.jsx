@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { WORLDS } from './game/worlds';
-import { drawBackground, drawEnemy } from './game/spriteRenderer';
+import { CHARACTERS } from './game/characters';
+import { drawBackground, drawPlayer } from './game/spriteRenderer';
 
 const ENEMY_LABELS = {
   goomba: 'Goomba-style blob',
@@ -17,14 +18,20 @@ const PREVIEW_H = 96;
 
 function WorldCard({ world, onSelect }) {
   const canvasRef = useRef(null);
+  const heroId = CHARACTERS[(world.index - 1) % CHARACTERS.length].id;
 
   useEffect(() => {
     const ctx = canvasRef.current.getContext('2d');
     drawBackground(ctx, PREVIEW_W, PREVIEW_H, world.palette);
     ctx.fillStyle = world.palette.ground;
     ctx.fillRect(0, PREVIEW_H - 20, PREVIEW_W, 20);
-    drawEnemy(ctx, { x: PREVIEW_W / 2 - 17, y: PREVIEW_H - 20 - 34, width: 34, height: 34 }, world.enemyType);
-  }, [world.id]);
+    drawPlayer(
+      ctx,
+      { x: PREVIEW_W / 2 - 15, y: PREVIEW_H - 20 - 46, width: 30, height: 46, facing: 1 },
+      heroId,
+      {}
+    );
+  }, [world.id, heroId]);
 
   return (
     <button

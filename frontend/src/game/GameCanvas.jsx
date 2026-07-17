@@ -12,16 +12,8 @@ import { buildLevel, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
 import { getWorld, DURATION_SECONDS } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
-import {
-  drawBackground,
-  drawPlatform,
-  drawCoin,
-  drawDoor,
-  drawFlag,
-  drawEnemy,
-  drawPlayer,
-  drawHUD,
-} from './spriteRenderer';
+import { drawBackground, drawPlatform, drawCoin, drawDoor, drawFlag, drawEnemy, drawPlayer } from './spriteRenderer';
+import { toggleMusic, isMusicPlaying } from './music';
 import CoinQuiz from '../overlays/CoinQuiz';
 import EnemyEncounter from '../overlays/EnemyEncounter';
 import DoorQuiz from '../overlays/DoorQuiz';
@@ -43,6 +35,7 @@ const GROUND_POUND_RADIUS = 90;
 // Peak jump height scales with velocity^2 under constant gravity, so to get a
 // jump that's 20% *higher* (not 20% faster launch), scale velocity by sqrt(1.2).
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
+const HUD_PUSH_INTERVAL_MS = 100;
 
 function aabbOverlap(a, b) {
   return (
@@ -79,30 +72,50 @@ function resolveVertical(player, solids) {
   }
 }
 
+function formatClock(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+function computeViewportSize() {
+  if (typeof window === 'undefined') return { w: 960, h: 480 };
+  const w = Math.min(window.innerWidth - 64, 1400);
+  const h = Math.round(w * 0.5);
+  return { w, h };
+}
+
 // Game loop mounts once; pause/overlay state is read from refs (not React
 // state) so opening a quiz never force a re-mount. See CLAUDE.md rule 1.
 // Overlays themselves are separate React components (rule 4) driven by the
 // `overlay` state below; `handlersRef` bridges their button clicks back into
-// the imperative game state the loop owns.
+// the imperative game state the loop owns. `hud` is a throttled snapshot of
+// score/lives/coins/time pushed from the loop purely for the HTML HUD bar to
+// render — it never affects the loop's own lifecycle.
 export default function GameCanvas({ characterId, worldId, onQuit }) {
   const canvasRef = useRef(null);
   const pausedRef = useRef(false);
   const keysRef = useRef(new Set());
   const handlersRef = useRef({});
   const [overlay, setOverlay] = useState(null);
+  const [hud, setHud] = useState(null);
+  const [viewportSize, setViewportSize] = useState(computeViewportSize);
+  const [musicOn, setMusicOn] = useState(isMusicPlaying());
+
+  const world = getWorld(worldId);
+  const character = getCharacter(characterId);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    let canvasWidth = window.innerWidth;
-    let canvasHeight = window.innerHeight;
+    let canvasWidth = computeViewportSize().w;
+    let canvasHeight = computeViewportSize().h;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
-    const world = getWorld(worldId);
     const durationMinutes = world.defaultDurationMinutes;
     const durationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
     const level = buildLevel({ world, durationMinutes });
-    const character = getCharacter(characterId);
     const vocab = world.vocab;
 
     const player = {
@@ -133,6 +146,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     };
 
     let lastFrameTime = performance.now();
+    let lastHudPush = 0;
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
@@ -392,9 +406,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function draw() {
-      // Ground is always pinned to the actual screen bottom, regardless of
-      // window height — world Y coordinates (physics, spawn, GROUND_Y) never
-      // change, only this render-time vertical offset does.
       const verticalOffset = canvasHeight - (level.groundY + GROUND_HEIGHT);
       drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, canvasHeight - GROUND_HEIGHT);
 
@@ -415,21 +426,29 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       ctx.restore();
 
-      drawHUD(ctx, {
-        state,
-        level,
-        character,
-        world,
-        canvasWidth,
-        canvasHeight,
-      });
+      if (now - lastHudPush > HUD_PUSH_INTERVAL_MS) {
+        lastHudPush = now;
+        setHud({
+          score: state.score,
+          lives: state.lives,
+          coinsCollected: state.coinsCollected,
+          totalCoins: level.coins.length,
+          timeRemaining: state.timeRemaining,
+          durationSeconds: state.durationSeconds,
+          comboCount: state.coinsCollected % 5,
+          gliding: state.gliding,
+          pounding: state.pounding,
+        });
+      }
     }
 
     function handleResize() {
-      canvasWidth = window.innerWidth;
-      canvasHeight = window.innerHeight;
+      const size = computeViewportSize();
+      canvasWidth = size.w;
+      canvasHeight = size.h;
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
+      setViewportSize(size);
     }
     window.addEventListener('resize', handleResize);
 
@@ -452,56 +471,90 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, worldId]);
 
   const h = handlersRef.current;
+  const fraction = hud ? hud.timeRemaining / hud.durationSeconds : 1;
+  const timeClass = fraction < 0.2 ? 'hud-timer critical' : fraction < 0.5 ? 'hud-timer warn' : 'hud-timer';
 
   return (
-    <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
-      <canvas
-        ref={canvasRef}
-        style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
-      />
+    <div className="game-page">
+      <div className="game-frame" style={{ width: viewportSize.w + 8 }}>
+        <div className="hud-panel">
+          <div className="hud-top">
+            <div className="hud-hearts">
+              {Array.from({ length: hud?.lives ?? 3 }).map((_, i) => (
+                <span key={i}>♥</span>
+              ))}
+            </div>
+            <div className="hud-title">
+              <div className="hud-world-name">{world.name}</div>
+              <div className="hud-world-sub">
+                World {world.index}
+                {world.subtitle ? `: ${world.subtitle}` : ''}
+              </div>
+            </div>
+            <div className="hud-stats">
+              <span className={timeClass}>⏱ {formatClock(hud?.timeRemaining ?? world.defaultDurationMinutes * 60)}</span>
+              <span>
+                COINS {hud?.coinsCollected ?? 0}/{hud?.totalCoins ?? 0}
+              </span>
+              <span>SCORE {String(hud?.score ?? 0).padStart(6, '0')}</span>
+            </div>
+          </div>
+          <div className="hud-divider" />
+          <div className="hud-bottom">
+            <div className="hud-player">
+              PLAYER: <strong>{character.name}</strong> · <span className="hud-ability">{character.abilityName}</span>
+              {character.ability === 'coinCombo' && <span className="hud-status"> · Combo {hud?.comboCount ?? 0}/5</span>}
+              {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
+              {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="hud-music"
+                onClick={() => setMusicOn(toggleMusic())}
+              >
+                {musicOn ? '♪ Music On' : '♪ Music Off'}
+              </button>
+              {onQuit && (
+                <button type="button" className="hud-quit" onClick={onQuit}>
+                  ⇥ Quit
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="game-viewport" style={{ width: viewportSize.w, height: viewportSize.h }}>
+          <canvas
+            ref={canvasRef}
+            style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
+          />
 
-      {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
-      {overlay?.type === 'enemy' && <EnemyEncounter question={overlay.question} onAnswer={h.resolveQuiz} />}
-      {overlay?.type === 'door' && <DoorQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
-      {overlay?.type === 'endOfLevel' && (
-        <EndOfLevelQuiz questions={overlay.questions} onFinish={h.finishEndOfLevel} />
-      )}
-      {overlay?.type === 'complete' && (
-        <LevelComplete
-          score={h.getScore?.() ?? 0}
-          timeBonus={h.getTimeBonus?.() ?? 0}
-          hasMissed={h.hasMissed?.() ?? false}
-          onReview={h.openReview}
-          onPlayAgain={h.playAgain}
-          onQuit={onQuit}
-        />
-      )}
-      {overlay?.type === 'review' && (
-        <ReviewMissedTerms items={h.getMissedItems?.() ?? []} onClose={h.closeReview} />
-      )}
-
-      {onQuit && (
-        <button
-          type="button"
-          onClick={onQuit}
-          style={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            padding: '8px 14px',
-            background: 'rgba(10, 14, 26, 0.75)',
-            color: '#fff',
-            border: '2px solid rgba(255,255,255,0.4)',
-            borderRadius: 6,
-            cursor: 'pointer',
-          }}
-        >
-          ◀ Quit to Menu
-        </button>
-      )}
+          {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
+          {overlay?.type === 'enemy' && <EnemyEncounter question={overlay.question} onAnswer={h.resolveQuiz} />}
+          {overlay?.type === 'door' && <DoorQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
+          {overlay?.type === 'endOfLevel' && (
+            <EndOfLevelQuiz questions={overlay.questions} onFinish={h.finishEndOfLevel} />
+          )}
+          {overlay?.type === 'complete' && (
+            <LevelComplete
+              score={h.getScore?.() ?? 0}
+              timeBonus={h.getTimeBonus?.() ?? 0}
+              hasMissed={h.hasMissed?.() ?? false}
+              onReview={h.openReview}
+              onPlayAgain={h.playAgain}
+              onQuit={onQuit}
+            />
+          )}
+          {overlay?.type === 'review' && (
+            <ReviewMissedTerms items={h.getMissedItems?.() ?? []} onClose={h.closeReview} />
+          )}
+        </div>
+        <div className="controls-hint">Arrows/WASD to move · Space/Up to jump · Down for ability</div>
+      </div>
     </div>
   );
 }

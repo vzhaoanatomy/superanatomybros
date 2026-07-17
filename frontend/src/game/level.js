@@ -54,11 +54,18 @@ export function buildLevel({ world, durationMinutes }) {
     type: 'ground',
   }));
 
+  // Platforms are placed into evenly-sized slots along the width, each with
+  // bounded jitter — pure random placement let some end up nearly stacked
+  // while others were far apart. Slots guarantee a minimum gap between
+  // neighbors while still varying position/size within each slot.
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
+  const usableWidth = width - 600;
+  const slotWidth = usableWidth / platformCount;
   for (let i = 0; i < platformCount; i++) {
-    const px = 250 + rng() * (width - 600);
-    const py = 220 + rng() * 170;
     const pw = 100 + rng() * 80;
+    const maxJitter = Math.max(0, slotWidth - pw - 60);
+    const px = 250 + i * slotWidth + 30 + rng() * maxJitter;
+    const py = 220 + rng() * 170;
     platforms.push({ x: px, y: py, width: pw, height: 24, type: 'block' });
   }
 
@@ -101,8 +108,8 @@ export function buildLevel({ world, durationMinutes }) {
     id: `coin-${i}`,
     x,
     y,
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     collected: false,
     pending: false,
     bounceUntil: 0,
@@ -119,16 +126,16 @@ export function buildLevel({ world, durationMinutes }) {
     const patrolMargin = Math.min(60, segWidth * 0.2);
     const minX = sx1 + patrolMargin;
     const maxX = Math.max(minX + 80, sx2 - patrolMargin);
-    const startX = minX + rng() * Math.max(1, maxX - minX - 34);
+    const startX = minX + rng() * Math.max(1, maxX - minX - 42);
     enemies.push({
       id: `enemy-${i}`,
       x: startX,
       startX,
       minX,
       maxX,
-      y: GROUND_Y - 34,
-      width: 34,
-      height: 34,
+      y: GROUND_Y - 42,
+      width: 42,
+      height: 42,
       vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.6),
       alive: true,
       pending: false,

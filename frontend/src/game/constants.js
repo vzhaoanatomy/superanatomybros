@@ -9,5 +9,5 @@ export const GRAVITY = 0.62;
 export const JUMP_CUTOFF_VELOCITY = -4; // releasing jump early clamps vy to this if still rising faster
 export const MAX_FALL_SPEED = 18;
 
-export const PLAYER_WIDTH = 32;
-export const PLAYER_HEIGHT = 44;
+export const PLAYER_WIDTH = 40;
+export const PLAYER_HEIGHT = 54;

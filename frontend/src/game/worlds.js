@@ -7,6 +7,7 @@ export const WORLDS = [
     id: 'world-1',
     index: 1,
     name: 'Anatomical & Directional Terms',
+    subtitle: "The Body's Compass",
     enemyType: 'goomba',
     defaultDurationMinutes: 3,
     palette: { sky: '#5fa8e8', hills: '#3aa65a', ground: '#8b5a2b', platform: '#8b5a2b', accent: '#ffd23f' },
@@ -27,6 +28,7 @@ export const WORLDS = [
     id: 'world-2',
     index: 2,
     name: 'Integumentary System',
+    subtitle: 'Skin Deep',
     enemyType: 'skinBlob',
     defaultDurationMinutes: 3,
     palette: { sky: '#ffc2d1', hills: '#e8899c', ground: '#c97b8a', platform: '#c97b8a', accent: '#ff2f76' },
@@ -45,6 +47,7 @@ export const WORLDS = [
     id: 'world-3',
     index: 3,
     name: 'Skeletal System',
+    subtitle: 'Bare Bones',
     enemyType: 'skeleton',
     defaultDurationMinutes: 3,
     palette: { sky: '#cfd6e4', hills: '#9aa3b5', ground: '#8f8975', platform: '#8f8975', accent: '#5a4a8f' },
@@ -63,6 +66,7 @@ export const WORLDS = [
     id: 'world-4',
     index: 4,
     name: 'Muscular System',
+    subtitle: 'Flex Zone',
     enemyType: 'muscleBrawler',
     defaultDurationMinutes: 3,
     palette: { sky: '#ff9e80', hills: '#e2694a', ground: '#a8402c', platform: '#a8402c', accent: '#ffffff' },
@@ -81,6 +85,7 @@ export const WORLDS = [
     id: 'world-5',
     index: 5,
     name: 'Nervous System',
+    subtitle: 'Live Wire',
     enemyType: 'neuron',
     defaultDurationMinutes: 3,
     palette: { sky: '#c9b8ff', hills: '#a190e8', ground: '#6a5acd', platform: '#6a5acd', accent: '#00b8d9' },
@@ -99,6 +104,7 @@ export const WORLDS = [
     id: 'world-6',
     index: 6,
     name: 'Feline Anatomy (Cat Dissection)',
+    subtitle: 'Nine Lives Lab',
     enemyType: 'labCat',
     defaultDurationMinutes: 3,
     palette: { sky: '#b8f2d8', hills: '#7fdba0', ground: '#3d8c5f', platform: '#3d8c5f', accent: '#1f6b45' },
@@ -117,6 +123,7 @@ export const WORLDS = [
     id: 'world-7',
     index: 7,
     name: 'Boss World',
+    subtitle: 'Final Reckoning',
     enemyType: 'dragonling',
     defaultDurationMinutes: 3,
     palette: { sky: '#ff7043', hills: '#c94a2f', ground: '#7a2020', platform: '#7a2020', accent: '#ffeb3b' },
@@ -137,4 +144,4 @@ export function getWorld(id) {
 }
 
 export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };
-export const WIDTH_BY_DURATION = { 2: 2200, 3: 3200, 5: 5200 };
+export const WIDTH_BY_DURATION = { 2: 3400, 3: 5200, 5: 8400 };
