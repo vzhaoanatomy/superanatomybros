@@ -9,7 +9,7 @@ export const WORLDS = [
     name: 'Anatomical & Directional Terms',
     enemyType: 'goomba',
     defaultDurationMinutes: 3,
-    palette: { sky: '#1c2b4a', ground: '#4a3323', platform: '#4a3323', accent: '#ffd23f' },
+    palette: { sky: '#5fa8e8', hills: '#3aa65a', ground: '#8b5a2b', platform: '#8b5a2b', accent: '#ffd23f' },
     vocab: [
       { id: 'anterior', term: 'Anterior', definition: 'Toward the front of the body.' },
       { id: 'posterior', term: 'Posterior', definition: 'Toward the back of the body.' },
@@ -29,7 +29,7 @@ export const WORLDS = [
     name: 'Integumentary System',
     enemyType: 'skinBlob',
     defaultDurationMinutes: 3,
-    palette: { sky: '#4a2338', ground: '#6e3a4a', platform: '#6e3a4a', accent: '#ff9ecb' },
+    palette: { sky: '#ffc2d1', hills: '#e8899c', ground: '#c97b8a', platform: '#c97b8a', accent: '#ff2f76' },
     vocab: [
       { id: 'epidermis', term: 'Epidermis', definition: 'The outer, protective layer of the skin.' },
       { id: 'dermis', term: 'Dermis', definition: 'The layer of skin beneath the epidermis containing vessels and nerves.' },
@@ -47,7 +47,7 @@ export const WORLDS = [
     name: 'Skeletal System',
     enemyType: 'skeleton',
     defaultDurationMinutes: 3,
-    palette: { sky: '#232331', ground: '#5c5a4d', platform: '#5c5a4d', accent: '#f2ead3' },
+    palette: { sky: '#cfd6e4', hills: '#9aa3b5', ground: '#8f8975', platform: '#8f8975', accent: '#5a4a8f' },
     vocab: [
       { id: 'cranium', term: 'Cranium', definition: 'The part of the skull that encloses the brain.' },
       { id: 'vertebra', term: 'Vertebra', definition: 'One of the bones that make up the spinal column.' },
@@ -65,7 +65,7 @@ export const WORLDS = [
     name: 'Muscular System',
     enemyType: 'muscleBrawler',
     defaultDurationMinutes: 3,
-    palette: { sky: '#3a1a1a', ground: '#6b2f2f', platform: '#6b2f2f', accent: '#ff6b4a' },
+    palette: { sky: '#ff9e80', hills: '#e2694a', ground: '#a8402c', platform: '#a8402c', accent: '#ffffff' },
     vocab: [
       { id: 'tendon', term: 'Tendon', definition: 'Connective tissue that attaches muscle to bone.' },
       { id: 'ligament', term: 'Ligament', definition: 'Connective tissue that attaches bone to bone.' },
@@ -83,7 +83,7 @@ export const WORLDS = [
     name: 'Nervous System',
     enemyType: 'neuron',
     defaultDurationMinutes: 3,
-    palette: { sky: '#151538', ground: '#332a6b', platform: '#332a6b', accent: '#7de3ff' },
+    palette: { sky: '#c9b8ff', hills: '#a190e8', ground: '#6a5acd', platform: '#6a5acd', accent: '#00b8d9' },
     vocab: [
       { id: 'neuron', term: 'Neuron', definition: 'A nerve cell that transmits electrical and chemical signals.' },
       { id: 'synapse', term: 'Synapse', definition: 'The junction where a signal passes from one neuron to another.' },
@@ -101,7 +101,7 @@ export const WORLDS = [
     name: 'Feline Anatomy (Cat Dissection)',
     enemyType: 'labCat',
     defaultDurationMinutes: 3,
-    palette: { sky: '#132a1e', ground: '#3c6b4a', platform: '#3c6b4a', accent: '#b6ff9e' },
+    palette: { sky: '#b8f2d8', hills: '#7fdba0', ground: '#3d8c5f', platform: '#3d8c5f', accent: '#1f6b45' },
     vocab: [
       { id: 'whiskers', term: 'Vibrissae', definition: "The technical term for a cat's whiskers, used for sensing surroundings." },
       { id: 'claw', term: 'Retractable Claw', definition: 'A claw that can be pulled back into a protective sheath.' },
@@ -119,7 +119,7 @@ export const WORLDS = [
     name: 'Boss World',
     enemyType: 'dragonling',
     defaultDurationMinutes: 3,
-    palette: { sky: '#170a0a', ground: '#3a1414', platform: '#3a1414', accent: '#ff4a4a' },
+    palette: { sky: '#ff7043', hills: '#c94a2f', ground: '#7a2020', platform: '#7a2020', accent: '#ffeb3b' },
     vocab: [
       { id: 'homeostasis', term: 'Homeostasis', definition: "The body's tendency to maintain a stable internal environment." },
       { id: 'anatomy', term: 'Anatomy', definition: 'The study of the structure of body parts and their relationships.' },

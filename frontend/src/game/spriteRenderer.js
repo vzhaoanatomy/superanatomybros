@@ -3,9 +3,41 @@ import { getCharacter } from './characters';
 // All pixel-art / canvas drawing lives here (CLAUDE.md rule 2). GameCanvas.jsx
 // only calls into this module — it never issues its own fill/stroke calls.
 
+const CLOUDS = [
+  { x: 0.06, y: 0.14, s: 1 },
+  { x: 0.24, y: 0.22, s: 0.7 },
+  { x: 0.42, y: 0.1, s: 0.85 },
+  { x: 0.62, y: 0.2, s: 0.6 },
+  { x: 0.82, y: 0.12, s: 1.1 },
+  { x: 0.95, y: 0.24, s: 0.7 },
+];
+
+function drawCloud(ctx, cx, cy, scale) {
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 34 * scale, 16 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - 24 * scale, cy + 5 * scale, 20 * scale, 12 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 24 * scale, cy + 5 * scale, 20 * scale, 12 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 export function drawBackground(ctx, width, height, palette) {
-  ctx.fillStyle = palette?.sky ?? '#1c2b4a';
+  ctx.fillStyle = palette?.sky ?? '#5fa8e8';
   ctx.fillRect(0, 0, width, height);
+
+  for (const c of CLOUDS) {
+    drawCloud(ctx, c.x * width, c.y * height, c.s);
+  }
+
+  ctx.fillStyle = palette?.hills ?? '#3aa65a';
+  const hillCount = 4;
+  const hillWidth = width / hillCount;
+  for (let i = 0; i < hillCount; i++) {
+    const cx = hillWidth * (i + 0.5);
+    ctx.beginPath();
+    ctx.ellipse(cx, height * 0.85, hillWidth * 0.62, 95, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 export function drawPlatform(ctx, platform, palette) {
@@ -355,6 +387,9 @@ function formatClock(seconds) {
 }
 
 export function drawHUD(ctx, { state, level, character, world, canvasWidth, canvasHeight }) {
+  ctx.fillStyle = 'rgba(10, 14, 26, 0.85)';
+  ctx.fillRect(0, 0, canvasWidth, 138);
+
   ctx.fillStyle = '#ffffff';
   ctx.font = '20px monospace';
   ctx.fillText(`Score: ${state.score}`, 16, 30);
@@ -389,6 +424,8 @@ export function drawHUD(ctx, { state, level, character, world, canvasWidth, canv
     ctx.fillText('Gliding...', 16, 124);
   }
 
+  ctx.fillStyle = 'rgba(10, 14, 26, 0.85)';
+  ctx.fillRect(0, canvasHeight - 34, canvasWidth, 34);
   ctx.fillStyle = '#ffffff';
   ctx.font = '14px monospace';
   ctx.fillText('Arrows/WASD to move, Space/Up to jump, Down for ability', 16, canvasHeight - 16);

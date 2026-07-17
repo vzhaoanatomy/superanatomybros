@@ -3,5 +3,35 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: #0b0e1a;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.6) 0 40px, transparent 41px),
+    radial-gradient(circle at 80% 15%, rgba(255, 255, 255, 0.5) 0 30px, transparent 31px),
+    linear-gradient(180deg, #6fb3f0 0%, #a8dcf0 55%, #cdeec4 100%);
+}
+
+.title-banner h1 {
+  margin: 0;
+  font-size: 42px;
+  letter-spacing: 1px;
+  color: #ffffff;
+  text-shadow:
+    3px 3px 0 #1a3a8f,
+    -2px -2px 0 #1a3a8f,
+    2px -2px 0 #1a3a8f,
+    -2px 2px 0 #1a3a8f,
+    2px 2px 0 #1a3a8f,
+    6px 6px 0 rgba(0, 0, 0, 0.25);
+}
+
+.tagline-ribbon {
+  display: inline-block;
+  margin: 14px 0 0;
+  padding: 8px 20px;
+  background: #ffd23f;
+  color: #3a2a00;
+  font-weight: bold;
+  border: 3px solid #3a2a00;
+  border-radius: 4px;
+  transform: rotate(-1deg);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
 }

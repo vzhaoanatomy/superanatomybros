@@ -6,6 +6,7 @@ const PREVIEW_SIZE = 96;
 
 function CharacterCard({ character, onSelect }) {
   const canvasRef = useRef(null);
+  const accent = character.colors.cap ?? character.colors.crown ?? character.colors.hair;
 
   useEffect(() => {
     const ctx = canvasRef.current.getContext('2d');
@@ -31,8 +32,9 @@ function CharacterCard({ character, onSelect }) {
         gap: 8,
         padding: 16,
         background: '#16213a',
-        border: '2px solid #2a3a5c',
-        borderRadius: 8,
+        border: `3px solid ${accent}`,
+        borderRadius: 10,
+        boxShadow: '0 4px 0 rgba(0,0,0,0.35)',
         color: '#fff',
         cursor: 'pointer',
         width: 160,
@@ -48,10 +50,11 @@ function CharacterCard({ character, onSelect }) {
 
 export default function CharacterSelect({ onSelect }) {
   return (
-    <div style={{ textAlign: 'center', color: '#fff', padding: 24 }}>
-      <h1 style={{ marginBottom: 4 }}>Super Anatomy Bros</h1>
-      <p style={{ color: '#aab4cc', marginBottom: 24 }}>Choose your character</p>
-      <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+    <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24 }}>
+      <div className="title-banner">
+        <h1 style={{ fontSize: 32 }}>Choose Your Character</h1>
+      </div>
+      <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginTop: 24 }}>
         {CHARACTERS.map((c) => (
           <CharacterCard key={c.id} character={c} onSelect={onSelect} />
         ))}
