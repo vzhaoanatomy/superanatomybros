@@ -392,7 +392,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function draw() {
-      drawBackground(ctx, canvasWidth, canvasHeight, world.palette);
+      drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, level.groundY);
 
       ctx.save();
       ctx.translate(-state.camera, 0);

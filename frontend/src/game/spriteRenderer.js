@@ -3,15 +3,6 @@ import { getCharacter } from './characters';
 // All pixel-art / canvas drawing lives here (CLAUDE.md rule 2). GameCanvas.jsx
 // only calls into this module — it never issues its own fill/stroke calls.
 
-const CLOUDS = [
-  { x: 0.06, y: 0.14, s: 1 },
-  { x: 0.24, y: 0.22, s: 0.7 },
-  { x: 0.42, y: 0.1, s: 0.85 },
-  { x: 0.62, y: 0.2, s: 0.6 },
-  { x: 0.82, y: 0.12, s: 1.1 },
-  { x: 0.95, y: 0.24, s: 0.7 },
-];
-
 function drawCloud(ctx, cx, cy, scale) {
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.beginPath();
@@ -21,29 +12,57 @@ function drawCloud(ctx, cx, cy, scale) {
   ctx.fill();
 }
 
-export function drawBackground(ctx, width, height, palette) {
+// Hill center sits far enough above groundY that its bottom edge never dips
+// below the ground line — otherwise it bleeds into view through pit gaps
+// where there's no ground to occlude it.
+function drawHill(ctx, cx, groundY, radiusX, color) {
+  const radiusY = radiusX * 0.47;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(cx, groundY - radiusY, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTree(ctx, cx, groundY, scale, color) {
+  ctx.fillStyle = 'rgba(74, 51, 35, 0.9)';
+  ctx.fillRect(cx - 4 * scale, groundY - 28 * scale, 8 * scale, 28 * scale);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(cx, groundY - 48 * scale, 26 * scale, 24 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - 16 * scale, groundY - 32 * scale, 19 * scale, 17 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + 16 * scale, groundY - 32 * scale, 19 * scale, 17 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Tiles `drawOne(screenX)` endlessly across the visible width with a slow
+// parallax offset, so the skyline never runs out no matter how far the
+// level scrolls.
+function tileAcross(ctx, width, camera, parallax, spacing, drawOne) {
+  const offset = (((camera * parallax) % spacing) + spacing) % spacing;
+  const count = Math.ceil(width / spacing) + 2;
+  for (let i = -1; i < count; i++) {
+    drawOne(i * spacing - offset + spacing / 2);
+  }
+}
+
+// groundY defaults to a fraction of height so this also works for small
+// scale previews (World Select cards) where there's no real level.groundY —
+// GameCanvas passes the actual level.groundY explicitly.
+export function drawBackground(ctx, width, height, palette, camera = 0, groundY = height * 0.82) {
   ctx.fillStyle = palette?.sky ?? '#5fa8e8';
   ctx.fillRect(0, 0, width, height);
 
-  for (const c of CLOUDS) {
-    drawCloud(ctx, c.x * width, c.y * height, c.s);
-  }
-
-  ctx.fillStyle = palette?.hills ?? '#3aa65a';
-  const hillCount = 4;
-  const hillWidth = width / hillCount;
-  for (let i = 0; i < hillCount; i++) {
-    const cx = hillWidth * (i + 0.5);
-    ctx.beginPath();
-    ctx.ellipse(cx, height * 0.85, hillWidth * 0.62, 95, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const scale = Math.min(1, height / 540);
+  tileAcross(ctx, width, camera, 0.05, 420 * scale, (cx) => drawCloud(ctx, cx, height * 0.12, scale));
+  tileAcross(ctx, width, camera, 0.08, 560 * scale, (cx) => drawCloud(ctx, cx, height * 0.22, 0.7 * scale));
+  tileAcross(ctx, width, camera, 0.2, 340 * scale, (cx) => drawHill(ctx, cx, groundY, 150 * scale, palette?.hills ?? '#3aa65a'));
+  tileAcross(ctx, width, camera, 0.35, 240 * scale, (cx) => drawTree(ctx, cx, groundY, scale, palette?.hills ?? '#2e7d46'));
 }
 
 const BRICK_W = 32;
 const BRICK_H = 16;
 
-export function drawPlatform(ctx, platform, palette) {
+function drawBlock(ctx, platform, palette) {
   const { x, y, width, height } = platform;
   ctx.fillStyle = palette?.ground ?? '#4a3323';
   ctx.fillRect(x, y, width, height);
@@ -72,6 +91,27 @@ export function drawPlatform(ctx, platform, palette) {
   ctx.fillRect(x, y + height - 3, width, 3);
 }
 
+// Solid ground — the lowest point in the scene. Deliberately untextured
+// (just a grass cap over a flat fill) so it reads as bedrock, distinct from
+// the brick-textured floating platforms.
+function drawGroundStrip(ctx, platform, palette) {
+  const { x, y, width, height } = platform;
+  ctx.fillStyle = palette?.ground ?? '#6b4a2b';
+  ctx.fillRect(x, y, width, height);
+  ctx.fillStyle = palette?.hills ?? '#3aa65a';
+  ctx.fillRect(x, y, width, 10);
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  ctx.fillRect(x, y + 10, width, 3);
+}
+
+export function drawPlatform(ctx, platform, palette) {
+  if (platform.type === 'ground') {
+    drawGroundStrip(ctx, platform, palette);
+  } else {
+    drawBlock(ctx, platform, palette);
+  }
+}
+
 export function drawCoin(ctx, coin) {
   if (coin.collected) return;
   const cx = coin.x + coin.width / 2;
@@ -86,15 +126,51 @@ export function drawCoin(ctx, coin) {
   ctx.fill();
 }
 
+// A shimmering portal rather than a plain pole — the visible oval is wider
+// than the (narrower) collision box, which is fine since it's pure flourish;
+// the invisible hitbox stays exactly door.width/height for jump-over blocking.
 export function drawDoor(ctx, door) {
   if (door.passed) return;
-  ctx.fillStyle = '#5b3fa0';
-  ctx.fillRect(door.x, door.y, door.width, door.height);
-  ctx.fillStyle = '#8e6bff';
-  ctx.fillRect(door.x + 4, door.y + 4, door.width - 8, door.height - 8);
-  ctx.fillStyle = '#ffd23f';
+  const { x, y, width, height } = door;
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  const visualW = 60;
+  const t = performance.now() / 500;
+
+  const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, visualW * 2);
+  glow.addColorStop(0, 'rgba(190, 140, 255, 0.45)');
+  glow.addColorStop(1, 'rgba(190, 140, 255, 0)');
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(door.x + door.width / 2, door.y + door.height / 2, 4, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, visualW * 2, height / 2 + 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, visualW / 2, height / 2, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(110, 60, 200, 0.4)';
+  ctx.fillRect(cx - visualW, y, visualW * 2, height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 3;
+  for (let i = 0; i < 3; i++) {
+    const phase = (t + i * 0.9) % 2.7;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, Math.abs(Math.sin(phase)) * visualW * 0.45 + 4, height / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.strokeStyle = '#d8bfff';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, visualW / 2, height / 2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  const sparkleY = cy + Math.sin(t * 2.4) * height * 0.35;
+  ctx.beginPath();
+  ctx.ellipse(cx, sparkleY, 3, 3, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -411,49 +487,49 @@ function formatClock(seconds) {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
-export function drawHUD(ctx, { state, level, character, world, canvasWidth, canvasHeight }) {
-  ctx.fillStyle = 'rgba(10, 14, 26, 0.85)';
-  ctx.fillRect(0, 0, canvasWidth, 138);
+// Outlined text reads against any world's sky color without needing an
+// opaque backdrop panel — the panel was capping the visible sky and making
+// the play area feel boxed in.
+function hudText(ctx, text, x, y, fillColor) {
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fillColor;
+  ctx.fillText(text, x, y);
+}
 
-  ctx.fillStyle = '#ffffff';
+export function drawHUD(ctx, { state, level, character, world, canvasWidth, canvasHeight }) {
+  const ink = '#2a1a0f';
+
   ctx.font = '20px monospace';
-  ctx.fillText(`Score: ${state.score}`, 16, 30);
-  ctx.fillText(`Lives: ${state.lives}`, 16, 56);
-  ctx.fillText(`Coins: ${state.coinsCollected}/${level.coins.length}`, 16, 82);
+  hudText(ctx, `Score: ${state.score}`, 16, 30, ink);
+  hudText(ctx, `Lives: ${state.lives}`, 16, 56, ink);
+  hudText(ctx, `Coins: ${state.coinsCollected}/${level.coins.length}`, 16, 82, ink);
 
   const fraction = state.timeRemaining / state.durationSeconds;
-  let timeColor = '#2ecc71';
+  let timeColor = '#1a7a3c';
   if (fraction < 0.2) {
     const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 120);
-    timeColor = `rgba(231, 76, 60, ${pulse.toFixed(2)})`;
+    timeColor = `rgba(200, 30, 30, ${pulse.toFixed(2)})`;
   } else if (fraction < 0.5) {
-    timeColor = '#f1c40f';
+    timeColor = '#b8860b';
   }
-  ctx.fillStyle = timeColor;
-  ctx.fillText(`Time: ${formatClock(state.timeRemaining)}`, 200, 30);
-
-  ctx.fillStyle = '#aab4cc';
-  ctx.font = '14px monospace';
-  ctx.fillText(world.name, 200, 52);
+  hudText(ctx, `Time: ${formatClock(state.timeRemaining)}`, 200, 30, timeColor);
 
   ctx.font = '14px monospace';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(`${character.name} — ${character.abilityName}`, 16, 106);
+  hudText(ctx, world.name, 200, 52, '#3a2a1a');
+
+  hudText(ctx, `${character.name} — ${character.abilityName}`, 16, 106, ink);
   if (character.ability === 'coinCombo') {
-    ctx.fillText(`Combo: ${state.coinsCollected % 5}/5`, 16, 124);
+    hudText(ctx, `Combo: ${state.coinsCollected % 5}/5`, 16, 124, ink);
   } else if (character.ability === 'groundPound' && state.pounding) {
-    ctx.fillStyle = '#ffd23f';
-    ctx.fillText('GROUND POUND!', 16, 124);
+    hudText(ctx, 'GROUND POUND!', 16, 124, '#b8860b');
   } else if (character.ability === 'glide' && state.gliding) {
-    ctx.fillStyle = '#89e0ff';
-    ctx.fillText('Gliding...', 16, 124);
+    hudText(ctx, 'Gliding...', 16, 124, '#1a5a8f');
   }
 
-  ctx.fillStyle = 'rgba(10, 14, 26, 0.85)';
-  ctx.fillRect(0, canvasHeight - 34, canvasWidth, 34);
-  ctx.fillStyle = '#ffffff';
   ctx.font = '14px monospace';
-  ctx.fillText('Arrows/WASD to move, Space/Up to jump, Down for ability', 16, canvasHeight - 16);
+  hudText(ctx, 'Arrows/WASD to move, Space/Up to jump, Down for ability', 16, canvasHeight - 16, ink);
 
   if (state.levelComplete) {
     ctx.font = 'bold 40px monospace';

@@ -1,6 +1,6 @@
 import { WIDTH_BY_DURATION } from './worlds';
 
-const GROUND_Y = 460;
+export const GROUND_Y = 460;
 
 function hashSeed(str) {
   let h = 1779033703 ^ str.length;
@@ -50,6 +50,7 @@ export function buildLevel({ world, durationMinutes }) {
     y: GROUND_Y,
     width: x2 - x1,
     height: 80,
+    type: 'ground',
   }));
 
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
@@ -57,7 +58,7 @@ export function buildLevel({ world, durationMinutes }) {
     const px = 250 + rng() * (width - 600);
     const py = 220 + rng() * 170;
     const pw = 100 + rng() * 80;
-    platforms.push({ x: px, y: py, width: pw, height: 24 });
+    platforms.push({ x: px, y: py, width: pw, height: 24, type: 'block' });
   }
 
   // Staircases: 2-3 ascending platforms a player can climb from lower to
@@ -73,7 +74,7 @@ export function buildLevel({ world, durationMinutes }) {
     const stepCount = 3;
     for (let step = 0; step < stepCount; step++) {
       const stepWidth = 90;
-      platforms.push({ x: stepX, y: stepY, width: stepWidth, height: 24 });
+      platforms.push({ x: stepX, y: stepY, width: stepWidth, height: 24, type: 'block' });
       if (step === stepCount - 1) {
         bonusCoinSpots.push({ x: stepX + stepWidth / 2 - 10, y: stepY - 40 });
       }
