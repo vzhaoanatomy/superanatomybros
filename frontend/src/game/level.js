@@ -60,24 +60,52 @@ export function buildLevel({ world, durationMinutes }) {
     platforms.push({ x: px, y: py, width: pw, height: 24 });
   }
 
-  const vocab = world.vocab;
-  const coinCount = Math.max(8, Math.round(width / 320));
-  const coins = [];
-  for (let i = 0; i < coinCount; i++) {
-    const cx = 120 + (i / coinCount) * (width - 300) + rng() * 60;
-    const cy = 200 + rng() * 190;
-    coins.push({
-      id: `coin-${i}`,
-      x: cx,
-      y: cy,
-      width: 20,
-      height: 20,
-      collected: false,
-      pending: false,
-      bounceUntil: 0,
-      termId: vocab[i % vocab.length].id,
-    });
+  // Staircases: 2-3 ascending platforms a player can climb from lower to
+  // higher ground, each step within jump range of the last, with a bonus
+  // coin waiting at the top. Purely optional — the main path never requires
+  // climbing one.
+  const staircaseCount = 1 + Math.floor(difficulty / 3);
+  const bonusCoinSpots = [];
+  for (let s = 0; s < staircaseCount; s++) {
+    const zoneWidth = width / (staircaseCount + 1);
+    let stepX = zoneWidth * (s + 1) + rng() * 150 - 75;
+    let stepY = GROUND_Y - 90;
+    const stepCount = 3;
+    for (let step = 0; step < stepCount; step++) {
+      const stepWidth = 90;
+      platforms.push({ x: stepX, y: stepY, width: stepWidth, height: 24 });
+      if (step === stepCount - 1) {
+        bonusCoinSpots.push({ x: stepX + stepWidth / 2 - 10, y: stepY - 40 });
+      }
+      stepX += stepWidth + 50 + rng() * 30;
+      stepY -= 105 + rng() * 20;
+    }
   }
+
+  // Coins are spaced out for runner-style pacing (not a quiz every second) —
+  // enemies stay frequent since dodging/crushing them is the moment-to-moment
+  // choice, while coins/checkpoints are the deliberate stops.
+  const vocab = world.vocab;
+  const coinCount = Math.max(4, Math.round(width / 1000));
+  const coinSpots = [];
+  for (let i = 0; i < coinCount; i++) {
+    const cx = 200 + (i / coinCount) * (width - 400) + rng() * 80;
+    const cy = 200 + rng() * 190;
+    coinSpots.push({ x: cx, y: cy });
+  }
+  coinSpots.push(...bonusCoinSpots);
+
+  const coins = coinSpots.map(({ x, y }, i) => ({
+    id: `coin-${i}`,
+    x,
+    y,
+    width: 20,
+    height: 20,
+    collected: false,
+    pending: false,
+    bounceUntil: 0,
+    termId: vocab[i % vocab.length].id,
+  }));
 
   const solidSegments = groundSegments.filter(([x1, x2]) => x2 - x1 > 160);
   const enemyCount = Math.max(2, Math.round(width / 700 + difficulty * 0.8));

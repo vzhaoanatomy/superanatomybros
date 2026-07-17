@@ -40,11 +40,36 @@ export function drawBackground(ctx, width, height, palette) {
   }
 }
 
+const BRICK_W = 32;
+const BRICK_H = 16;
+
 export function drawPlatform(ctx, platform, palette) {
+  const { x, y, width, height } = platform;
   ctx.fillStyle = palette?.ground ?? '#4a3323';
-  ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.fillRect(platform.x, platform.y, platform.width, 4);
+  ctx.fillRect(x, y, width, height);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+  ctx.lineWidth = 1;
+  let row = 0;
+  for (let ry = y; ry < y + height; ry += BRICK_H, row++) {
+    const rowH = Math.min(BRICK_H, y + height - ry);
+    ctx.beginPath();
+    ctx.moveTo(x, ry);
+    ctx.lineTo(x + width, ry);
+    ctx.stroke();
+    const offset = row % 2 === 0 ? 0 : BRICK_W / 2;
+    for (let bx = x + offset; bx < x + width; bx += BRICK_W) {
+      ctx.beginPath();
+      ctx.moveTo(bx, ry);
+      ctx.lineTo(bx, ry + rowH);
+      ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.14)';
+  ctx.fillRect(x, y, width, 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(x, y + height - 3, width, 3);
 }
 
 export function drawCoin(ctx, coin) {

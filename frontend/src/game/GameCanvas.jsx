@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  CANVAS_WIDTH,
-  CANVAS_HEIGHT,
   RUN_SPEED,
   JUMP_VELOCITY,
   GRAVITY,
@@ -96,6 +94,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
+    let canvasWidth = window.innerWidth;
+    let canvasHeight = window.innerHeight;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
     const world = getWorld(worldId);
     const durationMinutes = world.defaultDurationMinutes;
     const durationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
@@ -314,7 +316,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         groundPoundImpact();
       }
 
-      if (player.y > CANVAS_HEIGHT + 300) {
+      if (player.y > canvasHeight + 300) {
         loseLife();
       }
 
@@ -385,12 +387,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       state.camera = Math.max(
         0,
-        Math.min(player.x + player.width / 2 - CANVAS_WIDTH / 2, level.width - CANVAS_WIDTH)
+        Math.min(player.x + player.width / 2 - canvasWidth / 2, level.width - canvasWidth)
       );
     }
 
     function draw() {
-      drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, world.palette);
+      drawBackground(ctx, canvasWidth, canvasHeight, world.palette);
 
       ctx.save();
       ctx.translate(-state.camera, 0);
@@ -414,10 +416,18 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         level,
         character,
         world,
-        canvasWidth: CANVAS_WIDTH,
-        canvasHeight: CANVAS_HEIGHT,
+        canvasWidth,
+        canvasHeight,
       });
     }
+
+    function handleResize() {
+      canvasWidth = window.innerWidth;
+      canvasHeight = window.innerHeight;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+    }
+    window.addEventListener('resize', handleResize);
 
     let rafId;
     function loop() {
@@ -436,18 +446,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       cancelAnimationFrame(rafId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('resize', handleResize);
     };
   }, [characterId, worldId]);
 
   const h = handlersRef.current;
 
   return (
-    <div style={{ position: 'relative', width: CANVAS_WIDTH, margin: '0 auto' }}>
+    <div style={{ position: 'relative', width: '100vw', height: '100vh' }}>
       <canvas
         ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        style={{ display: 'block', margin: '0 auto', background: '#000', imageRendering: 'pixelated' }}
+        style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
       />
 
       {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
@@ -471,7 +480,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       )}
 
       {onQuit && (
-        <button type="button" onClick={onQuit} style={{ marginTop: 12 }}>
+        <button
+          type="button"
+          onClick={onQuit}
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            padding: '8px 14px',
+            background: 'rgba(10, 14, 26, 0.75)',
+            color: '#fff',
+            border: '2px solid rgba(255,255,255,0.4)',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
           ◀ Quit to Menu
         </button>
       )}
