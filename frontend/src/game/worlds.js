@@ -1,0 +1,140 @@
+// 7 built-in world "shells": theme, enemy type, and a small sample vocab set
+// per world. Teacher Mode (Phase 6) lets teachers replace/extend any world's
+// vocab — these are just enough sample terms for a working demo, not full
+// medical term sets.
+export const WORLDS = [
+  {
+    id: 'world-1',
+    index: 1,
+    name: 'Anatomical & Directional Terms',
+    enemyType: 'goomba',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#1c2b4a', ground: '#4a3323', platform: '#4a3323', accent: '#ffd23f' },
+    vocab: [
+      { id: 'anterior', term: 'Anterior', definition: 'Toward the front of the body.' },
+      { id: 'posterior', term: 'Posterior', definition: 'Toward the back of the body.' },
+      { id: 'superior', term: 'Superior', definition: 'Toward the head; above.' },
+      { id: 'inferior', term: 'Inferior', definition: 'Away from the head; below.' },
+      { id: 'medial', term: 'Medial', definition: 'Toward the midline of the body.' },
+      { id: 'lateral', term: 'Lateral', definition: 'Away from the midline of the body.' },
+      { id: 'proximal', term: 'Proximal', definition: 'Closer to the point of attachment on a limb.' },
+      { id: 'distal', term: 'Distal', definition: 'Farther from the point of attachment on a limb.' },
+      { id: 'superficial', term: 'Superficial', definition: 'Closer to the surface of the body.' },
+      { id: 'deep', term: 'Deep', definition: 'Farther from the surface of the body.' },
+    ],
+  },
+  {
+    id: 'world-2',
+    index: 2,
+    name: 'Integumentary System',
+    enemyType: 'skinBlob',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#4a2338', ground: '#6e3a4a', platform: '#6e3a4a', accent: '#ff9ecb' },
+    vocab: [
+      { id: 'epidermis', term: 'Epidermis', definition: 'The outer, protective layer of the skin.' },
+      { id: 'dermis', term: 'Dermis', definition: 'The layer of skin beneath the epidermis containing vessels and nerves.' },
+      { id: 'hypodermis', term: 'Hypodermis', definition: 'The fatty layer beneath the dermis; also called subcutaneous tissue.' },
+      { id: 'melanin', term: 'Melanin', definition: 'The pigment that gives skin, hair, and eyes their color.' },
+      { id: 'keratin', term: 'Keratin', definition: 'A tough protein found in skin, hair, and nails.' },
+      { id: 'sebaceous', term: 'Sebaceous Gland', definition: 'A gland that secretes oil to lubricate skin and hair.' },
+      { id: 'sudoriferous', term: 'Sudoriferous Gland', definition: 'A gland that produces sweat.' },
+      { id: 'follicle', term: 'Hair Follicle', definition: 'The structure in skin from which hair grows.' },
+    ],
+  },
+  {
+    id: 'world-3',
+    index: 3,
+    name: 'Skeletal System',
+    enemyType: 'skeleton',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#232331', ground: '#5c5a4d', platform: '#5c5a4d', accent: '#f2ead3' },
+    vocab: [
+      { id: 'cranium', term: 'Cranium', definition: 'The part of the skull that encloses the brain.' },
+      { id: 'vertebra', term: 'Vertebra', definition: 'One of the bones that make up the spinal column.' },
+      { id: 'femur', term: 'Femur', definition: 'The thigh bone; the longest bone in the body.' },
+      { id: 'humerus', term: 'Humerus', definition: 'The long bone of the upper arm.' },
+      { id: 'pelvis', term: 'Pelvis', definition: 'The basin-shaped ring of bones at the base of the spine.' },
+      { id: 'sternum', term: 'Sternum', definition: 'The flat bone in the center of the chest; the breastbone.' },
+      { id: 'joint', term: 'Joint', definition: 'A point where two or more bones meet.' },
+      { id: 'cartilage', term: 'Cartilage', definition: 'Flexible connective tissue that cushions joints.' },
+    ],
+  },
+  {
+    id: 'world-4',
+    index: 4,
+    name: 'Muscular System',
+    enemyType: 'muscleBrawler',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#3a1a1a', ground: '#6b2f2f', platform: '#6b2f2f', accent: '#ff6b4a' },
+    vocab: [
+      { id: 'tendon', term: 'Tendon', definition: 'Connective tissue that attaches muscle to bone.' },
+      { id: 'ligament', term: 'Ligament', definition: 'Connective tissue that attaches bone to bone.' },
+      { id: 'cardiac-muscle', term: 'Cardiac Muscle', definition: 'Involuntary striated muscle found only in the heart.' },
+      { id: 'smooth-muscle', term: 'Smooth Muscle', definition: 'Involuntary muscle found in organs like the stomach and blood vessels.' },
+      { id: 'skeletal-muscle', term: 'Skeletal Muscle', definition: 'Voluntary striated muscle attached to bone.' },
+      { id: 'contraction', term: 'Contraction', definition: 'The shortening of a muscle to produce movement or force.' },
+      { id: 'flexor', term: 'Flexor', definition: 'A muscle that bends a joint.' },
+      { id: 'extensor', term: 'Extensor', definition: 'A muscle that straightens a joint.' },
+    ],
+  },
+  {
+    id: 'world-5',
+    index: 5,
+    name: 'Nervous System',
+    enemyType: 'neuron',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#151538', ground: '#332a6b', platform: '#332a6b', accent: '#7de3ff' },
+    vocab: [
+      { id: 'neuron', term: 'Neuron', definition: 'A nerve cell that transmits electrical and chemical signals.' },
+      { id: 'synapse', term: 'Synapse', definition: 'The junction where a signal passes from one neuron to another.' },
+      { id: 'axon', term: 'Axon', definition: 'The long fiber of a neuron that carries signals away from the cell body.' },
+      { id: 'dendrite', term: 'Dendrite', definition: 'A branched extension of a neuron that receives signals.' },
+      { id: 'myelin', term: 'Myelin Sheath', definition: 'The fatty covering that insulates axons and speeds signal transmission.' },
+      { id: 'cerebrum', term: 'Cerebrum', definition: 'The largest part of the brain, responsible for thought and voluntary action.' },
+      { id: 'cerebellum', term: 'Cerebellum', definition: 'The part of the brain that coordinates balance and movement.' },
+      { id: 'reflex', term: 'Reflex Arc', definition: 'A neural pathway that produces a rapid, involuntary response.' },
+    ],
+  },
+  {
+    id: 'world-6',
+    index: 6,
+    name: 'Feline Anatomy (Cat Dissection)',
+    enemyType: 'labCat',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#132a1e', ground: '#3c6b4a', platform: '#3c6b4a', accent: '#b6ff9e' },
+    vocab: [
+      { id: 'whiskers', term: 'Vibrissae', definition: "The technical term for a cat's whiskers, used for sensing surroundings." },
+      { id: 'claw', term: 'Retractable Claw', definition: 'A claw that can be pulled back into a protective sheath.' },
+      { id: 'dewclaw', term: 'Dewclaw', definition: "A vestigial digit set higher on a cat's leg than the other toes." },
+      { id: 'trachea', term: 'Trachea', definition: 'The windpipe; carries air to the lungs.' },
+      { id: 'diaphragm', term: 'Diaphragm', definition: 'The muscle that separates the chest and abdominal cavities and drives breathing.' },
+      { id: 'peritoneum', term: 'Peritoneum', definition: 'The membrane lining the abdominal cavity.' },
+      { id: 'renal', term: 'Renal Artery', definition: 'The blood vessel that supplies the kidney.' },
+      { id: 'spinal-cord', term: 'Spinal Cord', definition: 'The bundle of nerves running through the vertebral column.' },
+    ],
+  },
+  {
+    id: 'world-7',
+    index: 7,
+    name: 'Boss World',
+    enemyType: 'dragonling',
+    defaultDurationMinutes: 3,
+    palette: { sky: '#170a0a', ground: '#3a1414', platform: '#3a1414', accent: '#ff4a4a' },
+    vocab: [
+      { id: 'homeostasis', term: 'Homeostasis', definition: "The body's tendency to maintain a stable internal environment." },
+      { id: 'anatomy', term: 'Anatomy', definition: 'The study of the structure of body parts and their relationships.' },
+      { id: 'physiology', term: 'Physiology', definition: 'The study of how the body and its parts function.' },
+      { id: 'organ-system', term: 'Organ System', definition: 'A group of organs working together to perform related functions.' },
+      { id: 'metabolism', term: 'Metabolism', definition: 'The sum of all chemical reactions that occur in the body.' },
+      { id: 'catabolism', term: 'Catabolism', definition: 'Metabolic reactions that break substances down, releasing energy.' },
+      { id: 'anabolism', term: 'Anabolism', definition: 'Metabolic reactions that build larger molecules from smaller ones.' },
+    ],
+  },
+];
+
+export function getWorld(id) {
+  return WORLDS.find((w) => w.id === id) ?? WORLDS[0];
+}
+
+export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };
+export const WIDTH_BY_DURATION = { 2: 2200, 3: 3200, 5: 5200 };

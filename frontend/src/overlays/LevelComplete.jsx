@@ -11,11 +11,14 @@ const buttonStyle = {
   fontFamily: 'inherit',
 };
 
-export default function LevelComplete({ score, hasMissed, onReview, onPlayAgain, onQuit }) {
+export default function LevelComplete({ score, timeBonus, hasMissed, onReview, onPlayAgain, onQuit }) {
   return (
     <div style={backdrop}>
       <div style={card}>
         <h2 style={{ color: '#2ecc71', margin: '0 0 8px' }}>Level Complete!</h2>
+        {timeBonus > 0 && (
+          <p style={{ fontSize: 14, color: '#89e0ff', margin: '0 0 4px' }}>Time Bonus: +{timeBonus}</p>
+        )}
         <p style={{ fontSize: 22, margin: '8px 0 20px' }}>Score: {score}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {hasMissed && (

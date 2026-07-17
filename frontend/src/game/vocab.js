@@ -1,19 +1,5 @@
-// Sample vocab for the placeholder level (World 1: Anatomical & Directional
-// Terms). Teacher Mode (Phase 6) lets teachers replace/extend this per world —
-// this is just enough to make the quiz loop playable end to end.
-export const WORLD1_VOCAB = [
-  { id: 'anterior', term: 'Anterior', definition: 'Toward the front of the body.' },
-  { id: 'posterior', term: 'Posterior', definition: 'Toward the back of the body.' },
-  { id: 'superior', term: 'Superior', definition: 'Toward the head; above.' },
-  { id: 'inferior', term: 'Inferior', definition: 'Away from the head; below.' },
-  { id: 'medial', term: 'Medial', definition: 'Toward the midline of the body.' },
-  { id: 'lateral', term: 'Lateral', definition: 'Away from the midline of the body.' },
-  { id: 'proximal', term: 'Proximal', definition: 'Closer to the point of attachment on a limb.' },
-  { id: 'distal', term: 'Distal', definition: 'Farther from the point of attachment on a limb.' },
-  { id: 'superficial', term: 'Superficial', definition: 'Closer to the surface of the body.' },
-  { id: 'deep', term: 'Deep', definition: 'Farther from the surface of the body.' },
-];
-
+// Generic quiz-question helpers, shared by every world. Per-world vocab data
+// lives in worlds.js.
 function shuffle(arr) {
   const copy = [...arr];
   for (let i = copy.length - 1; i > 0; i--) {

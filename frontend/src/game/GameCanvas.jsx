@@ -10,16 +10,17 @@ import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
 } from './constants';
-import { buildPlaceholderLevel } from './level';
+import { buildLevel } from './level';
 import { getCharacter } from './characters';
-import { WORLD1_VOCAB, buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
+import { getWorld, DURATION_SECONDS } from './worlds';
+import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
 import {
   drawBackground,
   drawPlatform,
   drawCoin,
   drawDoor,
   drawFlag,
-  drawGoomba,
+  drawEnemy,
   drawPlayer,
   drawHUD,
 } from './spriteRenderer';
@@ -85,7 +86,7 @@ function resolveVertical(player, solids) {
 // Overlays themselves are separate React components (rule 4) driven by the
 // `overlay` state below; `handlersRef` bridges their button clicks back into
 // the imperative game state the loop owns.
-export default function GameCanvas({ characterId, onQuit }) {
+export default function GameCanvas({ characterId, worldId, onQuit }) {
   const canvasRef = useRef(null);
   const pausedRef = useRef(false);
   const keysRef = useRef(new Set());
@@ -95,9 +96,12 @@ export default function GameCanvas({ characterId, onQuit }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const level = buildPlaceholderLevel();
+    const world = getWorld(worldId);
+    const durationMinutes = world.defaultDurationMinutes;
+    const durationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
+    const level = buildLevel({ world, durationMinutes });
     const character = getCharacter(characterId);
-    const vocab = WORLD1_VOCAB;
+    const vocab = world.vocab;
 
     const player = {
       x: level.spawn.x,
@@ -121,7 +125,12 @@ export default function GameCanvas({ characterId, onQuit }) {
       gliding: false,
       pounding: false,
       missedTermIds: new Set(),
+      durationSeconds,
+      timeRemaining: durationSeconds,
+      lastTimeBonus: 0,
     };
+
+    let lastFrameTime = performance.now();
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
@@ -167,6 +176,9 @@ export default function GameCanvas({ characterId, onQuit }) {
       state.gliding = false;
       state.pounding = false;
       state.missedTermIds = new Set();
+      state.timeRemaining = state.durationSeconds;
+      state.lastTimeBonus = 0;
+      lastFrameTime = performance.now();
       pausedRef.current = false;
       setOverlay(null);
     }
@@ -184,6 +196,7 @@ export default function GameCanvas({ characterId, onQuit }) {
     handlersRef.current.getMissedItems = () =>
       [...state.missedTermIds].map((id) => findTerm(vocab, id)).filter(Boolean);
     handlersRef.current.getScore = () => state.score;
+    handlersRef.current.getTimeBonus = () => state.lastTimeBonus;
     handlersRef.current.hasMissed = () => state.missedTermIds.size > 0;
 
     function handleKeyDown(e) {
@@ -221,7 +234,13 @@ export default function GameCanvas({ characterId, onQuit }) {
       setOverlay({ type, question });
     }
 
-    function updatePhysics() {
+    function updatePhysics(dt) {
+      state.timeRemaining -= dt;
+      if (state.timeRemaining <= 0) {
+        state.timeRemaining = state.durationSeconds;
+        loseLife();
+      }
+
       const keys = keysRef.current;
       const left = [...LEFT_KEYS].some((k) => keys.has(k));
       const right = [...RIGHT_KEYS].some((k) => keys.has(k));
@@ -356,6 +375,9 @@ export default function GameCanvas({ characterId, onQuit }) {
 
       if (!pausedRef.current && !state.levelComplete && player.x + player.width >= level.flag.x) {
         state.levelComplete = true;
+        const bonus = Math.floor(Math.max(0, state.timeRemaining)) * 10;
+        state.score += bonus;
+        state.lastTimeBonus = bonus;
         const questions = buildEndOfLevelQuestions(vocab, [...state.missedTermIds]);
         pausedRef.current = true;
         setOverlay({ type: 'endOfLevel', questions });
@@ -368,15 +390,15 @@ export default function GameCanvas({ characterId, onQuit }) {
     }
 
     function draw() {
-      drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
+      drawBackground(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, world.palette);
 
       ctx.save();
       ctx.translate(-state.camera, 0);
 
-      for (const p of level.platforms) drawPlatform(ctx, p);
+      for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
       for (const coin of level.coins) drawCoin(ctx, coin);
       for (const enemy of level.enemies) {
-        if (enemy.alive) drawGoomba(ctx, enemy);
+        if (enemy.alive) drawEnemy(ctx, enemy, world.enemyType);
       }
       drawDoor(ctx, level.door);
       drawFlag(ctx, level.flag);
@@ -391,6 +413,7 @@ export default function GameCanvas({ characterId, onQuit }) {
         state,
         level,
         character,
+        world,
         canvasWidth: CANVAS_WIDTH,
         canvasHeight: CANVAS_HEIGHT,
       });
@@ -398,8 +421,11 @@ export default function GameCanvas({ characterId, onQuit }) {
 
     let rafId;
     function loop() {
+      const now = performance.now();
+      const dt = Math.min((now - lastFrameTime) / 1000, 1);
+      lastFrameTime = now;
       if (!pausedRef.current) {
-        updatePhysics();
+        updatePhysics(dt);
       }
       draw();
       rafId = requestAnimationFrame(loop);
@@ -411,7 +437,7 @@ export default function GameCanvas({ characterId, onQuit }) {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [characterId]);
+  }, [characterId, worldId]);
 
   const h = handlersRef.current;
 
@@ -433,6 +459,7 @@ export default function GameCanvas({ characterId, onQuit }) {
       {overlay?.type === 'complete' && (
         <LevelComplete
           score={h.getScore?.() ?? 0}
+          timeBonus={h.getTimeBonus?.() ?? 0}
           hasMissed={h.hasMissed?.() ?? false}
           onReview={h.openReview}
           onPlayAgain={h.playAgain}
@@ -445,7 +472,7 @@ export default function GameCanvas({ characterId, onQuit }) {
 
       {onQuit && (
         <button type="button" onClick={onQuit} style={{ marginTop: 12 }}>
-          ◀ Change Character
+          ◀ Quit to Menu
         </button>
       )}
     </div>

@@ -83,6 +83,190 @@ export function drawGoomba(ctx, enemy) {
   ctx.stroke();
 }
 
+// World 2 enemy: a blotchy pink/red skin-disease blob.
+export function drawSkinBlob(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#d97a9c';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.5, w / 2, h * 0.46, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#a83f63';
+  [[0.28, 0.32], [0.65, 0.28], [0.42, 0.6], [0.72, 0.62]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w * px, y + h * py, w * 0.09, h * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.35, y + h * 0.45, w * 0.1, h * 0.1, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.65, y + h * 0.45, w * 0.1, h * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.35, y + h * 0.46, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.65, y + h * 0.46, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// World 3 enemy: a simple bone-white skeleton.
+export function drawSkeleton(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#f2ead3';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.2, w * 0.24, h * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.38, y + h * 0.18, w * 0.06, h * 0.06, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.62, y + h * 0.18, w * 0.06, h * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#f2ead3';
+  ctx.lineWidth = Math.max(2, w * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.5, y + h * 0.38);
+  ctx.lineTo(x + w * 0.5, y + h * 0.82);
+  for (let i = 0; i < 3; i++) {
+    const ry = y + h * (0.44 + i * 0.12);
+    ctx.moveTo(x + w * 0.24, ry);
+    ctx.lineTo(x + w * 0.76, ry);
+  }
+  ctx.moveTo(x + w * 0.5, y + h * 0.82);
+  ctx.lineTo(x + w * 0.28, y + h);
+  ctx.moveTo(x + w * 0.5, y + h * 0.82);
+  ctx.lineTo(x + w * 0.72, y + h);
+  ctx.stroke();
+}
+
+// World 4 enemy: a bulky red muscle-brawler.
+export function drawMuscleBrawler(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#c0392b';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.55, w * 0.42, h * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e05a45';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.16, y + h * 0.5, w * 0.18, h * 0.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.84, y + h * 0.5, w * 0.18, h * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#7a1f16';
+  ctx.lineWidth = Math.max(1, w * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.34, y + h * 0.4);
+  ctx.lineTo(x + w * 0.34, y + h * 0.75);
+  ctx.moveTo(x + w * 0.5, y + h * 0.36);
+  ctx.lineTo(x + w * 0.5, y + h * 0.78);
+  ctx.moveTo(x + w * 0.66, y + h * 0.4);
+  ctx.lineTo(x + w * 0.66, y + h * 0.75);
+  ctx.stroke();
+  ctx.fillStyle = '#111';
+  ctx.fillRect(x + w * 0.3, y + h * 0.24, w * 0.12, h * 0.08);
+  ctx.fillRect(x + w * 0.58, y + h * 0.24, w * 0.12, h * 0.08);
+}
+
+// World 5 enemy: a glowing neuron with dendrite branches.
+export function drawNeuron(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  const cx = x + w / 2;
+  const cy = y + h * 0.5;
+  ctx.strokeStyle = '#7de3ff';
+  ctx.lineWidth = Math.max(1, w * 0.05);
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI * 2 * i) / 6;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * w * 0.55, cy + Math.sin(angle) * h * 0.55);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#3355aa';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#7de3ff';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.14, h * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// World 6 enemy: a small lab cat.
+export function drawLabCat(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#3c3c3c';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.45, y + h * 0.6, w * 0.42, h * 0.36, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.78, y + h * 0.4, w * 0.24, h * 0.24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.62, y + h * 0.24);
+  ctx.lineTo(x + w * 0.7, y);
+  ctx.lineTo(x + w * 0.78, y + h * 0.22);
+  ctx.moveTo(x + w * 0.86, y + h * 0.22);
+  ctx.lineTo(x + w * 0.94, y);
+  ctx.lineTo(x + w * 0.98, y + h * 0.24);
+  ctx.fill();
+  ctx.strokeStyle = '#3c3c3c';
+  ctx.lineWidth = Math.max(1, w * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.1, y + h * 0.7);
+  ctx.quadraticCurveTo(x - w * 0.15, y + h * 0.4, x + w * 0.05, y + h * 0.2);
+  ctx.stroke();
+  ctx.fillStyle = '#b6ff9e';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.72, y + h * 0.38, w * 0.05, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.87, y + h * 0.38, w * 0.05, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// World 7 enemy: a small dragonling.
+export function drawDragonling(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#8a2f2f';
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.5, y + h * 0.15);
+  ctx.lineTo(x + w * 0.95, y + h * 0.5);
+  ctx.lineTo(x + w * 0.5, y + h * 0.5);
+  ctx.closePath();
+  ctx.moveTo(x + w * 0.5, y + h * 0.15);
+  ctx.lineTo(x + w * 0.05, y + h * 0.5);
+  ctx.lineTo(x + w * 0.5, y + h * 0.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ff4a4a';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.62, w * 0.34, h * 0.36, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.36, y + h * 0.32);
+  ctx.lineTo(x + w * 0.42, y + h * 0.1);
+  ctx.lineTo(x + w * 0.46, y + h * 0.32);
+  ctx.moveTo(x + w * 0.54, y + h * 0.32);
+  ctx.lineTo(x + w * 0.58, y + h * 0.1);
+  ctx.lineTo(x + w * 0.64, y + h * 0.32);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.4, y + h * 0.58, w * 0.06, h * 0.06, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.6, y + h * 0.58, w * 0.06, h * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+const ENEMY_RENDERERS = {
+  goomba: drawGoomba,
+  skinBlob: drawSkinBlob,
+  skeleton: drawSkeleton,
+  muscleBrawler: drawMuscleBrawler,
+  neuron: drawNeuron,
+  labCat: drawLabCat,
+  dragonling: drawDragonling,
+};
+
+export function drawEnemy(ctx, enemy, enemyType) {
+  (ENEMY_RENDERERS[enemyType] ?? drawGoomba)(ctx, enemy);
+}
+
 function rectPct(ctx, x, y, w, h, px, py, pw, ph, color) {
   ctx.fillStyle = color;
   ctx.fillRect(x + px * w, y + py * h, pw * w, ph * h);
@@ -163,14 +347,37 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
   }
 }
 
-export function drawHUD(ctx, { state, level, character, canvasWidth, canvasHeight }) {
+function formatClock(seconds) {
+  const s = Math.max(0, Math.ceil(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+export function drawHUD(ctx, { state, level, character, world, canvasWidth, canvasHeight }) {
   ctx.fillStyle = '#ffffff';
   ctx.font = '20px monospace';
   ctx.fillText(`Score: ${state.score}`, 16, 30);
   ctx.fillText(`Lives: ${state.lives}`, 16, 56);
   ctx.fillText(`Coins: ${state.coinsCollected}/${level.coins.length}`, 16, 82);
 
+  const fraction = state.timeRemaining / state.durationSeconds;
+  let timeColor = '#2ecc71';
+  if (fraction < 0.2) {
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 120);
+    timeColor = `rgba(231, 76, 60, ${pulse.toFixed(2)})`;
+  } else if (fraction < 0.5) {
+    timeColor = '#f1c40f';
+  }
+  ctx.fillStyle = timeColor;
+  ctx.fillText(`Time: ${formatClock(state.timeRemaining)}`, 200, 30);
+
+  ctx.fillStyle = '#aab4cc';
   ctx.font = '14px monospace';
+  ctx.fillText(world.name, 200, 52);
+
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#ffffff';
   ctx.fillText(`${character.name} — ${character.abilityName}`, 16, 106);
   if (character.ability === 'coinCombo') {
     ctx.fillText(`Combo: ${state.coinsCollected % 5}/5`, 16, 124);
