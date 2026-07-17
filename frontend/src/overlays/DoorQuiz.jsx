@@ -3,9 +3,9 @@ import QuizOverlay from './QuizOverlay';
 export default function DoorQuiz({ question, onAnswer }) {
   return (
     <QuizOverlay
-      title="Checkpoint Door"
-      accent="#8e6bff"
-      prompt="Answer correctly to unlock the door."
+      title="Checkpoint Portal"
+      statsText="Correct: Unlock · Wrong: Stay Blocked"
+      prompt="Which term matches:"
       definition={question.definition}
       options={question.options}
       correctId={question.termId}

@@ -1,6 +1,7 @@
 import { WIDTH_BY_DURATION } from './worlds';
 
 export const GROUND_Y = 460;
+export const GROUND_HEIGHT = 80;
 
 function hashSeed(str) {
   let h = 1779033703 ^ str.length;
@@ -49,7 +50,7 @@ export function buildLevel({ world, durationMinutes }) {
     x: x1,
     y: GROUND_Y,
     width: x2 - x1,
-    height: 80,
+    height: GROUND_HEIGHT,
     type: 'ground',
   }));
 

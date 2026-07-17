@@ -24,8 +24,8 @@ export default function EndOfLevelQuiz({ questions, onFinish }) {
     <QuizOverlay
       key={question.termId}
       title={`End-of-Level Quiz (${index + 1}/${questions.length})`}
-      accent="#ffd23f"
-      prompt="Targeted review — your missed terms come first."
+      statsText="Missed terms first"
+      prompt="Which term matches:"
       definition={question.definition}
       options={question.options}
       correctId={question.termId}

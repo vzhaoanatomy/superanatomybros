@@ -4,8 +4,8 @@ export default function EnemyEncounter({ question, onAnswer }) {
   return (
     <QuizOverlay
       title="Enemy Encounter!"
-      accent="#e74c3c"
-      prompt="Answer correctly to defeat it — wrong costs a life."
+      statsText="Correct: Defeat it · Wrong: -1 Life"
+      prompt="Which term matches:"
       definition={question.definition}
       options={question.options}
       correctId={question.termId}

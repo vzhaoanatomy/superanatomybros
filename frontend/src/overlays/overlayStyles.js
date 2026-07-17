@@ -36,3 +36,53 @@ export const optionButton = {
   cursor: 'pointer',
   fontFamily: 'inherit',
 };
+
+// Red-header / yellow-body theme for the quiz question box.
+export const quizCard = {
+  width: 560,
+  maxWidth: '92%',
+  borderRadius: 10,
+  overflow: 'hidden',
+  border: '4px solid #1a0f0a',
+  boxShadow: '6px 6px 0 rgba(0,0,0,0.35)',
+  fontFamily: 'ui-monospace, Consolas, monospace',
+};
+
+export const quizHeader = {
+  background: '#e2574a',
+  color: '#fff',
+  padding: '14px 22px',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  borderBottom: '4px solid #1a0f0a',
+};
+
+export const quizBody = {
+  background: '#f2c94c',
+  padding: '26px 24px 24px',
+  color: '#1a1200',
+  textAlign: 'left',
+};
+
+export const quizOptionsGrid = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 14,
+  marginTop: 22,
+};
+
+export const quizOptionButton = {
+  padding: '16px 10px',
+  borderRadius: 6,
+  border: '3px solid #1a0f0a',
+  background: '#ffffff',
+  color: '#1a0f0a',
+  fontWeight: 'bold',
+  fontSize: 15,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  boxShadow: '3px 3px 0 rgba(0,0,0,0.3)',
+};

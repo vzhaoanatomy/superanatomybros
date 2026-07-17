@@ -8,7 +8,7 @@ import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
 } from './constants';
-import { buildLevel } from './level';
+import { buildLevel, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
 import { getWorld, DURATION_SECONDS } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
@@ -316,7 +316,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         groundPoundImpact();
       }
 
-      if (player.y > canvasHeight + 300) {
+      if (player.y > level.groundY + 300) {
         loseLife();
       }
 
@@ -392,10 +392,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function draw() {
-      drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, level.groundY);
+      // Ground is always pinned to the actual screen bottom, regardless of
+      // window height — world Y coordinates (physics, spawn, GROUND_Y) never
+      // change, only this render-time vertical offset does.
+      const verticalOffset = canvasHeight - (level.groundY + GROUND_HEIGHT);
+      drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, canvasHeight - GROUND_HEIGHT);
 
       ctx.save();
-      ctx.translate(-state.camera, 0);
+      ctx.translate(-state.camera, verticalOffset);
 
       for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
       for (const coin of level.coins) drawCoin(ctx, coin);

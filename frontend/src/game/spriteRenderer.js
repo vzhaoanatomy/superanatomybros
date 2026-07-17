@@ -12,17 +12,6 @@ function drawCloud(ctx, cx, cy, scale) {
   ctx.fill();
 }
 
-// Hill center sits far enough above groundY that its bottom edge never dips
-// below the ground line — otherwise it bleeds into view through pit gaps
-// where there's no ground to occlude it.
-function drawHill(ctx, cx, groundY, radiusX, color) {
-  const radiusY = radiusX * 0.47;
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.ellipse(cx, groundY - radiusY, radiusX, radiusY, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
 function drawTree(ctx, cx, groundY, scale, color) {
   ctx.fillStyle = 'rgba(74, 51, 35, 0.9)';
   ctx.fillRect(cx - 4 * scale, groundY - 28 * scale, 8 * scale, 28 * scale);
@@ -55,8 +44,7 @@ export function drawBackground(ctx, width, height, palette, camera = 0, groundY 
   const scale = Math.min(1, height / 540);
   tileAcross(ctx, width, camera, 0.05, 420 * scale, (cx) => drawCloud(ctx, cx, height * 0.12, scale));
   tileAcross(ctx, width, camera, 0.08, 560 * scale, (cx) => drawCloud(ctx, cx, height * 0.22, 0.7 * scale));
-  tileAcross(ctx, width, camera, 0.2, 340 * scale, (cx) => drawHill(ctx, cx, groundY, 150 * scale, palette?.hills ?? '#3aa65a'));
-  tileAcross(ctx, width, camera, 0.35, 240 * scale, (cx) => drawTree(ctx, cx, groundY, scale, palette?.hills ?? '#2e7d46'));
+  tileAcross(ctx, width, camera, 0.3, 170 * scale, (cx) => drawTree(ctx, cx, groundY, scale, palette?.hills ?? '#2e7d46'));
 }
 
 const BRICK_W = 32;
