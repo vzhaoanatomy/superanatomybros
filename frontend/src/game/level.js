@@ -1,4 +1,4 @@
-import { WIDTH_BY_DURATION } from './worlds';
+import { WIDTH_BY_DURATION, DURATION_SECONDS } from './worlds';
 
 export const GROUND_Y = 460;
 export const GROUND_HEIGHT = 80;
@@ -43,7 +43,19 @@ function buildGroundSegments(rng, width, difficulty) {
 export function buildLevel({ world, durationMinutes }) {
   const rng = hashSeed(`${world.id}-${durationMinutes}`);
   const difficulty = world.index;
-  const width = WIDTH_BY_DURATION[durationMinutes] ?? WIDTH_BY_DURATION[3];
+  const vocab = world.vocab;
+
+  // A level must be long enough to seed at least one coin per vocab term
+  // (see coinCount below) — for a big list that means growing past the
+  // teacher-set duration's normal width, with the timer budget growing to
+  // match (~40px of level per second keeps the same pace as the built-in
+  // duration presets: 4800/120, 7400/180, 12000/300 all land on ~40).
+  const baseWidth = WIDTH_BY_DURATION[durationMinutes] ?? WIDTH_BY_DURATION[3];
+  const COIN_SPACING_FOR_VOCAB = 260;
+  const vocabDrivenWidth = 500 + vocab.length * COIN_SPACING_FOR_VOCAB;
+  const width = Math.max(baseWidth, vocabDrivenWidth);
+  const baseDurationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
+  const durationSeconds = Math.max(baseDurationSeconds, Math.ceil(width / 40));
 
   const groundSegments = buildGroundSegments(rng, width, difficulty);
   const platforms = groundSegments.map(([x1, x2]) => ({
@@ -123,9 +135,11 @@ export function buildLevel({ world, durationMinutes }) {
 
   // Coins are spaced out for runner-style pacing (not a quiz every second) —
   // enemies stay frequent since dodging/crushing them is the moment-to-moment
-  // choice, while coins/checkpoints are the deliberate stops.
-  const vocab = world.vocab;
-  const coinCount = Math.max(4, Math.round(width / 1000));
+  // choice, while coins/checkpoints are the deliberate stops. Coin count is
+  // also floored at vocab.length so a full pass through the level touches
+  // every term at least once (GameCanvas assigns termId at runtime from a
+  // shuffled no-repeat queue — see buildTermQueue in GameCanvas.jsx).
+  const coinCount = Math.max(4, Math.round(width / 1000), vocab.length);
   const coinSpots = [];
   for (let i = 0; i < coinCount; i++) {
     const cx = 200 + (i / coinCount) * (width - 400) + rng() * 80;
@@ -143,7 +157,7 @@ export function buildLevel({ world, durationMinutes }) {
     collected: false,
     pending: false,
     bounceUntil: 0,
-    termId: vocab[i % vocab.length].id,
+    termId: null,
   }));
 
   const solidSegments = groundSegments.filter(([x1, x2]) => x2 - x1 > 160);
@@ -169,7 +183,7 @@ export function buildLevel({ world, durationMinutes }) {
       vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.6),
       alive: true,
       pending: false,
-      termId: vocab[(i * 3 + 1) % vocab.length].id,
+      termId: null,
     });
   }
 
@@ -203,7 +217,7 @@ export function buildLevel({ world, durationMinutes }) {
       vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 1.15 + rng() * 0.6),
       alive: true,
       pending: false,
-      termId: vocab[(platformEnemyIndex * 5 + 2) % vocab.length].id,
+      termId: null,
     });
     platformEnemyIndex += 1;
   }
@@ -217,7 +231,7 @@ export function buildLevel({ world, durationMinutes }) {
     height: DOOR_HEIGHT,
     passed: false,
     pending: false,
-    termId: vocab[Math.floor(vocab.length / 2)].id,
+    termId: null,
   };
 
   // Mushroom + egg sit directly above a solid ground segment at a low,
@@ -328,6 +342,7 @@ export function buildLevel({ world, durationMinutes }) {
 
   return {
     width,
+    durationSeconds,
     groundY: GROUND_Y,
     spawn: { x: 60, y: GROUND_Y - 200 },
     platforms,

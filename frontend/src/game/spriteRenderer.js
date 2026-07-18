@@ -100,17 +100,43 @@ export function drawPlatform(ctx, platform, palette) {
   }
 }
 
+// A shiny 3D-look gold coin — gradient face, a darker offset "edge" for
+// thickness, an embossed rim, a vertical slot mark, and a glint highlight.
 export function drawCoin(ctx, coin) {
   if (coin.collected) return;
   const cx = coin.x + coin.width / 2;
   const cy = coin.y + coin.height / 2;
-  ctx.fillStyle = '#ffd23f';
+  const r = coin.width / 2;
+
+  ctx.fillStyle = '#c9861a';
   ctx.beginPath();
-  ctx.arc(cx, cy, coin.width / 2, 0, Math.PI * 2);
+  ctx.ellipse(cx + r * 0.12, cy + r * 0.08, r * 0.92, r, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#c9932a';
+
+  const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+  grad.addColorStop(0, '#fff6c8');
+  grad.addColorStop(0.35, '#ffd23f');
+  grad.addColorStop(0.75, '#f0a92e');
+  grad.addColorStop(1, '#c9861a');
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.arc(cx, cy, coin.width / 4, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, r * 0.92, r * 0.96, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(180,110,10,0.55)';
+  ctx.lineWidth = Math.max(1, r * 0.14);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r * 0.68, r * 0.72, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(150,90,10,0.5)';
+  ctx.fillRect(cx - r * 0.13, cy - r * 0.42, r * 0.26, r * 0.84);
+  ctx.fillStyle = 'rgba(255,240,180,0.6)';
+  ctx.fillRect(cx - r * 0.09, cy - r * 0.38, r * 0.1, r * 0.76);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath();
+  ctx.ellipse(cx - r * 0.32, cy - r * 0.4, r * 0.16, r * 0.09, -0.5, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -307,6 +333,59 @@ export function drawDinoMount(ctx, player) {
 
   ctx.fillStyle = '#c9932a';
   ctx.fillRect(dx + dw * 0.34, dy + dh * 0.24, dw * 0.28, dh * 0.09);
+}
+
+// Yoshi's tongue flick — a brief triangular extend-then-retract envelope
+// timed against player.tongueUntil (must match GameCanvas's TONGUE_FLICK_MS).
+const TONGUE_FLICK_MS = 220;
+const TONGUE_REACH_PX = 70;
+export function drawTongueFlick(ctx, player) {
+  const now = performance.now();
+  if (now >= player.tongueUntil) return;
+  const elapsed = TONGUE_FLICK_MS - (player.tongueUntil - now);
+  const t = elapsed / TONGUE_FLICK_MS;
+  const extend = t < 0.5 ? t / 0.5 : (1 - t) / 0.5;
+  const reach = TONGUE_REACH_PX * extend;
+  const faceDir = player.facing >= 0 ? 1 : -1;
+  const startX = player.facing >= 0 ? player.x + player.width : player.x;
+  const y = player.y + player.height * 0.4;
+
+  ctx.strokeStyle = '#e0455a';
+  ctx.lineWidth = Math.max(3, player.width * 0.12);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(startX, y);
+  ctx.lineTo(startX + faceDir * reach, y);
+  ctx.stroke();
+
+  ctx.fillStyle = '#ff8aa0';
+  ctx.beginPath();
+  ctx.ellipse(startX + faceDir * reach, y, 5, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// A brief "poof into an egg" flourish where a tongue-grabbed enemy was —
+// shrinks, fades, and drifts up over EGG_POOF_MS (see GameCanvas.jsx).
+const EGG_POOF_MS = 400;
+export function drawEggPoof(ctx, poof) {
+  const age = performance.now() - poof.createdAt;
+  if (age > EGG_POOF_MS) return;
+  const t = age / EGG_POOF_MS;
+  const scale = 1 - t * 0.3;
+  const rise = t * 20;
+
+  ctx.save();
+  ctx.globalAlpha = 1 - t;
+  ctx.fillStyle = '#eaf6e8';
+  ctx.beginPath();
+  ctx.ellipse(poof.x + 14, poof.y + 14 - rise, 14 * scale, 18 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4caf7d';
+  ctx.beginPath();
+  ctx.ellipse(poof.x + 10, poof.y + 8 - rise, 3, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(poof.x + 18, poof.y + 16 - rise, 3, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 // A shimmering portal rather than a plain pole — the visible oval is wider
@@ -629,29 +708,52 @@ export function drawBoss(ctx, boss) {
   ctx.strokeRect(barX, barY, barW, 10);
 }
 
-// Stationary end-of-level hazard — a pipe with a chomping head. The mouth
-// animation is purely time-driven (performance.now()), no state needed.
+// Stationary end-of-level hazard — a potted plant with a huge toothy head,
+// modeled after the classic pot-and-leaves piranha plant rather than a pipe.
+// The mouth animation is purely time-driven (performance.now()).
 export function drawPiranhaPlant(ctx, piranha) {
   if (!piranha.alive) return;
   const { x, y, width: w, height: h } = piranha;
-  const pipeH = h * 0.42;
-  const pipeY = y + h - pipeH;
 
-  ctx.fillStyle = '#1f7a39';
-  ctx.fillRect(x, pipeY, w, pipeH * 0.22);
-  ctx.fillStyle = '#2f9e4f';
-  ctx.fillRect(x + w * 0.08, pipeY + pipeH * 0.22, w * 0.84, pipeH * 0.78);
-
-  const headCY = y + h * 0.32;
-  const headRX = w * 0.42;
-  const headRY = h * 0.3;
-
-  ctx.strokeStyle = '#2f9e4f';
-  ctx.lineWidth = Math.max(2, w * 0.12);
+  const potH = h * 0.22;
+  const potY = y + h - potH;
+  ctx.fillStyle = '#8a5a3a';
   ctx.beginPath();
-  ctx.moveTo(x + w / 2, pipeY);
-  ctx.lineTo(x + w / 2, headCY + headRY * 0.6);
+  ctx.moveTo(x + w * 0.2, potY);
+  ctx.lineTo(x + w * 0.8, potY);
+  ctx.lineTo(x + w * 0.72, potY + potH);
+  ctx.lineTo(x + w * 0.28, potY + potH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#6b4326';
+  ctx.fillRect(x + w * 0.15, potY - potH * 0.18, w * 0.7, potH * 0.24);
+
+  const stemTopY = y + h * 0.36;
+  ctx.strokeStyle = '#2f9e4f';
+  ctx.lineWidth = Math.max(3, w * 0.16);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, potY);
+  ctx.quadraticCurveTo(x + w * 0.4, y + h * 0.58, x + w / 2, stemTopY);
   ctx.stroke();
+
+  ctx.fillStyle = '#2f9e4f';
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.46, y + h * 0.62);
+  ctx.quadraticCurveTo(x - w * 0.2, y + h * 0.56, x + w * 0.08, y + h * 0.78);
+  ctx.quadraticCurveTo(x + w * 0.3, y + h * 0.7, x + w * 0.46, y + h * 0.64);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.54, y + h * 0.6);
+  ctx.quadraticCurveTo(x + w * 1.2, y + h * 0.52, x + w * 0.94, y + h * 0.76);
+  ctx.quadraticCurveTo(x + w * 0.72, y + h * 0.66, x + w * 0.54, y + h * 0.62);
+  ctx.closePath();
+  ctx.fill();
+
+  const headCY = stemTopY - h * 0.02;
+  const headRX = w * 0.52;
+  const headRY = h * 0.34;
 
   ctx.fillStyle = '#e0453a';
   ctx.beginPath();
@@ -660,38 +762,51 @@ export function drawPiranhaPlant(ctx, piranha) {
 
   ctx.fillStyle = '#fff';
   [
-    [-0.2, -0.28],
-    [0.22, -0.12],
-    [-0.05, 0.2],
+    [-0.24, -0.32],
+    [0.26, -0.16],
+    [-0.06, 0.24],
+    [0.3, 0.2],
   ].forEach(([dx, dy]) => {
     ctx.beginPath();
-    ctx.ellipse(x + w / 2 + dx * w, headCY + dy * h, w * 0.06, w * 0.06, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + w / 2 + dx * w, headCY + dy * h, w * 0.065, w * 0.065, 0, 0, Math.PI * 2);
     ctx.fill();
   });
 
   // Chomp cycle: mouth opens and closes on a continuous time-based loop.
   const chomp = (Math.sin(performance.now() / 260) + 1) / 2;
-  const mouthOpen = 3 + chomp * headRY * 0.85;
-  ctx.fillStyle = '#3a0a08';
-  ctx.beginPath();
-  ctx.ellipse(x + w / 2, headCY + headRY * 0.35, headRX * 0.7, mouthOpen * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  const openAmt = 0.45 + chomp * 0.55;
+  const mouthTop = headCY + headRY * 0.1 - headRY * 0.55 * openAmt;
+  const mouthBottom = headCY + headRY * 0.1 + headRY * 0.55 * openAmt;
+  const mouthLeft = x + w / 2 - headRX * 0.72;
+  const mouthRight = x + w / 2 + headRX * 0.72;
 
   ctx.fillStyle = '#fff';
-  for (let i = -1; i <= 1; i += 2) {
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, (mouthTop + mouthBottom) / 2, headRX * 0.72, (mouthBottom - mouthTop) / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#3a0a08';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, (mouthTop + mouthBottom) / 2, headRX * 0.48, (mouthBottom - mouthTop) * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Two zigzag rows of teeth along the top/bottom of the mouth opening.
+  ctx.fillStyle = '#fff';
+  const toothCount = 5;
+  for (let i = 0; i < toothCount; i++) {
+    const tx = mouthLeft + ((mouthRight - mouthLeft) * (i + 0.5)) / toothCount;
     ctx.beginPath();
-    ctx.moveTo(x + w / 2 + i * headRX * 0.32, headCY + headRY * 0.08);
-    ctx.lineTo(x + w / 2 + i * headRX * 0.5, headCY + headRY * 0.26);
-    ctx.lineTo(x + w / 2 + i * headRX * 0.18, headCY + headRY * 0.26);
+    ctx.moveTo(tx - w * 0.05, mouthTop);
+    ctx.lineTo(tx + w * 0.05, mouthTop);
+    ctx.lineTo(tx, mouthTop + h * 0.09);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(tx - w * 0.05, mouthBottom);
+    ctx.lineTo(tx + w * 0.05, mouthBottom);
+    ctx.lineTo(tx, mouthBottom - h * 0.09);
     ctx.closePath();
     ctx.fill();
   }
-
-  ctx.fillStyle = '#111';
-  ctx.beginPath();
-  ctx.ellipse(x + w * 0.38, headCY - headRY * 0.32, w * 0.045, w * 0.045, 0, 0, Math.PI * 2);
-  ctx.ellipse(x + w * 0.62, headCY - headRY * 0.32, w * 0.045, w * 0.045, 0, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 // Bipedal turtle enemy — defeated by a head-stomp or a fireball, not the
@@ -699,37 +814,71 @@ export function drawPiranhaPlant(ctx, piranha) {
 export function drawKoopa(ctx, enemy) {
   const { x, y, width: w, height: h } = enemy;
   const faceDir = (enemy.vx ?? 1) >= 0 ? 1 : -1;
-  const headX = faceDir >= 0 ? x + w * 0.78 : x + w * 0.22;
+  const headX = faceDir >= 0 ? x + w * 0.76 : x + w * 0.24;
+  const snoutX = headX + faceDir * w * 0.16;
+  const tailX = faceDir >= 0 ? x + w * 0.06 : x + w * 0.94;
 
-  ctx.fillStyle = '#e8c877';
-  ctx.fillRect(x + w * 0.15, y + h * 0.78, w * 0.22, h * 0.22);
-  ctx.fillRect(x + w * 0.63, y + h * 0.78, w * 0.22, h * 0.22);
-
-  ctx.fillStyle = '#e8c877';
+  // legs
+  ctx.fillStyle = '#f0d080';
   ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h * 0.62, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.32, y + h * 0.88, w * 0.14, h * 0.13, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.68, y + h * 0.88, w * 0.14, h * 0.13, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = '#2ecc71';
+  // tail
+  ctx.fillStyle = '#f0d080';
   ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h * 0.42, w * 0.42, h * 0.36, 0, Math.PI, 0);
+  ctx.moveTo(tailX, y + h * 0.6);
+  ctx.lineTo(tailX - faceDir * w * 0.12, y + h * 0.68);
+  ctx.lineTo(tailX, y + h * 0.74);
+  ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = '#1e8449';
-  ctx.lineWidth = Math.max(1, w * 0.04);
+
+  // belly
+  ctx.fillStyle = '#fbe6a8';
   ctx.beginPath();
-  ctx.moveTo(x + w * 0.28, y + h * 0.42);
-  ctx.lineTo(x + w * 0.72, y + h * 0.42);
-  ctx.moveTo(x + w / 2, y + h * 0.14);
-  ctx.lineTo(x + w / 2, y + h * 0.42);
+  ctx.ellipse(x + w / 2, y + h * 0.68, w * 0.34, h * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // domed, segmented shell
+  ctx.fillStyle = '#3aa65a';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.42, w * 0.46, h * 0.38, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#2f8a4a';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.48, w * 0.46, h * 0.2, 0, 0, Math.PI);
+  ctx.fill();
+  ctx.strokeStyle = '#1e6b38';
+  ctx.lineWidth = Math.max(1, w * 0.035);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.18, y + h * 0.46);
+  ctx.lineTo(x + w * 0.82, y + h * 0.46);
+  ctx.moveTo(x + w * 0.34, y + h * 0.2);
+  ctx.lineTo(x + w * 0.34, y + h * 0.48);
+  ctx.moveTo(x + w * 0.5, y + h * 0.14);
+  ctx.lineTo(x + w * 0.5, y + h * 0.48);
+  ctx.moveTo(x + w * 0.66, y + h * 0.2);
+  ctx.lineTo(x + w * 0.66, y + h * 0.48);
   ctx.stroke();
-
-  ctx.fillStyle = '#8bd17c';
+  ctx.fillStyle = '#f1c40f';
   ctx.beginPath();
-  ctx.ellipse(headX, y + h * 0.34, w * 0.18, h * 0.18, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w / 2, y + h * 0.48, w * 0.46, h * 0.045, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // head + snout
+  ctx.fillStyle = '#f0d080';
+  ctx.beginPath();
+  ctx.ellipse(headX, y + h * 0.36, w * 0.2, h * 0.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fbe6a8';
+  ctx.beginPath();
+  ctx.ellipse(snoutX, y + h * 0.4, w * 0.1, h * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = '#111';
   ctx.beginPath();
-  ctx.ellipse(headX + faceDir * w * 0.05, y + h * 0.3, w * 0.035, h * 0.035, 0, 0, Math.PI * 2);
+  ctx.ellipse(headX - faceDir * w * 0.02, y + h * 0.3, w * 0.035, h * 0.035, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 

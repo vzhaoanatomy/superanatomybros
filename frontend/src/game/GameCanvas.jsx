@@ -10,7 +10,7 @@ import {
 } from './constants';
 import { buildLevel, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
-import { getWorld, DURATION_SECONDS } from './worlds';
+import { getWorld } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
 import {
   drawBackground,
@@ -27,6 +27,8 @@ import {
   drawPiranhaPlant,
   drawKoopa,
   drawShell,
+  drawTongueFlick,
+  drawEggPoof,
 } from './spriteRenderer';
 import {
   toggleMusic,
@@ -37,6 +39,7 @@ import {
   playStompSound,
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
+import { createTermQueue } from './termQueue';
 import { recordLocalScore, getNickname } from '../storage';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
@@ -66,6 +69,10 @@ const FIREBALL_SPEED = 10;
 const FIREBALL_COOLDOWN_MS = 350;
 const FIREBALL_MAX_TRAVEL = 650;
 const FIREBALL_SIZE = 18;
+const TONGUE_COOLDOWN_MS = 500;
+const TONGUE_FLICK_MS = 220;
+const TONGUE_REACH = 70;
+const EGG_POOF_MS = 400;
 
 function aabbOverlap(a, b) {
   return (
@@ -155,12 +162,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const durationMinutes = world.defaultDurationMinutes;
-    const durationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
     const level = buildLevel({ world, durationMinutes });
+    const durationSeconds = level.durationSeconds;
     const vocab = world.vocab;
     if (level.koopa) {
       level.koopa.nextThrowAt = scheduleKoopaThrow();
     }
+
+    // Every coin/enemy/door/boss-question draws its term from this shuffled
+    // no-repeat queue, rebuilt fresh on mount and on every Play Again so
+    // replays don't show the same order twice.
+    const termQueue = createTermQueue(vocab);
+    const nextTermId = termQueue.next;
+    termQueue.assignAll(level);
 
     const player = {
       x: level.spawn.x,
@@ -177,6 +191,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       mounted: false,
       big: false,
       hasFire: false,
+      tongueUntil: 0,
     };
 
     const state = {
@@ -193,11 +208,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       lastTimeBonus: 0,
       fireballs: [],
       shells: [],
+      eggPoofs: [],
     };
 
     let lastFrameTime = performance.now();
     let lastHudPush = 0;
     let lastFireballTime = 0;
+    let lastTongueTime = 0;
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
@@ -248,8 +265,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.mounted = false;
       player.big = false;
       player.hasFire = false;
+      player.tongueUntil = 0;
       state.fireballs = [];
       state.shells = [];
+      state.eggPoofs = [];
       if (level.piranha) {
         level.piranha.alive = true;
       }
@@ -278,6 +297,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       level.door.passed = false;
       level.door.pending = false;
+      termQueue.assignAll(level);
       state.score = 0;
       state.lives = 3;
       state.coinsCollected = 0;
@@ -362,7 +382,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     function openBossQuestion(questionNum) {
       const boss = level.boss;
-      const termId = vocab[Math.floor(Math.random() * vocab.length)].id;
+      const termId = nextTermId();
       const question = buildQuestion(vocab, termId);
       openQuiz(
         'boss',
@@ -422,6 +442,36 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         playFireballSound();
       }
 
+      // Riding Yoshi overrides the character's own Down ability: flick a
+      // tongue at a nearby enemy and swallow it into an (unusable, purely
+      // cosmetic) egg instead of the character's ground pound / etc.
+      if (
+        downHeld &&
+        player.mounted &&
+        !pausedRef.current &&
+        performance.now() - lastTongueTime > TONGUE_COOLDOWN_MS
+      ) {
+        lastTongueTime = performance.now();
+        player.tongueUntil = performance.now() + TONGUE_FLICK_MS;
+        const tongueBox = {
+          x: player.facing >= 0 ? player.x + player.width : player.x - TONGUE_REACH,
+          y: player.y,
+          width: TONGUE_REACH,
+          height: player.height,
+        };
+        for (const enemy of level.enemies) {
+          if (!enemy.alive || enemy.pending) continue;
+          if (aabbOverlap(tongueBox, enemy)) {
+            enemy.alive = false;
+            state.score += 50;
+            state.eggPoofs.push({ x: enemy.x, y: enemy.y, createdAt: performance.now() });
+            playStompSound();
+            break;
+          }
+        }
+      }
+      state.eggPoofs = state.eggPoofs.filter((p) => performance.now() - p.createdAt < EGG_POOF_MS);
+
       if (!player.pounding) {
         const runSpeed = player.mounted ? RUN_SPEED * MOUNT_SPEED_MULTIPLIER : RUN_SPEED;
         if (left && !right) {
@@ -445,7 +495,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         player.vy = JUMP_CUTOFF_VELOCITY;
       }
 
-      if (character.ability === 'groundPound' && downHeld && !player.onGround && !player.pounding) {
+      if (character.ability === 'groundPound' && downHeld && !player.mounted && !player.onGround && !player.pounding) {
         player.pounding = true;
         player.vx = 0;
         player.vy = GROUND_POUND_SPEED;
@@ -513,7 +563,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
           if (enemy.pending || !aabbOverlap(player, enemy)) continue;
 
-          if (player.pounding || performance.now() < player.starUntil) {
+          // Big (mushroom) adds a stomp-from-above instant kill, same as
+          // pound/star — touching it from the side while big still opens
+          // the quiz (loseLife's shield order pops "big" first on a wrong
+          // answer, same as any other hit).
+          const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
+          if (player.pounding || bigStomping || performance.now() < player.starUntil) {
             enemy.alive = false;
             state.score += 50;
             playStompSound();
@@ -648,12 +703,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       for (const fireball of state.fireballs) {
         if (fireball.alive) drawFireball(ctx, fireball);
       }
+      for (const poof of state.eggPoofs) drawEggPoof(ctx, poof);
 
       const now = performance.now();
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
       const invincible = now < player.starUntil;
       if (player.mounted) drawDinoMount(ctx, player);
       drawPlayer(ctx, player, characterId, { flashing, invincible, big: player.big });
+      if (player.mounted) drawTongueFlick(ctx, player);
 
       ctx.restore();
 
