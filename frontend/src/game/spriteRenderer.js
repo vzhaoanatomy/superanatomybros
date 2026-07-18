@@ -340,7 +340,9 @@ export function drawLabCat(ctx, enemy) {
   ctx.fill();
 }
 
-// World 7 enemy: a small dragonling.
+// Not currently assigned to a world's regular patrol enemies — reserved for
+// the Phase 5 final boss (World 7), per the "boss fight moves to World 7"
+// decision.
 export function drawDragonling(ctx, enemy) {
   const { x, y, width: w, height: h } = enemy;
   ctx.fillStyle = '#8a2f2f';
@@ -374,6 +376,31 @@ export function drawDragonling(ctx, enemy) {
   ctx.fill();
 }
 
+// World 6 enemy: a dark red blood clot.
+export function drawClot(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  ctx.fillStyle = '#6b1a1a';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.5, w / 2, h * 0.46, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#8f2a2a';
+  [[0.3, 0.3], [0.68, 0.32], [0.5, 0.62], [0.75, 0.6]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w * px, y + h * py, w * 0.1, h * 0.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.35, y + h * 0.42, w * 0.09, h * 0.09, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.65, y + h * 0.42, w * 0.09, h * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.35, y + h * 0.43, w * 0.035, h * 0.035, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.65, y + h * 0.43, w * 0.035, h * 0.035, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 const ENEMY_RENDERERS = {
   goomba: drawGoomba,
   skinBlob: drawSkinBlob,
@@ -381,6 +408,7 @@ const ENEMY_RENDERERS = {
   muscleBrawler: drawMuscleBrawler,
   neuron: drawNeuron,
   labCat: drawLabCat,
+  clot: drawClot,
   dragonling: drawDragonling,
 };
 

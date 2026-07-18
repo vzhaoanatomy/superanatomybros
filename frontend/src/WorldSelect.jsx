@@ -9,6 +9,7 @@ const ENEMY_LABELS = {
   skeleton: 'Skeleton',
   muscleBrawler: 'Muscle-brawler',
   neuron: 'Neuron',
+  clot: 'Blood clot',
   labCat: 'Lab cat',
   dragonling: 'Dragonlings',
 };
