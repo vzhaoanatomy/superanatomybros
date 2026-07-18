@@ -308,3 +308,19 @@ export function playSuccessFanfare() {
     playTone(ctx, noteFreq(n), t + i * 0.15, dur, 'square', 0.18);
   });
 }
+
+// A cheerful "ding ding ding ding ding" — five quick bell-like chimes on a
+// rising little tune, played once the player actually finishes a level
+// (after the end-of-level review, not just touching the flag).
+export function playLevelCompleteDings() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const notes = ['C6', 'E6', 'G6', 'E6', 'C7'];
+  notes.forEach((n, i) => {
+    const start = t0 + i * 0.16;
+    playTone(ctx, noteFreq(n), start, 0.3, 'sine', 0.2);
+    playTone(ctx, noteFreq(n), start, 0.3, 'triangle', 0.1);
+  });
+}

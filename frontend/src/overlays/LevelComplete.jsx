@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { backdrop, card } from './overlayStyles';
 import { fetchLeaderboard } from '../api';
 import { getNickname } from '../storage';
@@ -14,6 +14,69 @@ const buttonStyle = {
   fontSize: 15,
   fontFamily: 'inherit',
 };
+
+const FIREWORK_COLORS = ['#ff6b6b', '#ffd23f', '#4ecdc4', '#a78bfa', '#7de37b', '#ff8ac0'];
+const BURST_COUNT = 3;
+const PARTICLES_PER_BURST = 14;
+
+// A handful of repeating CSS-keyframe particle bursts behind the card —
+// pure decoration, no canvas/render-loop needed since it's just a few dozen
+// animated spans.
+function Fireworks() {
+  const bursts = useMemo(
+    () =>
+      Array.from({ length: BURST_COUNT }, (_, b) => {
+        const originX = 20 + Math.random() * 60;
+        const originY = 15 + Math.random() * 40;
+        const baseDelay = b * 0.7;
+        const particles = Array.from({ length: PARTICLES_PER_BURST }, (_, i) => {
+          const angle = (Math.PI * 2 * i) / PARTICLES_PER_BURST + Math.random() * 0.3;
+          const dist = 70 + Math.random() * 50;
+          return {
+            id: `${b}-${i}`,
+            color: FIREWORK_COLORS[(b + i) % FIREWORK_COLORS.length],
+            dx: Math.cos(angle) * dist,
+            dy: Math.sin(angle) * dist,
+            delay: baseDelay + Math.random() * 0.15,
+          };
+        });
+        return { id: b, originX, originY, particles };
+      }),
+    []
+  );
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      <style>{`
+        @keyframes firework-particle {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          75% { opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) scale(0.15); opacity: 0; }
+        }
+      `}</style>
+      {bursts.map((burst) =>
+        burst.particles.map((p) => (
+          <span
+            key={p.id}
+            style={{
+              position: 'absolute',
+              left: `${burst.originX}%`,
+              top: `${burst.originY}%`,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: p.color,
+              boxShadow: `0 0 6px ${p.color}`,
+              '--dx': `${p.dx}px`,
+              '--dy': `${p.dy}px`,
+              animation: `firework-particle 1.3s ease-out ${p.delay}s infinite`,
+            }}
+          />
+        ))
+      )}
+    </div>
+  );
+}
 
 export default function LevelComplete({ score, timeBonus, hasMissed, onReview, onPlayAgain, onQuit, classroomCode }) {
   const [leaderboard, setLeaderboard] = useState(null);
@@ -35,8 +98,9 @@ export default function LevelComplete({ score, timeBonus, hasMissed, onReview, o
 
   return (
     <div style={backdrop}>
-      <div style={card}>
-        <h2 style={{ color: '#2ecc71', margin: '0 0 8px' }}>Level Complete!</h2>
+      <Fireworks />
+      <div style={{ ...card, position: 'relative' }}>
+        <h2 style={{ color: '#2ecc71', margin: '0 0 8px' }}>🎉 Level Complete! 🎉</h2>
         {timeBonus > 0 && (
           <p style={{ fontSize: 14, color: '#89e0ff', margin: '0 0 4px' }}>Time Bonus: +{timeBonus}</p>
         )}

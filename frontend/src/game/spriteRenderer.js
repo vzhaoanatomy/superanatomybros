@@ -364,28 +364,36 @@ export function drawTongueFlick(ctx, player) {
   ctx.fill();
 }
 
-// A brief "poof into an egg" flourish where a tongue-grabbed enemy was —
-// shrinks, fades, and drifts up over EGG_POOF_MS (see GameCanvas.jsx).
-const EGG_POOF_MS = 400;
-export function drawEggPoof(ctx, poof) {
-  const age = performance.now() - poof.createdAt;
-  if (age > EGG_POOF_MS) return;
-  const t = age / EGG_POOF_MS;
-  const scale = 1 - t * 0.3;
-  const rise = t * 20;
+// A solid, permanent egg left behind wherever Yoshi's tongue grabbed an
+// enemy — purely decorative (no collision), stays for the rest of the run.
+export function drawSolidEgg(ctx, egg) {
+  const { x, y, width: w, height: h } = egg;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
 
-  ctx.save();
-  ctx.globalAlpha = 1 - t;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(cx, y + h, w * 0.38, h * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.fillStyle = '#eaf6e8';
   ctx.beginPath();
-  ctx.ellipse(poof.x + 14, poof.y + 14 - rise, 14 * scale, 18 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, w * 0.42, h * 0.48, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#c9d9c4';
+  ctx.lineWidth = Math.max(1, w * 0.04);
+  ctx.stroke();
+
   ctx.fillStyle = '#4caf7d';
-  ctx.beginPath();
-  ctx.ellipse(poof.x + 10, poof.y + 8 - rise, 3, 3, 0, 0, Math.PI * 2);
-  ctx.ellipse(poof.x + 18, poof.y + 16 - rise, 3, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  [
+    [0.35, 0.35],
+    [0.62, 0.5],
+    [0.4, 0.68],
+  ].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w * px, y + h * py, w * 0.09, h * 0.08, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  });
 }
 
 // A shimmering portal rather than a plain pole — the visible oval is wider

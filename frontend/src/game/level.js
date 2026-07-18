@@ -17,6 +17,33 @@ function hashSeed(str) {
   };
 }
 
+// Keeps a coin from ending up embedded inside (or blocked from below by) a
+// floating platform whose x-span it falls within — pushes it up clear of
+// every conflicting platform in that column, checking again after each push
+// in case that lands it inside a still-higher one (stacked climb steps).
+// `cx`/`cy` are the coin's top-left corner, matching the {x, y, width: 24,
+// height: 24} shape it's ultimately stored as.
+function clearCoinOfPlatforms(cx, cy, blockPlatforms) {
+  const COIN_SIZE = 24;
+  let y = cy;
+  for (let guard = 0; guard < 8; guard++) {
+    let changed = false;
+    for (const p of blockPlatforms) {
+      if (cx + COIN_SIZE < p.x || cx > p.x + p.width) continue;
+      if (y + COIN_SIZE > p.y - 8 && y < p.y + p.height + 8) {
+        y = p.y - COIN_SIZE - 10;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  // Platforms themselves never generate above y≈140 (see the climb-chain
+  // ceiling below), so a floor well under that is just a sanity backstop —
+  // it must never be higher than what the clearing loop above already
+  // computed, or it would clamp the coin straight back into a platform.
+  return Math.max(40, y);
+}
+
 function buildGroundSegments(rng, width, difficulty) {
   const minSeg = Math.max(260, 520 - difficulty * 30);
   const maxSeg = minSeg + 280;
@@ -41,7 +68,12 @@ function buildGroundSegments(rng, width, difficulty) {
 // (width, coin count, enemy count) scales with duration so a 5-minute level
 // is genuinely bigger, not just a longer clock.
 export function buildLevel({ world, durationMinutes }) {
-  const rng = hashSeed(`${world.id}-${durationMinutes}`);
+  // Seeded with a fresh random component on every call — layout (platforms,
+  // enemies, power-ups, coins) is deliberately NOT the same level-to-level
+  // so players can't just memorize a fixed path. hashSeed itself still gives
+  // a stable, well-distributed PRNG from whatever string it's given; only
+  // the string now changes every time.
+  const rng = hashSeed(`${world.id}-${durationMinutes}-${Math.random()}`);
   const difficulty = world.index;
   const vocab = world.vocab;
 
@@ -133,6 +165,15 @@ export function buildLevel({ world, durationMinutes }) {
     }
   }
 
+  // Every floating "block" platform, any width — used to keep coins clear
+  // of solid geometry below. `blockPlatforms` (width >= 90) is a narrower
+  // subset used later for enemy-patrol eligibility and highest-platform
+  // power-up placement; the odd narrower "bridge" platform is still solid
+  // ground a coin can end up embedded in, so the coin check can't use that
+  // same filtered list.
+  const allBlockPlatforms = platforms.filter((p) => p.type === 'block');
+  const blockPlatforms = allBlockPlatforms.filter((p) => p.width >= 90);
+
   // Coins are spaced out for runner-style pacing (not a quiz every second) —
   // enemies stay frequent since dodging/crushing them is the moment-to-moment
   // choice, while coins/checkpoints are the deliberate stops. Coin count is
@@ -143,10 +184,10 @@ export function buildLevel({ world, durationMinutes }) {
   const coinSpots = [];
   for (let i = 0; i < coinCount; i++) {
     const cx = 200 + (i / coinCount) * (width - 400) + rng() * 80;
-    const cy = 200 + rng() * 190;
+    const cy = clearCoinOfPlatforms(cx, 200 + rng() * 190, allBlockPlatforms);
     coinSpots.push({ x: cx, y: cy });
   }
-  coinSpots.push(...bonusCoinSpots);
+  coinSpots.push(...bonusCoinSpots.map((c) => ({ x: c.x, y: clearCoinOfPlatforms(c.x, c.y, allBlockPlatforms) })));
 
   const coins = coinSpots.map(({ x, y }, i) => ({
     id: `coin-${i}`,
@@ -195,7 +236,6 @@ export function buildLevel({ world, durationMinutes }) {
   // Only platforms with enough room for a real back-and-forth patrol get an
   // enemy (narrower ones gave 20-40px of range — too small to visibly read
   // as "moving" rather than a stationary wobble).
-  const blockPlatforms = platforms.filter((p) => p.type === 'block' && p.width >= 90);
   const patrolBlockPlatforms = blockPlatforms.filter((p) => p.width >= 130);
   const platformSpawnChance = 0.35 + difficulty * 0.06;
   let platformEnemyIndex = 0;

@@ -28,7 +28,7 @@ import {
   drawKoopa,
   drawShell,
   drawTongueFlick,
-  drawEggPoof,
+  drawSolidEgg,
 } from './spriteRenderer';
 import {
   toggleMusic,
@@ -37,6 +37,7 @@ import {
   playStarPowerSound,
   playFireballSound,
   playStompSound,
+  playLevelCompleteDings,
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
@@ -72,7 +73,6 @@ const FIREBALL_SIZE = 18;
 const TONGUE_COOLDOWN_MS = 500;
 const TONGUE_FLICK_MS = 220;
 const TONGUE_REACH = 70;
-const EGG_POOF_MS = 400;
 
 function aabbOverlap(a, b) {
   return (
@@ -208,7 +208,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       lastTimeBonus: 0,
       fireballs: [],
       shells: [],
-      eggPoofs: [],
+      solidEggs: [],
     };
 
     let lastFrameTime = performance.now();
@@ -259,6 +259,20 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function resetRun() {
+      // Fully regenerate the level layout (platforms, enemies, power-ups,
+      // coins) on every restart — buildLevel is seeded with a fresh random
+      // component each call, so replaying doesn't hand back the exact same
+      // path to memorize. Mutates the existing `level` object in place
+      // (Object.assign, not reassignment) so every closure that already
+      // reads `level.xxx` picks up the new layout transparently. Width and
+      // durationSeconds are deterministic (not rng-driven), so they stay
+      // consistent with state.durationSeconds captured at mount.
+      Object.assign(level, buildLevel({ world, durationMinutes }));
+      if (level.koopa) {
+        level.koopa.nextThrowAt = scheduleKoopaThrow();
+      }
+      termQueue.assignAll(level);
+
       respawnPlayer();
       player.invulnerableUntil = 0;
       player.starUntil = 0;
@@ -268,36 +282,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.tongueUntil = 0;
       state.fireballs = [];
       state.shells = [];
-      state.eggPoofs = [];
-      if (level.piranha) {
-        level.piranha.alive = true;
-      }
-      if (level.koopa) {
-        level.koopa.alive = true;
-        level.koopa.x = level.koopa.startX;
-        level.koopa.nextThrowAt = scheduleKoopaThrow();
-      }
-      for (const coin of level.coins) {
-        coin.collected = false;
-        coin.pending = false;
-        coin.bounceUntil = 0;
-      }
-      for (const enemy of level.enemies) {
-        enemy.alive = true;
-        enemy.pending = false;
-        enemy.x = enemy.startX;
-      }
-      for (const p of level.powerUps) {
-        p.collected = false;
-      }
-      if (level.boss) {
-        level.boss.hp = level.boss.maxHp;
-        level.boss.alive = true;
-        level.boss.pending = false;
-      }
-      level.door.passed = false;
-      level.door.pending = false;
-      termQueue.assignAll(level);
+      state.solidEggs = [];
       state.score = 0;
       state.lives = 3;
       state.coinsCollected = 0;
@@ -328,6 +313,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         const nickname = getNickname();
         if (nickname) submitScore(world.code, nickname, state.score).catch(() => {});
       }
+      playLevelCompleteDings();
       setOverlay({ type: 'complete' });
     };
     handlersRef.current.openReview = () => setOverlay({ type: 'review' });
@@ -464,13 +450,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (aabbOverlap(tongueBox, enemy)) {
             enemy.alive = false;
             state.score += 50;
-            state.eggPoofs.push({ x: enemy.x, y: enemy.y, createdAt: performance.now() });
+            // A solid, permanent egg is left behind exactly where the enemy
+            // stood (already resting on the ground/platform it patrolled) —
+            // purely decorative, no collision, stays for the rest of the run.
+            state.solidEggs.push({ x: enemy.x, y: enemy.y, width: enemy.width, height: enemy.height });
             playStompSound();
             break;
           }
         }
       }
-      state.eggPoofs = state.eggPoofs.filter((p) => performance.now() - p.createdAt < EGG_POOF_MS);
 
       if (!player.pounding) {
         const runSpeed = player.mounted ? RUN_SPEED * MOUNT_SPEED_MULTIPLIER : RUN_SPEED;
@@ -648,16 +636,27 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (p.collected) continue;
           if (!aabbOverlap(player, p)) continue;
           p.collected = true;
+          // Big / mounted / fire are mutually exclusive "forms" (Mario-style
+          // — you're small, big, riding, or fire, never more than one at
+          // once): picking up a new one clears whichever you already had.
+          // Star is a separate timed buff layered on top of whatever form
+          // you're in, so it's untouched here.
           if (p.type === 'mushroom') {
             state.lives = Math.min(MAX_LIVES, state.lives + 1);
             player.big = true;
+            player.mounted = false;
+            player.hasFire = false;
           } else if (p.type === 'star') {
             player.starUntil = performance.now() + STAR_DURATION_MS;
             playStarPowerSound(STAR_DURATION_MS);
           } else if (p.type === 'egg') {
             player.mounted = true;
+            player.big = false;
+            player.hasFire = false;
           } else if (p.type === 'fireFlower') {
             player.hasFire = true;
+            player.big = false;
+            player.mounted = false;
           }
         }
       }
@@ -703,7 +702,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       for (const fireball of state.fireballs) {
         if (fireball.alive) drawFireball(ctx, fireball);
       }
-      for (const poof of state.eggPoofs) drawEggPoof(ctx, poof);
+      for (const egg of state.solidEggs) drawSolidEgg(ctx, egg);
 
       const now = performance.now();
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
