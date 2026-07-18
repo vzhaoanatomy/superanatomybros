@@ -171,10 +171,44 @@ function drawEggPowerUp(ctx, x, y, w, h) {
   });
 }
 
+function drawFireFlowerPowerUp(ctx, x, y, w, h) {
+  ctx.strokeStyle = '#3f9d5c';
+  ctx.lineWidth = Math.max(1, w * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, y + h);
+  ctx.lineTo(x + w / 2, y + h * 0.5);
+  ctx.stroke();
+  ctx.fillStyle = '#3f9d5c';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.28, y + h * 0.82, w * 0.14, h * 0.09, 0.5, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.72, y + h * 0.82, w * 0.14, h * 0.09, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  const cx = x + w / 2;
+  const cy = y + h * 0.36;
+  ctx.fillStyle = '#e74c3c';
+  [0, 1, 2, 3].forEach((i) => {
+    const angle = (Math.PI / 2) * i + Math.PI / 4;
+    ctx.beginPath();
+    ctx.ellipse(cx + Math.cos(angle) * w * 0.2, cy + Math.sin(angle) * h * 0.2, w * 0.2, h * 0.2, angle, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.16, h * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#e8871e';
+  ctx.beginPath();
+  ctx.ellipse(cx - w * 0.05, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + w * 0.05, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 const POWER_UP_RENDERERS = {
   mushroom: drawMushroom,
   star: drawStarPowerUp,
   egg: drawEggPowerUp,
+  fireFlower: drawFireFlowerPowerUp,
 };
 
 export function drawPowerUp(ctx, powerUp) {
@@ -183,18 +217,96 @@ export function drawPowerUp(ctx, powerUp) {
   if (renderer) renderer(ctx, powerUp.x, powerUp.y, powerUp.width, powerUp.height);
 }
 
-// Small egg-shaped mount indicator drawn behind the player while riding it.
-export function drawMountBadge(ctx, player) {
-  const { x, y, width: w, height: h } = player;
-  ctx.fillStyle = '#eaf6e8';
+// A small flame the player lobs after picking up a fire flower — flickers
+// via a couple of pulsing lobes so it doesn't read as a flat static circle.
+export function drawFireball(ctx, fireball) {
+  const { x, y, width: w, height: h } = fireball;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const t = performance.now() / 60;
+  const flicker = 1 + Math.sin(t) * 0.12;
+  ctx.fillStyle = '#ffb347';
   ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h * 1.02, w * 0.62, h * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, (w / 2) * flicker, (h / 2) * flicker, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, (w / 2) * 0.6, (h / 2) * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffe89e';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, (w / 2) * 0.28, (h / 2) * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// The Yoshi-style dino the player rides while the egg mount is active,
+// drawn behind (and slightly larger than) the player so it reads as
+// something they're standing on rather than a badge floating nearby.
+export function drawDinoMount(ctx, player) {
+  const { x, y, width: w, height: h, facing } = player;
+  const dw = w * 2.1;
+  // Taller than the rider and anchored so its feet land on the same ground
+  // line as the player's own feet (y + h) — the player's body then overlaps
+  // the dino's upper back/neck instead of floating above or sinking into it.
+  const dh = h * 1.55;
+  const dx = x + w / 2 - dw / 2;
+  const dy = y + h - dh;
+  const faceDir = facing >= 0 ? 1 : -1;
+
+  ctx.fillStyle = '#3f9d5c';
+  ctx.beginPath();
+  ctx.moveTo(dx + dw * (faceDir >= 0 ? 0.06 : 0.94), dy + dh * 0.55);
+  ctx.quadraticCurveTo(
+    dx + dw * (faceDir >= 0 ? -0.16 : 1.16),
+    dy + dh * 0.32,
+    dx + dw * (faceDir >= 0 ? -0.02 : 1.02),
+    dy + dh * 0.12
+  );
+  ctx.lineTo(dx + dw * (faceDir >= 0 ? 0.14 : 0.86), dy + dh * 0.48);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#3f9d5c';
+  ctx.fillRect(dx + dw * 0.22, dy + dh * 0.78, dw * 0.14, dh * 0.22);
+  ctx.fillRect(dx + dw * 0.64, dy + dh * 0.78, dw * 0.14, dh * 0.22);
+
   ctx.fillStyle = '#4caf7d';
   ctx.beginPath();
-  ctx.ellipse(x + w * 0.3, y + h * 0.98, w * 0.12, h * 0.09, 0.3, 0, Math.PI * 2);
-  ctx.ellipse(x + w * 0.68, y + h * 1.06, w * 0.12, h * 0.09, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(dx + dw * 0.5, dy + dh * 0.52, dw * 0.46, dh * 0.4, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.fillStyle = '#eaf6e8';
+  ctx.beginPath();
+  ctx.ellipse(dx + dw * 0.5, dy + dh * 0.72, dw * 0.3, dh * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffb84d';
+  for (let i = 0; i < 3; i++) {
+    const sx = dx + dw * (0.36 + i * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(sx, dy + dh * 0.26);
+    ctx.lineTo(sx + dw * 0.03, dy + dh * 0.1);
+    ctx.lineTo(sx + dw * 0.06, dy + dh * 0.26);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const headX = faceDir >= 0 ? dx + dw * 0.88 : dx + dw * 0.12;
+  ctx.fillStyle = '#4caf7d';
+  ctx.beginPath();
+  ctx.ellipse(headX, dy + dh * 0.4, dw * 0.15, dh * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#eaf6e8';
+  ctx.beginPath();
+  ctx.ellipse(headX + faceDir * dw * 0.13, dy + dh * 0.44, dw * 0.08, dh * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(headX + faceDir * dw * 0.02, dy + dh * 0.33, dw * 0.025, dh * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#c9932a';
+  ctx.fillRect(dx + dw * 0.34, dy + dh * 0.24, dw * 0.28, dh * 0.09);
 }
 
 // A shimmering portal rather than a plain pole — the visible oval is wider
@@ -571,11 +683,45 @@ function drawRex(ctx, x, y, w, h, colors, facing) {
 
 export function drawPlayer(ctx, player, characterId, opts = {}) {
   const character = getCharacter(characterId);
-  const { x, y, width: w, height: h, facing } = player;
+  let { x, y, width: w, height: h } = player;
+  const { facing } = player;
+
+  // The mushroom's "big" state only scales what's drawn, not the physics
+  // box (growing the real hitbox mid-run risks clipping into platforms) —
+  // anchored at bottom-center so the character still looks grounded.
+  if (opts.big) {
+    const scale = 1.35;
+    const nw = w * scale;
+    const nh = h * scale;
+    x = x + w / 2 - nw / 2;
+    y = y + h - nh;
+    w = nw;
+    h = nh;
+  }
 
   if (opts.flashing) {
     ctx.save();
     ctx.globalAlpha = 0.55;
+  }
+
+  if (opts.invincible) {
+    ctx.save();
+    const t = performance.now() / 6;
+    ctx.filter = `hue-rotate(${t % 360}deg) saturate(2.4) brightness(1.15)`;
+
+    const glowHue = t % 360;
+    ctx.save();
+    ctx.filter = 'none';
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const glow = ctx.createRadialGradient(cx, cy, w * 0.2, cx, cy, w * 1.1);
+    glow.addColorStop(0, `hsla(${glowHue}, 100%, 65%, 0.55)`);
+    glow.addColorStop(1, 'hsla(0, 100%, 65%, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, w * 1.1, h * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   if (character.id === 'doc' || character.id === 'vee') {
@@ -587,9 +733,7 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
   }
 
   if (opts.invincible) {
-    ctx.strokeStyle = '#ffd23f';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.restore();
   }
 
   if (opts.flashing) {

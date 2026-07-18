@@ -202,6 +202,42 @@ export function playWrongBuzz() {
   osc.stop(t + 0.3);
 }
 
+// A sparkly ascending arpeggio that fills the whole star duration, scheduled
+// entirely up front on the audio clock — no JS timer keeps it running, so it
+// can't be cut short by rAF/setTimeout throttling in a backgrounded tab.
+export function playStarPowerSound(durationMs = 8000) {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const notes = ['C5', 'D5', 'E5', 'G5', 'A5', 'C6'];
+  const stepDur = 0.12;
+  const totalSteps = Math.floor(durationMs / 1000 / stepDur);
+  for (let i = 0; i < totalSteps; i++) {
+    const note = notes[i % notes.length];
+    const start = t0 + i * stepDur;
+    playTone(ctx, noteFreq(note), start, stepDur * 0.9, 'square', 0.09);
+    if (i % 2 === 0) {
+      playTone(ctx, noteFreq(transposeOctave(note, 1)), start, stepDur * 0.9, 'triangle', 0.05);
+    }
+  }
+}
+
+export function playFireballSound() {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(520, t);
+  osc.frequency.exponentialRampToValueAtTime(220, t + 0.14);
+  gain.gain.setValueAtTime(0.14, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.17);
+}
+
 export function playSuccessFanfare() {
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();

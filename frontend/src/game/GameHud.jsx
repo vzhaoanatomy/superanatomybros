@@ -33,8 +33,10 @@ export default function GameHud({ world, character, hud, timeClass, formatClock,
           {character.ability === 'coinCombo' && <span className="hud-status"> · Combo {hud?.comboCount ?? 0}/5</span>}
           {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
           {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}
-          {hud?.starActive && <span className="hud-status warn"> · ⭐ STAR POWER!</span>}
-          {hud?.mounted && <span className="hud-status"> · 🥚 Mounted</span>}
+          {hud?.starActive && <span className="hud-status warn"> · 🌈 STAR POWER!</span>}
+          {hud?.mounted && <span className="hud-status"> · 🦖 Riding Dino</span>}
+          {hud?.big && <span className="hud-status"> · 🍄 Big!</span>}
+          {hud?.hasFire && <span className="hud-status warn"> · 🔥 Fire Power (F)</span>}
           {hud?.bossAlive && (
             <span className="hud-status warn">
               {' '}

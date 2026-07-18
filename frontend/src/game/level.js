@@ -191,8 +191,12 @@ export function buildLevel({ world, durationMinutes }) {
   // into the ground, never so high a standing player's bounding box (top at
   // GROUND_Y - PLAYER_HEIGHT) fails to overlap its bottom edge.
   const POWER_UP_SIZE = 28;
-  const powerUpTypes = ['mushroom', 'star', 'egg'];
-  const powerUpCount = Math.max(1, Math.round(width / 3500));
+  const powerUpTypes = ['mushroom', 'star', 'egg', 'fireFlower'];
+  // At least one of every type per level (the cycling assignment below
+  // guarantees that once count >= powerUpTypes.length) — a short level was
+  // previously rounding down to a single power-up, so rarer types like the
+  // egg mount never showed up at all.
+  const powerUpCount = Math.max(powerUpTypes.length, Math.round(width / 2200));
   const powerUps = [];
   for (let i = 0; i < powerUpCount; i++) {
     const [sx1, sx2] = solidSegments[(i + 1) % solidSegments.length];

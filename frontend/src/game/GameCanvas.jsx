@@ -22,9 +22,10 @@ import {
   drawPlayer,
   drawPowerUp,
   drawBoss,
-  drawMountBadge,
+  drawDinoMount,
+  drawFireball,
 } from './spriteRenderer';
-import { toggleMusic, isMusicPlaying, playSuccessFanfare } from './music';
+import { toggleMusic, isMusicPlaying, playSuccessFanfare, playStarPowerSound, playFireballSound } from './music';
 import GameHud from './GameHud';
 import GameOverlays from './GameOverlays';
 
@@ -32,6 +33,7 @@ const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const LEFT_KEYS = new Set(['ArrowLeft', 'KeyA']);
 const RIGHT_KEYS = new Set(['ArrowRight', 'KeyD']);
 const DOWN_KEYS = new Set(['ArrowDown', 'KeyS']);
+const FIRE_KEYS = new Set(['KeyF']);
 const INVULN_MS = 1200;
 const COIN_BOUNCE_MS = 800;
 const COIN_CORRECT_POINTS = 15;
@@ -47,6 +49,10 @@ const STAR_DURATION_MS = 8000;
 const MOUNT_SPEED_MULTIPLIER = 1.5;
 const MAX_LIVES = 5;
 const BOSS_DEFEAT_SCORE = 1500;
+const FIREBALL_SPEED = 10;
+const FIREBALL_COOLDOWN_MS = 350;
+const FIREBALL_MAX_TRAVEL = 650;
+const FIREBALL_SIZE = 18;
 
 function aabbOverlap(a, b) {
   return (
@@ -153,6 +159,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       pounding: false,
       starUntil: 0,
       mounted: false,
+      big: false,
+      hasFire: false,
     };
 
     const state = {
@@ -167,10 +175,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       durationSeconds,
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
+      fireballs: [],
     };
 
     let lastFrameTime = performance.now();
     let lastHudPush = 0;
+    let lastFireballTime = 0;
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
@@ -193,6 +203,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         player.invulnerableUntil = performance.now() + INVULN_MS;
         return;
       }
+      // Big (mushroom) and fire (fire flower) are Mario-style: a hit that
+      // actually costs a life also strips them, same as the mount popping.
+      player.big = false;
+      player.hasFire = false;
       state.lives -= 1;
       if (state.lives <= 0) {
         state.lives = 3;
@@ -206,6 +220,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.invulnerableUntil = 0;
       player.starUntil = 0;
       player.mounted = false;
+      player.big = false;
+      player.hasFire = false;
+      state.fireballs = [];
       for (const coin of level.coins) {
         coin.collected = false;
         coin.pending = false;
@@ -336,6 +353,27 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const right = [...RIGHT_KEYS].some((k) => keys.has(k));
       const jumpHeld = [...JUMP_KEYS].some((k) => keys.has(k));
       const downHeld = [...DOWN_KEYS].some((k) => keys.has(k));
+      const fireHeld = [...FIRE_KEYS].some((k) => keys.has(k));
+
+      if (
+        fireHeld &&
+        player.hasFire &&
+        !pausedRef.current &&
+        performance.now() - lastFireballTime > FIREBALL_COOLDOWN_MS
+      ) {
+        lastFireballTime = performance.now();
+        const spawnX = player.facing >= 0 ? player.x + player.width : player.x - FIREBALL_SIZE;
+        state.fireballs.push({
+          x: spawnX,
+          y: player.y + player.height * 0.35,
+          spawnX,
+          vx: FIREBALL_SPEED * player.facing,
+          width: FIREBALL_SIZE,
+          height: FIREBALL_SIZE,
+          alive: true,
+        });
+        playFireballSound();
+      }
 
       if (!player.pounding) {
         const runSpeed = player.mounted ? RUN_SPEED * MOUNT_SPEED_MULTIPLIER : RUN_SPEED;
@@ -449,6 +487,29 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       if (!pausedRef.current) {
+        for (const fireball of state.fireballs) {
+          if (!fireball.alive) continue;
+          fireball.x += fireball.vx;
+          if (Math.abs(fireball.x - fireball.spawnX) > FIREBALL_MAX_TRAVEL || fireball.x < 0 || fireball.x > level.width) {
+            fireball.alive = false;
+            continue;
+          }
+          for (const enemy of level.enemies) {
+            if (!enemy.alive || enemy.pending) continue;
+            if (aabbOverlap(fireball, enemy)) {
+              enemy.alive = false;
+              fireball.alive = false;
+              state.score += 50;
+              break;
+            }
+          }
+        }
+        if (state.fireballs.length > 20) {
+          state.fireballs = state.fireballs.filter((f) => f.alive);
+        }
+      }
+
+      if (!pausedRef.current) {
         for (const coin of level.coins) {
           if (coin.collected || coin.pending) continue;
           if (performance.now() < coin.bounceUntil) continue;
@@ -479,10 +540,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           p.collected = true;
           if (p.type === 'mushroom') {
             state.lives = Math.min(MAX_LIVES, state.lives + 1);
+            player.big = true;
           } else if (p.type === 'star') {
             player.starUntil = performance.now() + STAR_DURATION_MS;
+            playStarPowerSound(STAR_DURATION_MS);
           } else if (p.type === 'egg') {
             player.mounted = true;
+          } else if (p.type === 'fireFlower') {
+            player.hasFire = true;
           }
         }
       }
@@ -520,12 +585,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (level.boss) drawBoss(ctx, level.boss);
       drawDoor(ctx, level.door);
       drawFlag(ctx, level.flag);
+      for (const fireball of state.fireballs) {
+        if (fireball.alive) drawFireball(ctx, fireball);
+      }
 
       const now = performance.now();
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
       const invincible = now < player.starUntil;
-      if (player.mounted) drawMountBadge(ctx, player);
-      drawPlayer(ctx, player, characterId, { flashing, invincible });
+      if (player.mounted) drawDinoMount(ctx, player);
+      drawPlayer(ctx, player, characterId, { flashing, invincible, big: player.big });
 
       ctx.restore();
 
@@ -543,6 +611,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           pounding: state.pounding,
           starActive: invincible,
           mounted: player.mounted,
+          big: player.big,
+          hasFire: player.hasFire,
           bossHp: level.boss ? level.boss.hp : null,
           bossMaxHp: level.boss ? level.boss.maxHp : null,
           bossAlive: level.boss ? level.boss.alive : false,
@@ -607,7 +677,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
           <GameOverlays overlay={overlay} h={h} onQuit={onQuit} />
         </div>
-        <div className="controls-hint">Arrows/WASD to move · Space/Up to jump · Down for ability</div>
+        <div className="controls-hint">
+          Arrows/WASD to move · Space/Up to jump · Down for ability · F to throw fireball (with Fire Flower)
+        </div>
       </div>
     </div>
   );
