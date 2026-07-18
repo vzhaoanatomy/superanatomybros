@@ -11,13 +11,13 @@ small sample sets needed for a working demo.
 ## The 7 built-in worlds
 | # | World | Enemy sprite |
 |---|-------|--------------|
-| 1 | Anatomical and Directional Terms | goomba-style blob |
-| 2 | Integumentary System | skin-disease blob |
-| 3 | Skeletal System | skeleton |
-| 4 | Muscular System | muscle-brawler |
-| 5 | Nervous System | neuron |
-| 6 | Feline Anatomy (Cat Dissection) | lab-cat |
-| 7 | Boss World | dragonlings + final dragon boss |
+| 1 | Orientation Oasis (Anatomical & Regional Terms) | goomba-style blob |
+| 2 | Integumentary Kingdom | skin-disease blob |
+| 3 | Skeletal Caverns | skeleton |
+| 4 | Muscular Mountains | muscle-brawler |
+| 5 | Nervous Nexus | neuron |
+| 6 | Cardiovascular Castle | blood clot |
+| 7 | Feline Frontier (Cat Dissection) | lab-cat + final dragon boss |
 
 Each world gets a distinct background palette and its own enemy sprite.
 
