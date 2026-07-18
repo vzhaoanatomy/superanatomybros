@@ -108,7 +108,7 @@ export function buildLevel({ world, durationMinutes }) {
   // jump from the ground is built as a chain of steps, each within safe
   // jump range of the last, guaranteeing a real path up rather than an
   // isolated block nothing can reach.
-  const JUMP_RISE = 140; // conservative vertical reach per jump (base full jump is ~179px)
+  const JUMP_RISE = 155; // conservative vertical reach per jump (base full jump is ~179px)
   const JUMP_DX_CLIMB = 170; // conservative horizontal reach while also climbing
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
   const usableWidth = width - 600;
@@ -119,7 +119,7 @@ export function buildLevel({ world, durationMinutes }) {
     const climbSteps = rng() < 0.4 ? (rng() < 0.5 ? 2 : 3) : 1;
 
     let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
-    let cursorY = GROUND_Y - (60 + rng() * 75); // base step: always a single safe jump from the ground
+    let cursorY = GROUND_Y - (70 + rng() * 95); // base step: always a single safe jump from the ground, but reaching higher than before
 
     for (let step = 0; step < climbSteps; step++) {
       const pw = 90 + rng() * 60;

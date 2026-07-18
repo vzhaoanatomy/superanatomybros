@@ -58,6 +58,10 @@ const INVULN_MS = 1200;
 const COIN_BOUNCE_MS = 800;
 const COIN_CORRECT_POINTS = 15;
 const COIN_WRONG_PENALTY = 10;
+// Skipping the quiz (stomp/pound/star/fireball) is worth less than actually
+// answering it (see the quiz-resolved enemy kill below at +50) — still
+// rewarding so those abilities stay fun to use, but not the best strategy.
+const INSTANT_KILL_SCORE = 10;
 const GLIDE_FALL_SPEED = 1.6;
 const GROUND_POUND_SPEED = 24;
 const GROUND_POUND_RADIUS = 90;
@@ -353,8 +357,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         const dy = enemy.y + enemy.height / 2 - (player.y + player.height / 2);
         if (Math.hypot(dx, dy) <= GROUND_POUND_RADIUS) {
           enemy.alive = false;
-          state.score += 50;
+          state.score += INSTANT_KILL_SCORE;
           playStompSound();
+          popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
         }
       }
     }
@@ -458,12 +463,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (!enemy.alive || enemy.pending) continue;
           if (aabbOverlap(tongueBox, enemy)) {
             enemy.alive = false;
-            state.score += 50;
+            state.score += INSTANT_KILL_SCORE;
             // A solid, permanent egg is left behind exactly where the enemy
             // stood (already resting on the ground/platform it patrolled) —
             // purely decorative, no collision, stays for the rest of the run.
             state.solidEggs.push({ x: enemy.x, y: enemy.y, width: enemy.width, height: enemy.height });
             playStompSound();
+            popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
             break;
           }
         }
@@ -567,8 +573,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
           if (player.pounding || bigStomping || performance.now() < player.starUntil) {
             enemy.alive = false;
-            state.score += 50;
+            state.score += INSTANT_KILL_SCORE;
             playStompSound();
+            popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
           } else if (performance.now() >= player.invulnerableUntil) {
             enemy.pending = true;
             const question = buildQuestion(vocab, enemy.termId);
@@ -602,8 +609,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             if (aabbOverlap(fireball, enemy)) {
               enemy.alive = false;
               fireball.alive = false;
-              state.score += 50;
+              state.score += INSTANT_KILL_SCORE;
               playStompSound();
+              popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
               break;
             }
           }

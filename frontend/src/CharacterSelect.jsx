@@ -37,11 +37,11 @@ function CharacterCard({ character, onSelect }) {
         boxShadow: '0 4px 0 rgba(0,0,0,0.35)',
         color: '#fff',
         cursor: 'pointer',
-        width: 160,
+        width: 190,
       }}
     >
       <canvas ref={canvasRef} width={PREVIEW_SIZE} height={PREVIEW_SIZE} style={{ imageRendering: 'pixelated' }} />
-      <strong>{character.name}</strong>
+      <strong style={{ fontSize: 14, lineHeight: 1.3 }}>{character.name}</strong>
       <span style={{ fontSize: 13, color: '#ffd23f' }}>{character.abilityName}</span>
       <span style={{ fontSize: 11, color: '#aab4cc', textAlign: 'center' }}>{character.abilityDescription}</span>
     </button>
