@@ -114,6 +114,89 @@ export function drawCoin(ctx, coin) {
   ctx.fill();
 }
 
+function drawMushroom(ctx, x, y, w, h) {
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.35, w / 2, h * 0.35, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  [[0.28, 0.22], [0.5, 0.14], [0.72, 0.22]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w * px, y + h * py, w * 0.1, h * 0.09, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillStyle = '#f4d9b0';
+  ctx.fillRect(x + w * 0.3, y + h * 0.42, w * 0.4, h * 0.5);
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.42, y + h * 0.6, w * 0.05, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.58, y + h * 0.6, w * 0.05, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawStarPowerUp(ctx, x, y, w, h) {
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const outerR = w / 2;
+  const innerR = outerR * 0.45;
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    const px = cx + Math.cos(angle) * r;
+    const py = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(cx - w * 0.12, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + w * 0.12, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawEggPowerUp(ctx, x, y, w, h) {
+  ctx.fillStyle = '#eaf6e8';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.55, w * 0.42, h * 0.48, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4caf7d';
+  [[0.35, 0.35], [0.62, 0.5], [0.4, 0.68]].forEach(([px, py]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w * px, y + h * py, w * 0.09, h * 0.08, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+const POWER_UP_RENDERERS = {
+  mushroom: drawMushroom,
+  star: drawStarPowerUp,
+  egg: drawEggPowerUp,
+};
+
+export function drawPowerUp(ctx, powerUp) {
+  if (powerUp.collected) return;
+  const renderer = POWER_UP_RENDERERS[powerUp.type];
+  if (renderer) renderer(ctx, powerUp.x, powerUp.y, powerUp.width, powerUp.height);
+}
+
+// Small egg-shaped mount indicator drawn behind the player while riding it.
+export function drawMountBadge(ctx, player) {
+  const { x, y, width: w, height: h } = player;
+  ctx.fillStyle = '#eaf6e8';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 1.02, w * 0.62, h * 0.22, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#4caf7d';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.3, y + h * 0.98, w * 0.12, h * 0.09, 0.3, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.68, y + h * 1.06, w * 0.12, h * 0.09, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 // A shimmering portal rather than a plain pole — the visible oval is wider
 // than the (narrower) collision box, which is fine since it's pure flourish;
 // the invisible hitbox stays exactly door.width/height for jump-over blocking.
@@ -414,6 +497,24 @@ const ENEMY_RENDERERS = {
 
 export function drawEnemy(ctx, enemy, enemyType) {
   (ENEMY_RENDERERS[enemyType] ?? drawGoomba)(ctx, enemy);
+}
+
+// World 7 final boss — a scaled-up dragonling with an HP bar hovering above.
+export function drawBoss(ctx, boss) {
+  if (!boss.alive) return;
+  drawDragonling(ctx, boss);
+
+  const barW = boss.width;
+  const barX = boss.x;
+  const barY = boss.y - 22;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(barX, barY, barW, 10);
+  const pct = Math.max(0, boss.hp / boss.maxHp);
+  ctx.fillStyle = pct > 0.5 ? '#2ecc71' : pct > 0.25 ? '#f1c40f' : '#e74c3c';
+  ctx.fillRect(barX, barY, barW * pct, 10);
+  ctx.strokeStyle = '#111';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(barX, barY, barW, 10);
 }
 
 function rectPct(ctx, x, y, w, h, px, py, pw, ph, color) {

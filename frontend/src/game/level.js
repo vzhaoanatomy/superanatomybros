@@ -185,6 +185,48 @@ export function buildLevel({ world, durationMinutes }) {
     termId: vocab[Math.floor(vocab.length / 2)].id,
   };
 
+  // Power-ups sit directly above a solid ground segment at a low, always-
+  // walkable height, so they never carry the reachability risk floating
+  // platforms do. The y-range is bounded on both ends: never so low it sinks
+  // into the ground, never so high a standing player's bounding box (top at
+  // GROUND_Y - PLAYER_HEIGHT) fails to overlap its bottom edge.
+  const POWER_UP_SIZE = 28;
+  const powerUpTypes = ['mushroom', 'star', 'egg'];
+  const powerUpCount = Math.max(1, Math.round(width / 3500));
+  const powerUps = [];
+  for (let i = 0; i < powerUpCount; i++) {
+    const [sx1, sx2] = solidSegments[(i + 1) % solidSegments.length];
+    const margin = 80;
+    const segSpan = Math.max(40, sx2 - sx1 - margin * 2);
+    powerUps.push({
+      id: `power-${i}`,
+      type: powerUpTypes[i % powerUpTypes.length],
+      x: sx1 + margin + rng() * segSpan,
+      y: GROUND_Y - (34 + rng() * 38),
+      width: POWER_UP_SIZE,
+      height: POWER_UP_SIZE,
+      collected: false,
+    });
+  }
+
+  // World 7 only: a final boss blocking the way to the flag, tall enough
+  // that no jump clears it (same trick as the checkpoint door).
+  const flag = { x: width - 100, y: GROUND_Y - 200, width: 20, height: 200 };
+  const BOSS_HEIGHT = 240;
+  const boss =
+    world.index === 7
+      ? {
+          x: flag.x - 260,
+          y: GROUND_Y - BOSS_HEIGHT,
+          width: 100,
+          height: BOSS_HEIGHT,
+          hp: 3,
+          maxHp: 3,
+          alive: true,
+          pending: false,
+        }
+      : null;
+
   return {
     width,
     groundY: GROUND_Y,
@@ -193,6 +235,8 @@ export function buildLevel({ world, durationMinutes }) {
     coins,
     enemies,
     door,
-    flag: { x: width - 100, y: GROUND_Y - 200, width: 20, height: 200 },
+    powerUps,
+    boss,
+    flag,
   };
 }

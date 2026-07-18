@@ -12,14 +12,21 @@ import { buildLevel, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
 import { getWorld, DURATION_SECONDS } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
-import { drawBackground, drawPlatform, drawCoin, drawDoor, drawFlag, drawEnemy, drawPlayer } from './spriteRenderer';
+import {
+  drawBackground,
+  drawPlatform,
+  drawCoin,
+  drawDoor,
+  drawFlag,
+  drawEnemy,
+  drawPlayer,
+  drawPowerUp,
+  drawBoss,
+  drawMountBadge,
+} from './spriteRenderer';
 import { toggleMusic, isMusicPlaying, playSuccessFanfare } from './music';
-import CoinQuiz from '../overlays/CoinQuiz';
-import EnemyEncounter from '../overlays/EnemyEncounter';
-import DoorQuiz from '../overlays/DoorQuiz';
-import EndOfLevelQuiz from '../overlays/EndOfLevelQuiz';
-import ReviewMissedTerms from '../overlays/ReviewMissedTerms';
-import LevelComplete from '../overlays/LevelComplete';
+import GameHud from './GameHud';
+import GameOverlays from './GameOverlays';
 
 const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const LEFT_KEYS = new Set(['ArrowLeft', 'KeyA']);
@@ -36,6 +43,10 @@ const GROUND_POUND_RADIUS = 90;
 // jump that's 20% *higher* (not 20% faster launch), scale velocity by sqrt(1.2).
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 const HUD_PUSH_INTERVAL_MS = 100;
+const STAR_DURATION_MS = 8000;
+const MOUNT_SPEED_MULTIPLIER = 1.5;
+const MAX_LIVES = 5;
+const BOSS_DEFEAT_SCORE = 1500;
 
 function aabbOverlap(a, b) {
   return (
@@ -140,6 +151,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       facing: 1,
       invulnerableUntil: 0,
       pounding: false,
+      starUntil: 0,
+      mounted: false,
     };
 
     const state = {
@@ -173,6 +186,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function loseLife() {
+      // The egg mount absorbs one hit: no life lost, no respawn-to-start —
+      // just the mount pops and a brief invulnerability window opens.
+      if (player.mounted) {
+        player.mounted = false;
+        player.invulnerableUntil = performance.now() + INVULN_MS;
+        return;
+      }
       state.lives -= 1;
       if (state.lives <= 0) {
         state.lives = 3;
@@ -184,6 +204,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     function resetRun() {
       respawnPlayer();
       player.invulnerableUntil = 0;
+      player.starUntil = 0;
+      player.mounted = false;
       for (const coin of level.coins) {
         coin.collected = false;
         coin.pending = false;
@@ -193,6 +215,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         enemy.alive = true;
         enemy.pending = false;
         enemy.x = enemy.startX;
+      }
+      for (const p of level.powerUps) {
+        p.collected = false;
+      }
+      if (level.boss) {
+        level.boss.hp = level.boss.maxHp;
+        level.boss.alive = true;
+        level.boss.pending = false;
       }
       level.door.passed = false;
       level.door.pending = false;
@@ -255,10 +285,43 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       handlersRef.current._pendingResolve = (isCorrect) => {
         handlersRef.current._pendingResolve = null;
         onResolve(isCorrect);
-        pausedRef.current = false;
-        setOverlay(null);
+        // onResolve may chain straight into another openQuiz call (the boss
+        // battle's 3-question sequence) — if it did, a fresh _pendingResolve
+        // is already set, so skip the unpause/clear that would stomp it.
+        if (!handlersRef.current._pendingResolve) {
+          pausedRef.current = false;
+          setOverlay(null);
+        }
       };
       setOverlay({ type, question });
+    }
+
+    function openBossQuestion(questionNum) {
+      const boss = level.boss;
+      const termId = vocab[Math.floor(Math.random() * vocab.length)].id;
+      const question = buildQuestion(vocab, termId);
+      openQuiz(
+        'boss',
+        { ...question, questionNum, hp: boss.hp, maxHp: boss.maxHp },
+        (isCorrect) => {
+          if (isCorrect) {
+            boss.hp -= 1;
+          } else {
+            recordWrong(termId);
+            loseLife();
+          }
+          if (boss.hp <= 0) {
+            boss.alive = false;
+            boss.pending = false;
+            state.score += BOSS_DEFEAT_SCORE;
+            playSuccessFanfare();
+          } else if (questionNum < 3) {
+            openBossQuestion(questionNum + 1);
+          } else {
+            boss.pending = false;
+          }
+        }
+      );
     }
 
     function updatePhysics(dt) {
@@ -275,11 +338,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const downHeld = [...DOWN_KEYS].some((k) => keys.has(k));
 
       if (!player.pounding) {
+        const runSpeed = player.mounted ? RUN_SPEED * MOUNT_SPEED_MULTIPLIER : RUN_SPEED;
         if (left && !right) {
-          player.vx = -RUN_SPEED;
+          player.vx = -runSpeed;
           player.facing = -1;
         } else if (right && !left) {
-          player.vx = RUN_SPEED;
+          player.vx = runSpeed;
           player.facing = 1;
         } else {
           player.vx = 0;
@@ -312,7 +376,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       const doorSolid = !level.door.passed ? [level.door] : [];
-      const solids = [...level.platforms, ...doorSolid];
+      const bossSolid = level.boss && level.boss.alive ? [level.boss] : [];
+      const solids = [...level.platforms, ...doorSolid, ...bossSolid];
 
       player.x += player.vx;
       player.x = Math.max(0, Math.min(player.x, level.width - player.width));
@@ -329,6 +394,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             recordWrong(level.door.termId);
           }
         });
+        player.x = pushBack;
+      }
+
+      if (level.boss && level.boss.alive && !level.boss.pending && aabbOverlap(player, level.boss)) {
+        const pushBack = player.vx > 0 ? level.boss.x - player.width : level.boss.x + level.boss.width;
+        level.boss.pending = true;
+        openBossQuestion(1);
         player.x = pushBack;
       }
       resolveHorizontal(player, solids);
@@ -356,7 +428,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
           if (enemy.pending || !aabbOverlap(player, enemy)) continue;
 
-          if (player.pounding) {
+          if (player.pounding || performance.now() < player.starUntil) {
             enemy.alive = false;
             state.score += 50;
           } else if (performance.now() >= player.invulnerableUntil) {
@@ -400,6 +472,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         }
       }
 
+      if (!pausedRef.current) {
+        for (const p of level.powerUps) {
+          if (p.collected) continue;
+          if (!aabbOverlap(player, p)) continue;
+          p.collected = true;
+          if (p.type === 'mushroom') {
+            state.lives = Math.min(MAX_LIVES, state.lives + 1);
+          } else if (p.type === 'star') {
+            player.starUntil = performance.now() + STAR_DURATION_MS;
+          } else if (p.type === 'egg') {
+            player.mounted = true;
+          }
+        }
+      }
+
       if (!pausedRef.current && !state.levelComplete && player.x + player.width >= level.flag.x) {
         state.levelComplete = true;
         const bonus = Math.floor(Math.max(0, state.timeRemaining)) * 10;
@@ -426,15 +513,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
       for (const coin of level.coins) drawCoin(ctx, coin);
+      for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
       for (const enemy of level.enemies) {
         if (enemy.alive) drawEnemy(ctx, enemy, world.enemyType);
       }
+      if (level.boss) drawBoss(ctx, level.boss);
       drawDoor(ctx, level.door);
       drawFlag(ctx, level.flag);
 
       const now = performance.now();
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
-      drawPlayer(ctx, player, characterId, { flashing });
+      const invincible = now < player.starUntil;
+      if (player.mounted) drawMountBadge(ctx, player);
+      drawPlayer(ctx, player, characterId, { flashing, invincible });
 
       ctx.restore();
 
@@ -450,6 +541,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           comboCount: state.coinsCollected % 5,
           gliding: state.gliding,
           pounding: state.pounding,
+          starActive: invincible,
+          mounted: player.mounted,
+          bossHp: level.boss ? level.boss.hp : null,
+          bossMaxHp: level.boss ? level.boss.maxHp : null,
+          bossAlive: level.boss ? level.boss.alive : false,
         });
       }
     }
@@ -493,77 +589,23 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   return (
     <div className="game-page">
       <div className="game-frame" style={{ width: viewportSize.w + 8 }}>
-        <div className="hud-panel">
-          <div className="hud-top">
-            <div className="hud-hearts">
-              {Array.from({ length: hud?.lives ?? 3 }).map((_, i) => (
-                <span key={i}>♥</span>
-              ))}
-            </div>
-            <div className="hud-title">
-              <div className="hud-world-name">{world.name}</div>
-              <div className="hud-world-sub">
-                World {world.index}
-                {world.subtitle ? `: ${world.subtitle}` : ''}
-              </div>
-            </div>
-            <div className="hud-stats">
-              <span className={timeClass}>⏱ {formatClock(hud?.timeRemaining ?? world.defaultDurationMinutes * 60)}</span>
-              <span>
-                COINS {hud?.coinsCollected ?? 0}/{hud?.totalCoins ?? 0}
-              </span>
-              <span>SCORE {String(hud?.score ?? 0).padStart(6, '0')}</span>
-            </div>
-          </div>
-          <div className="hud-divider" />
-          <div className="hud-bottom">
-            <div className="hud-player">
-              PLAYER: <strong>{character.name}</strong> · <span className="hud-ability">{character.abilityName}</span>
-              {character.ability === 'coinCombo' && <span className="hud-status"> · Combo {hud?.comboCount ?? 0}/5</span>}
-              {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
-              {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="hud-music"
-                onClick={() => setMusicOn(toggleMusic())}
-              >
-                {musicOn ? '♪ Music On' : '♪ Music Off'}
-              </button>
-              {onQuit && (
-                <button type="button" className="hud-quit" onClick={onQuit}>
-                  ⇥ Quit
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <GameHud
+          world={world}
+          character={character}
+          hud={hud}
+          timeClass={timeClass}
+          formatClock={formatClock}
+          musicOn={musicOn}
+          onToggleMusic={() => setMusicOn(toggleMusic())}
+          onQuit={onQuit}
+        />
         <div className="game-viewport" style={{ width: viewportSize.w, height: viewportSize.h }}>
           <canvas
             ref={canvasRef}
             style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
           />
 
-          {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
-          {overlay?.type === 'enemy' && <EnemyEncounter question={overlay.question} onAnswer={h.resolveQuiz} />}
-          {overlay?.type === 'door' && <DoorQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
-          {overlay?.type === 'endOfLevel' && (
-            <EndOfLevelQuiz questions={overlay.questions} onFinish={h.finishEndOfLevel} />
-          )}
-          {overlay?.type === 'complete' && (
-            <LevelComplete
-              score={h.getScore?.() ?? 0}
-              timeBonus={h.getTimeBonus?.() ?? 0}
-              hasMissed={h.hasMissed?.() ?? false}
-              onReview={h.openReview}
-              onPlayAgain={h.playAgain}
-              onQuit={onQuit}
-            />
-          )}
-          {overlay?.type === 'review' && (
-            <ReviewMissedTerms items={h.getMissedItems?.() ?? []} onClose={h.closeReview} />
-          )}
+          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} />
         </div>
         <div className="controls-hint">Arrows/WASD to move · Space/Up to jump · Down for ability</div>
       </div>
