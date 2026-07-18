@@ -79,10 +79,21 @@ function formatClock(seconds) {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
+// Fits the viewport within both window dimensions at once — HUD panel,
+// frame borders, controls hint, and page padding all eat into vertical
+// space, so a width-only cap left the ground below the fold on shorter
+// screens. Aspect ratio (2:1) is preserved either way.
 function computeViewportSize() {
   if (typeof window === 'undefined') return { w: 960, h: 480 };
-  const w = Math.min(window.innerWidth - 64, 1400);
-  const h = Math.round(w * 0.5);
+  const CHROME_HEIGHT = 230; // hud-panel + divider + controls-hint + borders + page padding
+  const maxW = Math.min(window.innerWidth - 64, 1300);
+  const maxH = Math.max(300, window.innerHeight - CHROME_HEIGHT);
+  let w = maxW;
+  let h = Math.round(w * 0.5);
+  if (h > maxH) {
+    h = maxH;
+    w = Math.round(h * 2);
+  }
   return { w, h };
 }
 

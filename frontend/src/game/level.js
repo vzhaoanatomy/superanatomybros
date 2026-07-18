@@ -57,16 +57,26 @@ export function buildLevel({ world, durationMinutes }) {
   // Platforms are placed into evenly-sized slots along the width, each with
   // bounded jitter — pure random placement let some end up nearly stacked
   // while others were far apart. Slots guarantee a minimum gap between
-  // neighbors while still varying position/size within each slot.
+  // neighbors while still varying position/size within each slot. Each slot
+  // also picks a height band (low or high, for a real alternate route) and
+  // sometimes a 2-platform chain instead of a single block, so there's more
+  // than one line to run along.
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
   const usableWidth = width - 600;
   const slotWidth = usableWidth / platformCount;
   for (let i = 0; i < platformCount; i++) {
-    const pw = 100 + rng() * 80;
-    const maxJitter = Math.max(0, slotWidth - pw - 60);
-    const px = 250 + i * slotWidth + 30 + rng() * maxJitter;
-    const py = 220 + rng() * 170;
-    platforms.push({ x: px, y: py, width: pw, height: 24, type: 'block' });
+    const slotStart = 250 + i * slotWidth;
+    const highBand = rng() < 0.45;
+    const py = highBand ? 150 + rng() * 90 : 300 + rng() * 110;
+    const chainLength = rng() < 0.35 && slotWidth > 220 ? 2 : 1;
+
+    let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
+    for (let c = 0; c < chainLength; c++) {
+      const pw = 90 + rng() * 70;
+      if (cursorX + pw > slotStart + slotWidth - 20) break;
+      platforms.push({ x: cursorX, y: py, width: pw, height: 24, type: 'block' });
+      cursorX += pw + 40 + rng() * 25;
+    }
   }
 
   // Staircases: 2-3 ascending platforms a player can climb from lower to

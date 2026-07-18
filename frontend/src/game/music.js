@@ -1,10 +1,11 @@
 // Procedural chiptune background music via the Web Audio API — no audio
 // files, just oscillators. Square lead + triangle harmony (an octave below)
-// + sawtooth bass + a simple kick/snare pulse, ~170 BPM. Six short chord-
-// progression "sections" are picked in a non-consecutive order so the loop
-// doesn't feel like the same 4 bars over and over.
+// + sawtooth bass + a simple kick/snare pulse, ~195 BPM with short staccato
+// notes and an accented downbeat for a bouncy, platformer-ish feel. Six
+// short chord-progression "sections" are picked in a non-consecutive order
+// so the loop doesn't feel like the same 4 bars over and over.
 
-const BPM = 170;
+const BPM = 195;
 const BEAT_SEC = 60 / BPM;
 const STEP_SEC = BEAT_SEC / 2; // eighth notes
 const STEPS_PER_SECTION = 16;
@@ -124,9 +125,12 @@ function scheduleStep(step, time) {
   const chord = CHORDS[section.progression[groupIndex]];
   const chordTone = chord[section.pattern[step % 4]];
 
+  // Short, staccato notes with an accented downbeat give a bouncy,
+  // platformer "hop" feel rather than a smooth legato line.
+  const isDownbeat = step % 4 === 0;
   const leadNote = transposeOctave(chordTone, 1);
-  playTone(ctx, noteFreq(leadNote), time, STEP_SEC * 0.9, 'square', 0.11);
-  playTone(ctx, noteFreq(transposeOctave(leadNote, -1)), time, STEP_SEC * 0.9, 'triangle', 0.07);
+  playTone(ctx, noteFreq(leadNote), time, STEP_SEC * 0.55, 'square', isDownbeat ? 0.15 : 0.1);
+  playTone(ctx, noteFreq(transposeOctave(leadNote, -1)), time, STEP_SEC * 0.55, 'triangle', 0.07);
 
   if (step % 4 === 0) {
     const rootNote = transposeOctave(chord[0], -1);

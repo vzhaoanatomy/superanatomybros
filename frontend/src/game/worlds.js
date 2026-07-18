@@ -144,4 +144,4 @@ export function getWorld(id) {
 }
 
 export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };
-export const WIDTH_BY_DURATION = { 2: 3400, 3: 5200, 5: 8400 };
+export const WIDTH_BY_DURATION = { 2: 4800, 3: 7400, 5: 12000 };
