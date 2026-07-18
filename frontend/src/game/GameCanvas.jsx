@@ -223,6 +223,23 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     let lastHudPush = 0;
     let lastFireballTime = 0;
     let lastTongueTime = 0;
+    let glossaryOpen = false;
+
+    // Toggled by the G key or the HUD button — a plain pause/resume like
+    // any quiz overlay, just without a resolve callback. Won't open over an
+    // already-active quiz/other overlay, and won't fight one that opens
+    // while it's up since those set pausedRef themselves.
+    function toggleGlossary() {
+      if (glossaryOpen) {
+        glossaryOpen = false;
+        pausedRef.current = false;
+        setOverlay(null);
+      } else if (!pausedRef.current) {
+        glossaryOpen = true;
+        pausedRef.current = true;
+        setOverlay({ type: 'glossary' });
+      }
+    }
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
@@ -337,10 +354,16 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     handlersRef.current.getScore = () => state.score;
     handlersRef.current.getTimeBonus = () => state.lastTimeBonus;
     handlersRef.current.hasMissed = () => state.missedTermIds.size > 0;
+    handlersRef.current.toggleGlossary = toggleGlossary;
+    handlersRef.current.getVocab = () => vocab;
 
     function handleKeyDown(e) {
       if (JUMP_KEYS.has(e.code) || LEFT_KEYS.has(e.code) || RIGHT_KEYS.has(e.code) || DOWN_KEYS.has(e.code)) {
         e.preventDefault();
+      }
+      if (e.code === 'KeyG') {
+        toggleGlossary();
+        return;
       }
       keysRef.current.add(e.code);
     }
@@ -811,6 +834,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           formatClock={formatClock}
           musicOn={musicOn}
           onToggleMusic={() => setMusicOn(toggleMusic())}
+          onToggleGlossary={h.toggleGlossary}
           onQuit={onQuit}
         />
         <div className="game-viewport" style={{ width: viewportSize.w, height: viewportSize.h }}>

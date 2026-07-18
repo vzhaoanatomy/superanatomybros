@@ -2,7 +2,17 @@
 // score, player ability status, music toggle, quit. Pure presentation over
 // the throttled `hud` snapshot GameCanvas pushes each frame; no game state
 // of its own.
-export default function GameHud({ world, character, hud, timeClass, formatClock, musicOn, onToggleMusic, onQuit }) {
+export default function GameHud({
+  world,
+  character,
+  hud,
+  timeClass,
+  formatClock,
+  musicOn,
+  onToggleMusic,
+  onToggleGlossary,
+  onQuit,
+}) {
   return (
     <div className="hud-panel">
       <div className="hud-top">
@@ -38,7 +48,7 @@ export default function GameHud({ world, character, hud, timeClass, formatClock,
           {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
           {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}
           {hud?.starActive && <span className="hud-status warn"> · 🌈 STAR POWER!</span>}
-          {hud?.mounted && <span className="hud-status"> · 🦖 Riding Dino</span>}
+          {hud?.mounted && <span className="hud-status warn"> · 🦖 Tongue Lick (↓/S)</span>}
           {hud?.big && <span className="hud-status"> · 🍄 Big!</span>}
           {hud?.hasFire && <span className="hud-status warn"> · 🔥 Fire Power (F)</span>}
           {hud?.bossAlive && (
@@ -49,6 +59,11 @@ export default function GameHud({ world, character, hud, timeClass, formatClock,
           )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {onToggleGlossary && (
+            <button type="button" className="hud-music" onClick={onToggleGlossary}>
+              📖 Terms (G)
+            </button>
+          )}
           <button type="button" className="hud-music" onClick={onToggleMusic}>
             {musicOn ? '♪ Music On' : '♪ Music Off'}
           </button>

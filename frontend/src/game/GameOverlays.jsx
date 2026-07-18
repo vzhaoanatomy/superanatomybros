@@ -4,6 +4,7 @@ import DoorQuiz from '../overlays/DoorQuiz';
 import BossEncounter from '../overlays/BossEncounter';
 import EndOfLevelQuiz from '../overlays/EndOfLevelQuiz';
 import ReviewMissedTerms from '../overlays/ReviewMissedTerms';
+import TermGlossary from '../overlays/TermGlossary';
 import LevelComplete from '../overlays/LevelComplete';
 
 // Picks the one overlay component matching the loop's current `overlay`
@@ -32,6 +33,9 @@ export default function GameOverlays({ overlay, h, onQuit, world }) {
       )}
       {overlay?.type === 'review' && (
         <ReviewMissedTerms items={h.getMissedItems?.() ?? []} onClose={h.closeReview} />
+      )}
+      {overlay?.type === 'glossary' && (
+        <TermGlossary items={h.getVocab?.() ?? []} onClose={h.toggleGlossary} />
       )}
     </>
   );
