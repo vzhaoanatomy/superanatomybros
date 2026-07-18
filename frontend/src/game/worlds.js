@@ -1,3 +1,5 @@
+import { loadCustomWorldData, loadJoinedWorlds } from '../storage';
+
 // 7 built-in world "shells": theme, enemy type, and a small sample vocab set
 // per world. Teacher Mode (Phase 6) lets teachers replace/extend any world's
 // vocab — these are just enough sample terms for a working demo, not full
@@ -143,9 +145,63 @@ export const WORLDS = [
   },
 ];
 
+// Merges the 7 built-ins (with any Teacher Mode override applied) with
+// locally-created custom worlds and any classroom worlds the player has
+// joined by code. `getWorld`/the menu both read through this rather than the
+// static `WORLDS` array directly, so custom/classroom worlds are playable via
+// the exact same world-select -> character-select -> GameCanvas flow.
+export function getAllWorlds() {
+  const { overrides, custom } = loadCustomWorldData();
+  const joined = loadJoinedWorlds();
+
+  const builtIns = WORLDS.map((world) => {
+    const override = overrides[world.id];
+    if (!override) return world;
+    return {
+      ...world,
+      name: override.name ?? world.name,
+      subtitle: override.subtitle ?? world.subtitle,
+      defaultDurationMinutes: override.defaultDurationMinutes ?? world.defaultDurationMinutes,
+      vocab: override.vocab ?? world.vocab,
+      customized: true,
+      custom: true,
+    };
+  });
+
+  const customWorlds = custom.map((world, i) => ({
+    ...world,
+    index: WORLDS.length + 1 + i,
+    isCustom: true,
+    custom: true,
+  }));
+
+  const joinedWorlds = joined.map((world, i) => ({
+    ...world,
+    index: WORLDS.length + 1 + custom.length + i,
+    isClassroom: true,
+    custom: true,
+  }));
+
+  return [...builtIns, ...customWorlds, ...joinedWorlds];
+}
+
 export function getWorld(id) {
-  return WORLDS.find((w) => w.id === id) ?? WORLDS[0];
+  return getAllWorlds().find((w) => w.id === id) ?? WORLDS[0];
 }
 
 export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };
 export const WIDTH_BY_DURATION = { 2: 4800, 3: 7400, 5: 12000 };
+
+// Teacher Mode's builder offers these as pick-a-theme presets for brand-new
+// custom worlds (built-in edits keep the built-in's own theme/enemy).
+export const ENEMY_TYPE_OPTIONS = [
+  { type: 'goomba', label: 'Goomba-style blob' },
+  { type: 'skinBlob', label: 'Skin-disease blob' },
+  { type: 'skeleton', label: 'Skeleton' },
+  { type: 'muscleBrawler', label: 'Muscle-brawler' },
+  { type: 'neuron', label: 'Neuron' },
+  { type: 'clot', label: 'Blood clot' },
+  { type: 'labCat', label: 'Lab cat' },
+];
+
+export const PALETTE_PRESETS = WORLDS.map((w) => ({ key: w.id, label: w.name, palette: w.palette }));

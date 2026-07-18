@@ -173,6 +173,37 @@ export function buildLevel({ world, durationMinutes }) {
     });
   }
 
+  // Some floating platforms get a patrolling enemy too, not just the ground —
+  // scales with difficulty so later worlds feel busier up top. Reuses the
+  // exact same fixed-y patrol shape as ground enemies (no gravity/collision
+  // needed for enemies at all); only the x-span source differs (the
+  // platform's own width instead of a ground segment).
+  const blockPlatforms = platforms.filter((p) => p.type === 'block' && p.width >= 90);
+  const platformSpawnChance = 0.25 + difficulty * 0.05;
+  let platformEnemyIndex = 0;
+  for (const platform of blockPlatforms) {
+    if (rng() >= platformSpawnChance) continue;
+    const patrolMargin = Math.min(20, platform.width * 0.15);
+    const minX = platform.x + patrolMargin;
+    const maxX = Math.max(minX + 40, platform.x + platform.width - patrolMargin - 42);
+    const startX = minX + rng() * Math.max(1, maxX - minX);
+    enemies.push({
+      id: `platform-enemy-${platformEnemyIndex}`,
+      x: startX,
+      startX,
+      minX,
+      maxX,
+      y: platform.y - 42,
+      width: 42,
+      height: 42,
+      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.6),
+      alive: true,
+      pending: false,
+      termId: vocab[(platformEnemyIndex * 5 + 2) % vocab.length].id,
+    });
+    platformEnemyIndex += 1;
+  }
+
   const DOOR_HEIGHT = 320;
   const doorX = Math.min(width * 0.35, width - 600);
   const door = {

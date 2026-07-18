@@ -26,6 +26,8 @@ import {
   drawFireball,
 } from './spriteRenderer';
 import { toggleMusic, isMusicPlaying, playSuccessFanfare, playStarPowerSound, playFireballSound } from './music';
+import { recordLocalScore, getNickname } from '../storage';
+import { submitScore } from '../api';
 import GameHud from './GameHud';
 import GameOverlays from './GameOverlays';
 
@@ -261,6 +263,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     handlersRef.current.finishEndOfLevel = (results) => {
       for (const r of results) {
         if (!r.correct) recordWrong(r.termId);
+      }
+      recordLocalScore({
+        worldId: world.id,
+        worldName: world.name,
+        characterName: character.name,
+        score: state.score,
+        date: new Date().toISOString(),
+      });
+      if (world.isClassroom) {
+        const nickname = getNickname();
+        if (nickname) submitScore(world.code, nickname, state.score).catch(() => {});
       }
       setOverlay({ type: 'complete' });
     };
@@ -675,7 +688,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
           />
 
-          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} />
+          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} />
         </div>
         <div className="controls-hint">
           Arrows/WASD to move · Space/Up to jump · Down for ability · F to throw fireball (with Fire Flower)

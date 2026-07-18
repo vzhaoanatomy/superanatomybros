@@ -174,11 +174,28 @@ export function toggleMusic() {
   return playing;
 }
 
+let sfxEnabled = true;
+
+export function isSfxEnabled() {
+  return sfxEnabled;
+}
+
+export function toggleSfx() {
+  sfxEnabled = !sfxEnabled;
+  return sfxEnabled;
+}
+
+export function setSfxEnabled(value) {
+  sfxEnabled = value;
+  return sfxEnabled;
+}
+
 // One-shot SFX — share the same lazily-created AudioContext as the music so
 // they work whether or not background music is toggled on. These are called
 // from real click handlers (quiz answers) or shortly after one (reaching the
 // flag), so the context is already unlocked by the time they fire.
 export function playCorrectChime() {
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;
@@ -187,6 +204,7 @@ export function playCorrectChime() {
 }
 
 export function playWrongBuzz() {
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;
@@ -206,6 +224,7 @@ export function playWrongBuzz() {
 // entirely up front on the audio clock — no JS timer keeps it running, so it
 // can't be cut short by rAF/setTimeout throttling in a backgrounded tab.
 export function playStarPowerSound(durationMs = 8000) {
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t0 = ctx.currentTime;
@@ -223,6 +242,7 @@ export function playStarPowerSound(durationMs = 8000) {
 }
 
 export function playFireballSound() {
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;
@@ -239,6 +259,7 @@ export function playFireballSound() {
 }
 
 export function playSuccessFanfare() {
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;

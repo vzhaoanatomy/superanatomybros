@@ -9,7 +9,7 @@ import LevelComplete from '../overlays/LevelComplete';
 // Picks the one overlay component matching the loop's current `overlay`
 // state (see openQuiz in GameCanvas) and wires its callbacks back to the
 // handlersRef bridge (`h`) the loop exposes.
-export default function GameOverlays({ overlay, h, onQuit }) {
+export default function GameOverlays({ overlay, h, onQuit, world }) {
   return (
     <>
       {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
@@ -27,6 +27,7 @@ export default function GameOverlays({ overlay, h, onQuit }) {
           onReview={h.openReview}
           onPlayAgain={h.playAgain}
           onQuit={onQuit}
+          classroomCode={world?.isClassroom ? world.code : null}
         />
       )}
       {overlay?.type === 'review' && (
