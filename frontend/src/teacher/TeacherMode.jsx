@@ -3,6 +3,7 @@ import { getAllWorlds, WORLDS } from '../game/worlds';
 import { loadCustomWorldData, saveCustomWorldData, loadJoinedWorlds, saveJoinedWorlds } from '../storage';
 import { publishWorld, updateWorld } from '../api';
 import WorldBuilderForm from './WorldBuilderForm';
+import MissedTermsPanel from './MissedTermsPanel';
 import * as t from './teacherStyles';
 
 export default function TeacherMode({ onExit }) {
@@ -10,6 +11,7 @@ export default function TeacherMode({ onExit }) {
   const [editing, setEditing] = useState(null); // null | 'new' | { world, isBuiltIn }
   const [publishingId, setPublishingId] = useState(null);
   const [publishError, setPublishError] = useState(null); // { id, message }
+  const [statsForId, setStatsForId] = useState(null);
 
   const worlds = getAllWorlds();
 
@@ -196,7 +198,21 @@ export default function TeacherMode({ onExit }) {
                   >
                     Copy
                   </button>
+                  <button
+                    type="button"
+                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+                    onClick={() => setStatsForId(statsForId === world.id ? null : world.id)}
+                  >
+                    📊 Missed Terms
+                  </button>
                 </div>
+              )}
+              {statsForId === world.id && world.classroomCode && (
+                <MissedTermsPanel
+                  code={world.classroomCode}
+                  vocab={world.vocab}
+                  onClose={() => setStatsForId(null)}
+                />
               )}
               {publishError?.id === world.id && (
                 <p style={{ color: '#ff8a5c', fontSize: 13, marginTop: 8 }}>{publishError.message}</p>

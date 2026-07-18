@@ -4,8 +4,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from codes import unique_code
-from db import scores_collection, worlds_collection
-from models import ScoreEntry, ScoreSubmitRequest, WorldPayload, WorldPublishResponse
+from db import scores_collection, term_stats_collection, worlds_collection
+from models import ScoreEntry, ScoreSubmitRequest, TermMissStat, WorldPayload, WorldPublishResponse
 
 app = FastAPI(title="Super Anatomy Bros API")
 
@@ -68,6 +68,15 @@ async def submit_score(code: str, payload: ScoreSubmitRequest):
         {"$max": {"score": payload.score}, "$setOnInsert": {"code": code, "nickname": nickname}},
         upsert=True,
     )
+    # Every run's misses count toward the class-wide tally, not just each
+    # student's best run — this answers "what's tripping the class up,"
+    # a different question than the score leaderboard above.
+    for term_id in payload.missedTermIds:
+        await term_stats_collection.update_one(
+            {"code": code, "termId": term_id},
+            {"$inc": {"missCount": 1}},
+            upsert=True,
+        )
     return {"status": "ok"}
 
 
@@ -77,3 +86,10 @@ async def get_leaderboard(code: str):
     cursor = scores_collection.find({"code": code}).sort("score", -1)
     entries = [ScoreEntry(nickname=doc["nickname"], score=doc["score"]) async for doc in cursor]
     return entries
+
+
+@app.get("/api/worlds/{code}/missed-terms", response_model=list[TermMissStat])
+async def get_missed_terms(code: str):
+    code = code.upper()
+    cursor = term_stats_collection.find({"code": code}).sort("missCount", -1)
+    return [TermMissStat(termId=doc["termId"], missCount=doc["missCount"]) async for doc in cursor]

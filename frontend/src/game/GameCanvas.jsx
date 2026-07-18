@@ -29,6 +29,8 @@ import {
   drawShell,
   drawTongueFlick,
   drawSolidEgg,
+  drawScorePopup,
+  SCORE_POPUP_MS,
 } from './spriteRenderer';
 import {
   toggleMusic,
@@ -45,6 +47,7 @@ import { recordLocalScore, getNickname } from '../storage';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
 import GameOverlays from './GameOverlays';
+import TouchControls from './TouchControls';
 
 const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const LEFT_KEYS = new Set(['ArrowLeft', 'KeyA']);
@@ -209,6 +212,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       fireballs: [],
       shells: [],
       solidEggs: [],
+      scorePopups: [],
     };
 
     let lastFrameTime = performance.now();
@@ -218,6 +222,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
+    }
+
+    function popup(x, y, text, color) {
+      state.scorePopups.push({ x, y, text, color, createdAt: performance.now() });
     }
 
     function respawnPlayer() {
@@ -283,6 +291,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.fireballs = [];
       state.shells = [];
       state.solidEggs = [];
+      state.scorePopups = [];
       state.score = 0;
       state.lives = 3;
       state.coinsCollected = 0;
@@ -311,7 +320,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       });
       if (world.isClassroom) {
         const nickname = getNickname();
-        if (nickname) submitScore(world.code, nickname, state.score).catch(() => {});
+        if (nickname) submitScore(world.code, nickname, state.score, [...state.missedTermIds]).catch(() => {});
       }
       playLevelCompleteDings();
       setOverlay({ type: 'complete' });
@@ -569,9 +578,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
                 enemy.alive = false;
                 state.score += 50;
                 playStompSound();
+                popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
               } else {
                 recordWrong(enemy.termId);
                 loseLife();
+                popup(player.x + player.width / 2, player.y, '-1 Life', '#ff6b6b');
               }
             });
           }
@@ -621,11 +632,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               coin.collected = true;
               state.coinsCollected += 1;
               const combo = character.ability === 'coinCombo' && state.coinsCollected % 5 === 0;
-              state.score += combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
+              const gained = combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
+              state.score += gained;
+              popup(coin.x + coin.width / 2, coin.y, combo ? `+${gained} Combo!` : `+${gained}`, '#7de37b');
             } else {
               recordWrong(coin.termId);
               state.score -= COIN_WRONG_PENALTY;
               coin.bounceUntil = performance.now() + COIN_BOUNCE_MS;
+              popup(coin.x + coin.width / 2, coin.y, `-${COIN_WRONG_PENALTY}`, '#ff6b6b');
             }
           });
         }
@@ -711,6 +725,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       drawPlayer(ctx, player, characterId, { flashing, invincible, big: player.big });
       if (player.mounted) drawTongueFlick(ctx, player);
 
+      for (const p of state.scorePopups) drawScorePopup(ctx, p, now);
+      if (state.scorePopups.length) {
+        state.scorePopups = state.scorePopups.filter((p) => now - p.createdAt < SCORE_POPUP_MS);
+      }
+
       ctx.restore();
 
       if (now - lastHudPush > HUD_PUSH_INTERVAL_MS) {
@@ -732,6 +751,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           bossHp: level.boss ? level.boss.hp : null,
           bossMaxHp: level.boss ? level.boss.maxHp : null,
           bossAlive: level.boss ? level.boss.alive : false,
+          progress: Math.min(1, Math.max(0, player.x / level.flag.x)),
         });
       }
     }
@@ -791,6 +811,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             style={{ display: 'block', width: '100%', height: '100%', background: '#000', imageRendering: 'pixelated' }}
           />
 
+          <TouchControls keysRef={keysRef} />
           <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} />
         </div>
         <div className="controls-hint">

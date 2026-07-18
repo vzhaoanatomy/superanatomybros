@@ -43,10 +43,14 @@ export function fetchWorld(code) {
   return request(`/api/worlds/${code}`);
 }
 
-export function submitScore(code, nickname, score) {
-  return request(`/api/scores/${code}`, { method: 'POST', body: JSON.stringify({ nickname, score }) });
+export function submitScore(code, nickname, score, missedTermIds = []) {
+  return request(`/api/scores/${code}`, { method: 'POST', body: JSON.stringify({ nickname, score, missedTermIds }) });
 }
 
 export function fetchLeaderboard(code) {
   return request(`/api/scores/${code}`);
+}
+
+export function fetchMissedTerms(code) {
+  return request(`/api/worlds/${code}/missed-terms`);
 }

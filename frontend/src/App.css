@@ -119,6 +119,30 @@
   50% { opacity: 0.45; }
 }
 
+.hud-progress-track {
+  position: relative;
+  height: 6px;
+  background: #1f2937;
+  border-radius: 3px;
+  margin-top: 10px;
+  overflow: visible;
+}
+
+.hud-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #2ecc71, #7de37b);
+  transition: width 0.15s linear;
+}
+
+.hud-progress-flag {
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+}
+
 .hud-divider {
   height: 1px;
   background: #1f2937;
@@ -168,6 +192,18 @@
 .game-viewport {
   position: relative;
   border-top: 3px solid #1f2937;
+}
+
+@keyframes quiz-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+.quiz-shake {
+  animation: quiz-shake 0.4s ease-in-out;
 }
 
 .controls-hint {

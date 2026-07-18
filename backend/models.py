@@ -34,8 +34,16 @@ class WorldPublishResponse(BaseModel):
 class ScoreSubmitRequest(BaseModel):
     nickname: str = Field(min_length=1, max_length=24)
     score: int
+    missedTermIds: list[str] = []
 
 
 class ScoreEntry(BaseModel):
     nickname: str
     score: int
+
+
+# Aggregated across every run submitted for a classroom code, not just the
+# best one — this is "which terms trip the class up," not a per-student stat.
+class TermMissStat(BaseModel):
+    termId: str
+    missCount: int

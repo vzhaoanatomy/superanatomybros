@@ -9,19 +9,24 @@ const FEEDBACK_DELAY_MS = 700;
 // sees whether they got it right before the overlay closes.
 export default function QuizOverlay({ title, statsText, prompt, definition, options, correctId, onAnswer }) {
   const [selected, setSelected] = useState(null);
+  const [wrong, setWrong] = useState(false);
 
   function handleClick(optionId) {
     if (selected) return;
     setSelected(optionId);
     const isCorrect = optionId === correctId;
-    if (isCorrect) playCorrectChime();
-    else playWrongBuzz();
+    if (isCorrect) {
+      playCorrectChime();
+    } else {
+      playWrongBuzz();
+      setWrong(true);
+    }
     setTimeout(() => onAnswer(isCorrect), FEEDBACK_DELAY_MS);
   }
 
   return (
-    <div style={backdrop}>
-      <div style={quizCard}>
+    <div style={{ ...backdrop, background: wrong ? 'rgba(120, 20, 20, 0.6)' : backdrop.background }}>
+      <div style={quizCard} className={wrong ? 'quiz-shake' : undefined}>
         <div style={quizHeader}>
           <strong style={{ fontSize: 20, letterSpacing: 1, textTransform: 'uppercase' }}>{title}</strong>
           {statsText && <span style={{ fontSize: 13, opacity: 0.92 }}>{statsText}</span>}

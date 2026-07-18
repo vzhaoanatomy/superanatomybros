@@ -13,3 +13,4 @@ db = client[DB_NAME]
 
 worlds_collection = db["worlds"]
 scores_collection = db["scores"]
+term_stats_collection = db["term_stats"]

@@ -26,6 +26,10 @@ export default function GameHud({ world, character, hud, timeClass, formatClock,
           <span>SCORE {String(hud?.score ?? 0).padStart(6, '0')}</span>
         </div>
       </div>
+      <div className="hud-progress-track">
+        <div className="hud-progress-fill" style={{ width: `${(hud?.progress ?? 0) * 100}%` }} />
+        <span className="hud-progress-flag">🚩</span>
+      </div>
       <div className="hud-divider" />
       <div className="hud-bottom">
         <div className="hud-player">

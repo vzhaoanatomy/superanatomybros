@@ -1026,3 +1026,21 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
   }
 }
 
+export const SCORE_POPUP_MS = 900;
+
+// A "+15" / "-10" / "+50" callout that rises and fades at the spot a quiz
+// was resolved — the immediate payoff cue for a coin/enemy/door answer.
+export function drawScorePopup(ctx, popup, now) {
+  const t = Math.min(1, (now - popup.createdAt) / SCORE_POPUP_MS);
+  const riseY = popup.y - t * 46;
+  ctx.save();
+  ctx.globalAlpha = 1 - t;
+  ctx.font = 'bold 19px ui-monospace, Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillText(popup.text, popup.x + 1, riseY + 1);
+  ctx.fillStyle = popup.color;
+  ctx.fillText(popup.text, popup.x, riseY);
+  ctx.restore();
+}
+
