@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { backdrop, quizCard, quizHeader, quizBody, quizOptionsGrid, quizOptionButton } from './overlayStyles';
+import { playCorrectChime, playWrongBuzz } from '../game/music';
 
 const FEEDBACK_DELAY_MS = 700;
 
@@ -12,7 +13,10 @@ export default function QuizOverlay({ title, statsText, prompt, definition, opti
   function handleClick(optionId) {
     if (selected) return;
     setSelected(optionId);
-    setTimeout(() => onAnswer(optionId === correctId), FEEDBACK_DELAY_MS);
+    const isCorrect = optionId === correctId;
+    if (isCorrect) playCorrectChime();
+    else playWrongBuzz();
+    setTimeout(() => onAnswer(isCorrect), FEEDBACK_DELAY_MS);
   }
 
   return (

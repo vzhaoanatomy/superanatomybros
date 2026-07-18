@@ -57,25 +57,45 @@ export function buildLevel({ world, durationMinutes }) {
   // Platforms are placed into evenly-sized slots along the width, each with
   // bounded jitter — pure random placement let some end up nearly stacked
   // while others were far apart. Slots guarantee a minimum gap between
-  // neighbors while still varying position/size within each slot. Each slot
-  // also picks a height band (low or high, for a real alternate route) and
-  // sometimes a 2-platform chain instead of a single block, so there's more
-  // than one line to run along.
+  // neighbors while still varying position/size within each slot.
+  //
+  // Every platform must be *scaffolded*: a full jump only reaches ~179px of
+  // rise (215px for Vee's super jump), so any platform higher than a single
+  // jump from the ground is built as a chain of steps, each within safe
+  // jump range of the last, guaranteeing a real path up rather than an
+  // isolated block nothing can reach.
+  const JUMP_RISE = 140; // conservative vertical reach per jump (base full jump is ~179px)
+  const JUMP_DX_CLIMB = 170; // conservative horizontal reach while also climbing
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
   const usableWidth = width - 600;
   const slotWidth = usableWidth / platformCount;
   for (let i = 0; i < platformCount; i++) {
     const slotStart = 250 + i * slotWidth;
-    const highBand = rng() < 0.45;
-    const py = highBand ? 150 + rng() * 90 : 300 + rng() * 110;
-    const chainLength = rng() < 0.35 && slotWidth > 220 ? 2 : 1;
+    const slotEnd = slotStart + slotWidth - 20;
+    const climbSteps = rng() < 0.4 ? (rng() < 0.5 ? 2 : 3) : 1;
 
     let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
-    for (let c = 0; c < chainLength; c++) {
-      const pw = 90 + rng() * 70;
-      if (cursorX + pw > slotStart + slotWidth - 20) break;
-      platforms.push({ x: cursorX, y: py, width: pw, height: 24, type: 'block' });
-      cursorX += pw + 40 + rng() * 25;
+    let cursorY = GROUND_Y - (60 + rng() * 75); // base step: always a single safe jump from the ground
+
+    for (let step = 0; step < climbSteps; step++) {
+      const pw = 90 + rng() * 60;
+      if (cursorX + pw > slotEnd) break;
+      platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
+
+      // Occasionally add a same-height bridge platform beside this step —
+      // an easy horizontal hop, not a climb, so no reachability risk.
+      if (rng() < 0.3 && cursorX + pw + 60 <= slotEnd) {
+        const bridgeX = cursorX + pw + 40 + rng() * 20;
+        const bridgeW = 80 + rng() * 50;
+        if (bridgeX + bridgeW <= slotEnd) {
+          platforms.push({ x: bridgeX, y: cursorY, width: bridgeW, height: 24, type: 'block' });
+          cursorX = bridgeX;
+        }
+      }
+
+      cursorX += pw * 0.3 + 60 + rng() * (JUMP_DX_CLIMB - 60);
+      cursorY -= 60 + rng() * (JUMP_RISE - 60);
+      if (cursorY < 140) break;
     }
   }
 

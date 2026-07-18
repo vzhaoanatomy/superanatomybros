@@ -13,7 +13,7 @@ import { getCharacter } from './characters';
 import { getWorld, DURATION_SECONDS } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
 import { drawBackground, drawPlatform, drawCoin, drawDoor, drawFlag, drawEnemy, drawPlayer } from './spriteRenderer';
-import { toggleMusic, isMusicPlaying } from './music';
+import { toggleMusic, isMusicPlaying, playSuccessFanfare } from './music';
 import CoinQuiz from '../overlays/CoinQuiz';
 import EnemyEncounter from '../overlays/EnemyEncounter';
 import DoorQuiz from '../overlays/DoorQuiz';
@@ -405,6 +405,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         const bonus = Math.floor(Math.max(0, state.timeRemaining)) * 10;
         state.score += bonus;
         state.lastTimeBonus = bonus;
+        playSuccessFanfare();
         const questions = buildEndOfLevelQuestions(vocab, [...state.missedTermIds]);
         pausedRef.current = true;
         setOverlay({ type: 'endOfLevel', questions });

@@ -173,3 +173,42 @@ export function toggleMusic() {
   }
   return playing;
 }
+
+// One-shot SFX — share the same lazily-created AudioContext as the music so
+// they work whether or not background music is toggled on. These are called
+// from real click handlers (quiz answers) or shortly after one (reaching the
+// flag), so the context is already unlocked by the time they fire.
+export function playCorrectChime() {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  playTone(ctx, noteFreq('C6'), t, 0.12, 'square', 0.16);
+  playTone(ctx, noteFreq('E6'), t + 0.09, 0.16, 'square', 0.16);
+}
+
+export function playWrongBuzz() {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(180, t);
+  osc.frequency.exponentialRampToValueAtTime(85, t + 0.25);
+  gain.gain.setValueAtTime(0.16, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.3);
+}
+
+export function playSuccessFanfare() {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  const notes = ['C5', 'C5', 'C5', 'G5'];
+  notes.forEach((n, i) => {
+    const dur = i === notes.length - 1 ? 0.4 : 0.14;
+    playTone(ctx, noteFreq(n), t + i * 0.15, dur, 'square', 0.18);
+  });
+}
