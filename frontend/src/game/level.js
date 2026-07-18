@@ -116,7 +116,12 @@ export function buildLevel({ world, durationMinutes }) {
   for (let i = 0; i < platformCount; i++) {
     const slotStart = 250 + i * slotWidth;
     const slotEnd = slotStart + slotWidth - 20;
-    const climbSteps = rng() < 0.4 ? (rng() < 0.5 ? 2 : 3) : 1;
+    // Multi-step "towers" (platforms stacked above platforms) are now the
+    // common case rather than the exception, biased toward taller stacks,
+    // so the level reads as real vertical climbing instead of one low
+    // platform floating above the ground.
+    const climbRoll = rng();
+    const climbSteps = climbRoll < 0.3 ? 1 : climbRoll < 0.55 ? 2 : climbRoll < 0.85 ? 3 : 4;
 
     let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
     let cursorY = GROUND_Y - (70 + rng() * 95); // base step: always a single safe jump from the ground, but reaching higher than before
@@ -147,7 +152,7 @@ export function buildLevel({ world, durationMinutes }) {
   // higher ground, each step within jump range of the last, with a bonus
   // coin waiting at the top. Purely optional — the main path never requires
   // climbing one.
-  const staircaseCount = 1 + Math.floor(difficulty / 3);
+  const staircaseCount = 2 + Math.floor(difficulty / 3);
   const bonusCoinSpots = [];
   for (let s = 0; s < staircaseCount; s++) {
     const zoneWidth = width / (staircaseCount + 1);
