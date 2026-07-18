@@ -629,6 +629,134 @@ export function drawBoss(ctx, boss) {
   ctx.strokeRect(barX, barY, barW, 10);
 }
 
+// Stationary end-of-level hazard — a pipe with a chomping head. The mouth
+// animation is purely time-driven (performance.now()), no state needed.
+export function drawPiranhaPlant(ctx, piranha) {
+  if (!piranha.alive) return;
+  const { x, y, width: w, height: h } = piranha;
+  const pipeH = h * 0.42;
+  const pipeY = y + h - pipeH;
+
+  ctx.fillStyle = '#1f7a39';
+  ctx.fillRect(x, pipeY, w, pipeH * 0.22);
+  ctx.fillStyle = '#2f9e4f';
+  ctx.fillRect(x + w * 0.08, pipeY + pipeH * 0.22, w * 0.84, pipeH * 0.78);
+
+  const headCY = y + h * 0.32;
+  const headRX = w * 0.42;
+  const headRY = h * 0.3;
+
+  ctx.strokeStyle = '#2f9e4f';
+  ctx.lineWidth = Math.max(2, w * 0.12);
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2, pipeY);
+  ctx.lineTo(x + w / 2, headCY + headRY * 0.6);
+  ctx.stroke();
+
+  ctx.fillStyle = '#e0453a';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, headCY, headRX, headRY, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  [
+    [-0.2, -0.28],
+    [0.22, -0.12],
+    [-0.05, 0.2],
+  ].forEach(([dx, dy]) => {
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2 + dx * w, headCY + dy * h, w * 0.06, w * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Chomp cycle: mouth opens and closes on a continuous time-based loop.
+  const chomp = (Math.sin(performance.now() / 260) + 1) / 2;
+  const mouthOpen = 3 + chomp * headRY * 0.85;
+  ctx.fillStyle = '#3a0a08';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, headCY + headRY * 0.35, headRX * 0.7, mouthOpen * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  for (let i = -1; i <= 1; i += 2) {
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2 + i * headRX * 0.32, headCY + headRY * 0.08);
+    ctx.lineTo(x + w / 2 + i * headRX * 0.5, headCY + headRY * 0.26);
+    ctx.lineTo(x + w / 2 + i * headRX * 0.18, headCY + headRY * 0.26);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.38, headCY - headRY * 0.32, w * 0.045, w * 0.045, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.62, headCY - headRY * 0.32, w * 0.045, w * 0.045, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Bipedal turtle enemy — defeated by a head-stomp or a fireball, not the
+// usual quiz gate. Faces the direction it's currently patrolling.
+export function drawKoopa(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  const faceDir = (enemy.vx ?? 1) >= 0 ? 1 : -1;
+  const headX = faceDir >= 0 ? x + w * 0.78 : x + w * 0.22;
+
+  ctx.fillStyle = '#e8c877';
+  ctx.fillRect(x + w * 0.15, y + h * 0.78, w * 0.22, h * 0.22);
+  ctx.fillRect(x + w * 0.63, y + h * 0.78, w * 0.22, h * 0.22);
+
+  ctx.fillStyle = '#e8c877';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.62, w * 0.32, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#2ecc71';
+  ctx.beginPath();
+  ctx.ellipse(x + w / 2, y + h * 0.42, w * 0.42, h * 0.36, 0, Math.PI, 0);
+  ctx.fill();
+  ctx.strokeStyle = '#1e8449';
+  ctx.lineWidth = Math.max(1, w * 0.04);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.28, y + h * 0.42);
+  ctx.lineTo(x + w * 0.72, y + h * 0.42);
+  ctx.moveTo(x + w / 2, y + h * 0.14);
+  ctx.lineTo(x + w / 2, y + h * 0.42);
+  ctx.stroke();
+
+  ctx.fillStyle = '#8bd17c';
+  ctx.beginPath();
+  ctx.ellipse(headX, y + h * 0.34, w * 0.18, h * 0.18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.ellipse(headX + faceDir * w * 0.05, y + h * 0.3, w * 0.035, h * 0.035, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// A thrown koopa shell — spins continuously via a time-based rotation angle.
+export function drawShell(ctx, shell) {
+  const { x, y, width: w, height: h } = shell;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const angle = (performance.now() / 80) % (Math.PI * 2);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#2ecc71';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1e8449';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.3, 0);
+  ctx.lineTo(w * 0.3, 0);
+  ctx.moveTo(0, -h * 0.3);
+  ctx.lineTo(0, h * 0.3);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function rectPct(ctx, x, y, w, h, px, py, pw, ph, color) {
   ctx.fillStyle = color;
   ctx.fillRect(x + px * w, y + py * h, pw * w, ph * h);

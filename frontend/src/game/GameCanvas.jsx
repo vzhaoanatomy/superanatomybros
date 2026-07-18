@@ -24,8 +24,19 @@ import {
   drawBoss,
   drawDinoMount,
   drawFireball,
+  drawPiranhaPlant,
+  drawKoopa,
+  drawShell,
 } from './spriteRenderer';
-import { toggleMusic, isMusicPlaying, playSuccessFanfare, playStarPowerSound, playFireballSound } from './music';
+import {
+  toggleMusic,
+  isMusicPlaying,
+  playSuccessFanfare,
+  playStarPowerSound,
+  playFireballSound,
+  playStompSound,
+} from './music';
+import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { recordLocalScore, getNickname } from '../storage';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
@@ -147,6 +158,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     const durationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
     const level = buildLevel({ world, durationMinutes });
     const vocab = world.vocab;
+    if (level.koopa) {
+      level.koopa.nextThrowAt = scheduleKoopaThrow();
+    }
 
     const player = {
       x: level.spawn.x,
@@ -178,6 +192,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
       fireballs: [],
+      shells: [],
     };
 
     let lastFrameTime = performance.now();
@@ -198,17 +213,26 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function loseLife() {
-      // The egg mount absorbs one hit: no life lost, no respawn-to-start —
-      // just the mount pops and a brief invulnerability window opens.
+      // Any active power-up absorbs one hit before an actual life is lost —
+      // mount pops first (biggest shield), then big, then fire — reverting
+      // the character to its normal size/state with a brief invulnerability
+      // window, same "shield" convention for every damage source (quiz
+      // wrong answer, piranha chomp, koopa shell, pit, timeout).
       if (player.mounted) {
         player.mounted = false;
         player.invulnerableUntil = performance.now() + INVULN_MS;
         return;
       }
-      // Big (mushroom) and fire (fire flower) are Mario-style: a hit that
-      // actually costs a life also strips them, same as the mount popping.
-      player.big = false;
-      player.hasFire = false;
+      if (player.big) {
+        player.big = false;
+        player.invulnerableUntil = performance.now() + INVULN_MS;
+        return;
+      }
+      if (player.hasFire) {
+        player.hasFire = false;
+        player.invulnerableUntil = performance.now() + INVULN_MS;
+        return;
+      }
       state.lives -= 1;
       if (state.lives <= 0) {
         state.lives = 3;
@@ -225,6 +249,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.big = false;
       player.hasFire = false;
       state.fireballs = [];
+      state.shells = [];
+      if (level.piranha) {
+        level.piranha.alive = true;
+      }
+      if (level.koopa) {
+        level.koopa.alive = true;
+        level.koopa.x = level.koopa.startX;
+        level.koopa.nextThrowAt = scheduleKoopaThrow();
+      }
       for (const coin of level.coins) {
         coin.collected = false;
         coin.pending = false;
@@ -306,6 +339,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         if (Math.hypot(dx, dy) <= GROUND_POUND_RADIUS) {
           enemy.alive = false;
           state.score += 50;
+          playStompSound();
         }
       }
     }
@@ -482,6 +516,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (player.pounding || performance.now() < player.starUntil) {
             enemy.alive = false;
             state.score += 50;
+            playStompSound();
           } else if (performance.now() >= player.invulnerableUntil) {
             enemy.pending = true;
             const question = buildQuestion(vocab, enemy.termId);
@@ -490,6 +525,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               if (isCorrect) {
                 enemy.alive = false;
                 state.score += 50;
+                playStompSound();
               } else {
                 recordWrong(enemy.termId);
                 loseLife();
@@ -513,13 +549,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               enemy.alive = false;
               fireball.alive = false;
               state.score += 50;
+              playStompSound();
               break;
             }
           }
+          if (fireball.alive) fireballHitsHazard(fireball, level, state);
         }
         if (state.fireballs.length > 20) {
           state.fireballs = state.fireballs.filter((f) => f.alive);
         }
+      }
+
+      if (!pausedRef.current) {
+        updateHazards(level, player, state, loseLife);
       }
 
       if (!pausedRef.current) {
@@ -596,8 +638,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         if (enemy.alive) drawEnemy(ctx, enemy, world.enemyType);
       }
       if (level.boss) drawBoss(ctx, level.boss);
+      if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
+      if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
       drawDoor(ctx, level.door);
       drawFlag(ctx, level.flag);
+      for (const shell of state.shells) {
+        if (shell.alive) drawShell(ctx, shell);
+      }
       for (const fireball of state.fireballs) {
         if (fireball.alive) drawFireball(ctx, fireball);
       }

@@ -178,14 +178,18 @@ export function buildLevel({ world, durationMinutes }) {
   // exact same fixed-y patrol shape as ground enemies (no gravity/collision
   // needed for enemies at all); only the x-span source differs (the
   // platform's own width instead of a ground segment).
+  // Only platforms with enough room for a real back-and-forth patrol get an
+  // enemy (narrower ones gave 20-40px of range — too small to visibly read
+  // as "moving" rather than a stationary wobble).
   const blockPlatforms = platforms.filter((p) => p.type === 'block' && p.width >= 90);
-  const platformSpawnChance = 0.25 + difficulty * 0.05;
+  const patrolBlockPlatforms = blockPlatforms.filter((p) => p.width >= 130);
+  const platformSpawnChance = 0.35 + difficulty * 0.06;
   let platformEnemyIndex = 0;
-  for (const platform of blockPlatforms) {
+  for (const platform of patrolBlockPlatforms) {
     if (rng() >= platformSpawnChance) continue;
-    const patrolMargin = Math.min(20, platform.width * 0.15);
+    const patrolMargin = 10;
     const minX = platform.x + patrolMargin;
-    const maxX = Math.max(minX + 40, platform.x + platform.width - patrolMargin - 42);
+    const maxX = platform.x + platform.width - patrolMargin - 42;
     const startX = minX + rng() * Math.max(1, maxX - minX);
     enemies.push({
       id: `platform-enemy-${platformEnemyIndex}`,
@@ -196,7 +200,7 @@ export function buildLevel({ world, durationMinutes }) {
       y: platform.y - 42,
       width: 42,
       height: 42,
-      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.6),
+      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 1.15 + rng() * 0.6),
       alive: true,
       pending: false,
       termId: vocab[(platformEnemyIndex * 5 + 2) % vocab.length].id,
@@ -216,28 +220,47 @@ export function buildLevel({ world, durationMinutes }) {
     termId: vocab[Math.floor(vocab.length / 2)].id,
   };
 
-  // Power-ups sit directly above a solid ground segment at a low, always-
-  // walkable height, so they never carry the reachability risk floating
-  // platforms do. The y-range is bounded on both ends: never so low it sinks
-  // into the ground, never so high a standing player's bounding box (top at
-  // GROUND_Y - PLAYER_HEIGHT) fails to overlap its bottom edge.
+  // Mushroom + egg sit directly above a solid ground segment at a low,
+  // always-walkable height, so they never carry the reachability risk
+  // floating platforms do. The y-range is bounded on both ends: never so
+  // low it sinks into the ground, never so high a standing player's
+  // bounding box (top at GROUND_Y - PLAYER_HEIGHT) fails to overlap its
+  // bottom edge.
   const POWER_UP_SIZE = 28;
-  const powerUpTypes = ['mushroom', 'star', 'egg', 'fireFlower'];
-  // At least one of every type per level (the cycling assignment below
-  // guarantees that once count >= powerUpTypes.length) — a short level was
-  // previously rounding down to a single power-up, so rarer types like the
-  // egg mount never showed up at all.
-  const powerUpCount = Math.max(powerUpTypes.length, Math.round(width / 2200));
+  const groundPowerUpTypes = ['mushroom', 'egg'];
+  const groundPowerUpCount = Math.max(groundPowerUpTypes.length, Math.round(width / 3000));
   const powerUps = [];
-  for (let i = 0; i < powerUpCount; i++) {
+  for (let i = 0; i < groundPowerUpCount; i++) {
     const [sx1, sx2] = solidSegments[(i + 1) % solidSegments.length];
     const margin = 80;
     const segSpan = Math.max(40, sx2 - sx1 - margin * 2);
     powerUps.push({
-      id: `power-${i}`,
-      type: powerUpTypes[i % powerUpTypes.length],
+      id: `power-ground-${i}`,
+      type: groundPowerUpTypes[i % groundPowerUpTypes.length],
       x: sx1 + margin + rng() * segSpan,
       y: GROUND_Y - (34 + rng() * 38),
+      width: POWER_UP_SIZE,
+      height: POWER_UP_SIZE,
+      collected: false,
+    });
+  }
+
+  // Star and fire flower sit on the highest floating platforms instead —
+  // grabbing the strongest power-ups takes real platforming skill rather
+  // than just walking down the ground path.
+  const platformPowerUpTypes = ['star', 'fireFlower'];
+  const highestPlatforms = [...blockPlatforms].sort((a, b) => a.y - b.y);
+  const platformPowerUpCount = Math.min(
+    highestPlatforms.length,
+    Math.max(platformPowerUpTypes.length, Math.round(width / 3500))
+  );
+  for (let i = 0; i < platformPowerUpCount; i++) {
+    const platform = highestPlatforms[i];
+    powerUps.push({
+      id: `power-platform-${i}`,
+      type: platformPowerUpTypes[i % platformPowerUpTypes.length],
+      x: platform.x + platform.width / 2 - POWER_UP_SIZE / 2,
+      y: platform.y - POWER_UP_SIZE - 6,
       width: POWER_UP_SIZE,
       height: POWER_UP_SIZE,
       collected: false,
@@ -262,6 +285,47 @@ export function buildLevel({ world, durationMinutes }) {
         }
       : null;
 
+  // Piranha plant: a stationary hazard near the end of the level (before
+  // the boss/flag, not blocking the path — it's a threat you have to
+  // navigate around or burn a fireball on, not a gate). Only fire defeats
+  // it; touching it costs a life automatically (see loseLife in
+  // GameCanvas.jsx for how power-ups absorb that hit first).
+  const PIRANHA_HEIGHT = 70;
+  const piranhaX = Math.max(width * 0.6, boss ? boss.x - 220 : Math.min(width - 260, flag.x - 220));
+  const piranha = {
+    x: piranhaX,
+    y: GROUND_Y - PIRANHA_HEIGHT,
+    width: 44,
+    height: PIRANHA_HEIGHT,
+    alive: true,
+  };
+
+  // Koopa Troopa: patrols like a normal ground enemy but isn't quiz-gated —
+  // it's a skill enemy, defeated only by stomping its head or a fireball,
+  // and periodically lobs a shell at the player (GameCanvas owns the actual
+  // throw timer since it needs a runtime clock, not level-gen-time data).
+  const koopaCandidates = solidSegments.filter(([x1]) => x1 > width * 0.4 && x1 < piranhaX - 300);
+  const koopaSegments = koopaCandidates.length ? koopaCandidates : solidSegments;
+  const [ksx1, ksx2] = koopaSegments[Math.floor(koopaSegments.length / 2)];
+  const koopaSegWidth = ksx2 - ksx1;
+  const koopaMargin = Math.min(60, koopaSegWidth * 0.2);
+  const koopaMinX = ksx1 + koopaMargin;
+  const koopaMaxX = Math.max(koopaMinX + 80, ksx2 - koopaMargin);
+  const koopaStartX = koopaMinX + rng() * Math.max(1, koopaMaxX - koopaMinX - 40);
+  const koopa = {
+    id: 'koopa-0',
+    x: koopaStartX,
+    startX: koopaStartX,
+    minX: koopaMinX,
+    maxX: koopaMaxX,
+    y: GROUND_Y - 46,
+    width: 40,
+    height: 46,
+    vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 0.8 + 0.4),
+    alive: true,
+    nextThrowAt: 0,
+  };
+
   return {
     width,
     groundY: GROUND_Y,
@@ -273,5 +337,7 @@ export function buildLevel({ world, durationMinutes }) {
     powerUps,
     boss,
     flag,
+    piranha,
+    koopa,
   };
 }

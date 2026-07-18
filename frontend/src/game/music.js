@@ -258,6 +258,45 @@ export function playFireballSound() {
   osc.stop(t + 0.17);
 }
 
+// A quick downward "stomp" blip — played whenever an enemy is defeated
+// (pound, star touch, fireball, or a correct enemy-quiz answer), separate
+// from playCorrectChime so combat has its own distinct feedback.
+export function playStompSound() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(340, t);
+  osc.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+  gain.gain.setValueAtTime(0.18, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.15);
+}
+
+// A short hurt "oof" — for damage sources with no quiz to give feedback of
+// their own (piranha plant chomp, koopa shell hit).
+export function playHurtSound() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(110, t + 0.2);
+  gain.gain.setValueAtTime(0.2, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.25);
+}
+
 export function playSuccessFanfare() {
   if (!sfxEnabled) return;
   const ctx = ensureContext();
