@@ -83,6 +83,7 @@ const GROUND_POUND_RADIUS = 90;
 // jump that's 20% *higher* (not 20% faster launch), scale velocity by sqrt(1.2).
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 const HUD_PUSH_INTERVAL_MS = 100;
+const TERM_FLASH_MS = 2000;
 const STAR_DURATION_MS = 8000;
 const MOUNT_SPEED_MULTIPLIER = 1.5;
 const MAX_LIVES = 5;
@@ -171,6 +172,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   const [hud, setHud] = useState(null);
   const [viewportSize, setViewportSize] = useState(computeViewportSize);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
+  // Brief term+definition reinforcement shown over live gameplay right
+  // after a quiz resolves — non-blocking, purely a review aid.
+  const [termFlash, setTermFlash] = useState(null);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
@@ -219,6 +223,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     };
 
     const juice = createJuiceState();
+
+    // Where a life loss respawns the player — starts at the level's own
+    // spawn point, moves to the checkpoint door once it's actually passed.
+    let lastCheckpoint = { x: level.spawn.x, y: level.spawn.y };
 
     const state = {
       camera: 0,
@@ -303,9 +311,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
     }
 
+    let termFlashTimer = null;
+    function flashTerm(term, definition, correct) {
+      if (!term) return;
+      if (termFlashTimer) clearTimeout(termFlashTimer);
+      setTermFlash({ id: performance.now(), term, definition, correct });
+      termFlashTimer = setTimeout(() => setTermFlash(null), TERM_FLASH_MS);
+    }
+
     function respawnPlayer() {
-      player.x = level.spawn.x;
-      player.y = level.spawn.y;
+      player.x = lastCheckpoint.x;
+      player.y = lastCheckpoint.y;
       player.vx = 0;
       player.vy = 0;
       player.pounding = false;
@@ -356,6 +372,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       termQueue.assignAll(level);
 
+      // A fresh run regenerates the door's position too, so any checkpoint
+      // progress from the last attempt shouldn't carry over.
+      lastCheckpoint = { x: level.spawn.x, y: level.spawn.y };
       respawnPlayer();
       player.invulnerableUntil = 0;
       player.starUntil = 0;
@@ -473,6 +492,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         if (!handlersRef.current._pendingResolve) {
           resume();
           setOverlay(null);
+          const correctOption = question.options.find((o) => o.id === question.termId);
+          flashTerm(correctOption?.term, question.definition, isCorrect);
         }
       };
       setOverlay({ type, question });
@@ -634,6 +655,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (isCorrect) {
             level.door.passed = true;
             recordCorrect(level.door.termId);
+            // Mirrors level.spawn's own "GROUND_Y - 200" formula so the
+            // player drops in standing safely on the ground just past the
+            // door, not inside it.
+            lastCheckpoint = { x: level.door.x, y: level.door.y + level.door.height - 200 };
           } else {
             recordWrong(level.door.termId);
           }
@@ -909,6 +934,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     return () => {
       cancelAnimationFrame(rafId);
       clearCustomTrack();
+      if (termFlashTimer) clearTimeout(termFlashTimer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
@@ -942,6 +968,18 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
           <TouchControls keysRef={keysRef} />
           <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} character={character} />
+          {termFlash && (
+            <div
+              key={termFlash.id}
+              className="term-flash"
+              style={{ borderColor: termFlash.correct ? '#8bd17c' : '#e97c6d' }}
+            >
+              <strong>
+                {termFlash.correct ? '✓' : '✗'} {termFlash.term}
+              </strong>
+              <span>{termFlash.definition}</span>
+            </div>
+          )}
         </div>
         <div className="controls-hint">
           Arrows/WASD to move · Space/Up to jump · Down for ability · F to throw fireball (with Fire Flower)

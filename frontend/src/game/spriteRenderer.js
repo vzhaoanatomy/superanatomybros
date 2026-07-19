@@ -399,49 +399,44 @@ export function drawSolidEgg(ctx, egg) {
 // A shimmering portal rather than a plain pole — the visible oval is wider
 // than the (narrower) collision box, which is fine since it's pure flourish;
 // the invisible hitbox stays exactly door.width/height for jump-over blocking.
+// A real door (not the old swirling portal) with a floating "CHECKPOINT"
+// label above it — reaching it and answering correctly moves the player's
+// respawn point here for the rest of the run (see GameCanvas.jsx's
+// lastCheckpoint).
 export function drawDoor(ctx, door) {
   if (door.passed) return;
   const { x, y, width, height } = door;
+  const visualW = 44;
+  const doorX = x + width / 2 - visualW / 2;
+
+  ctx.fillStyle = '#4a2f18';
+  ctx.fillRect(doorX - 4, y - 4, visualW + 8, height + 8);
+
+  ctx.fillStyle = '#8a5a2a';
+  ctx.fillRect(doorX, y, visualW, height);
+
+  ctx.strokeStyle = '#5a3a1a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(doorX + 5, y + height * 0.08, visualW - 10, height * 0.38);
+  ctx.strokeRect(doorX + 5, y + height * 0.54, visualW - 10, height * 0.38);
+
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(doorX + visualW - 9, y + height / 2, 4, 0, Math.PI * 2);
+  ctx.fill();
+
   const cx = x + width / 2;
-  const cy = y + height / 2;
-  const visualW = 60;
-  const t = performance.now() / 500;
-
-  const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, visualW * 2);
-  glow.addColorStop(0, 'rgba(190, 140, 255, 0.45)');
-  glow.addColorStop(1, 'rgba(190, 140, 255, 0)');
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, visualW * 2, height / 2 + 24, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, visualW / 2, height / 2, 0, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.fillStyle = 'rgba(110, 60, 200, 0.4)';
-  ctx.fillRect(cx - visualW, y, visualW * 2, height);
-  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-  ctx.lineWidth = 3;
-  for (let i = 0; i < 3; i++) {
-    const phase = (t + i * 0.9) % 2.7;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, Math.abs(Math.sin(phase)) * visualW * 0.45 + 4, height / 2, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  ctx.strokeStyle = '#d8bfff';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, visualW / 2, height / 2, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  const sparkleY = cy + Math.sin(t * 2.4) * height * 0.35;
-  ctx.beginPath();
-  ctx.ellipse(cx, sparkleY, 3, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
+  const labelText = 'CHECKPOINT';
+  ctx.font = 'bold 12px ui-monospace, Consolas, monospace';
+  ctx.textAlign = 'center';
+  const textWidth = ctx.measureText(labelText).width;
+  ctx.fillStyle = 'rgba(15, 10, 5, 0.85)';
+  ctx.fillRect(cx - textWidth / 2 - 8, y - 30, textWidth + 16, 20);
+  ctx.strokeStyle = '#ffd23f';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(cx - textWidth / 2 - 8, y - 30, textWidth + 16, 20);
+  ctx.fillStyle = '#ffd23f';
+  ctx.fillText(labelText, cx, y - 16);
 }
 
 export function drawFlag(ctx, flag) {

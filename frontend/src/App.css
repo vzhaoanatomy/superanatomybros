@@ -207,6 +207,43 @@
   animation: quiz-shake 0.4s ease-in-out;
 }
 
+@keyframes term-flash-fade {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  12% { opacity: 1; transform: translate(-50%, 0); }
+  82% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+.term-flash {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 20px;
+  background: rgba(14, 21, 38, 0.92);
+  border: 2px solid #ffd23f;
+  border-radius: 8px;
+  color: #fff;
+  font-family: ui-monospace, Consolas, monospace;
+  text-align: center;
+  pointer-events: none;
+  animation: term-flash-fade 2s ease forwards;
+}
+
+.term-flash strong {
+  font-size: 16px;
+}
+
+.term-flash span {
+  font-size: 13px;
+  color: #c8d3ea;
+  font-style: italic;
+}
+
 .controls-hint {
   text-align: center;
   padding: 8px;

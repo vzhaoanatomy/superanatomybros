@@ -323,11 +323,14 @@ export function buildLevel({ world, durationMinutes }) {
   }
 
   const DOOR_HEIGHT = 320;
-  const doorX = Math.min(width * 0.35, width - 600);
+  const DOOR_WIDTH = 24;
+  // Exact middle of the track — a real halfway checkpoint, not just some
+  // fraction of the way in.
+  const doorX = width / 2 - DOOR_WIDTH / 2;
   const door = {
     x: doorX,
     y: GROUND_Y - DOOR_HEIGHT,
-    width: 24,
+    width: DOOR_WIDTH,
     height: DOOR_HEIGHT,
     passed: false,
     pending: false,
