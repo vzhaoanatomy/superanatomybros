@@ -14,7 +14,7 @@ app = FastAPI(title="Super Anatomy Bros API")
 # Comma-separated list so this can point at a LAN IP (same-network classroom
 # use) or a real deployed frontend domain (cloud hosting) without a code
 # change — defaults to today's local-dev-only behavior if unset.
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
