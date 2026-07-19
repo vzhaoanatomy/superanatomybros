@@ -31,6 +31,15 @@ export const panel = {
   marginBottom: 14,
 };
 
+export const sectionHeader = {
+  fontSize: 13,
+  fontWeight: 'bold',
+  letterSpacing: 0.5,
+  textTransform: 'uppercase',
+  color: '#9fb0d0',
+  margin: '18px 0 8px',
+};
+
 export const label = {
   display: 'block',
   fontSize: 12,

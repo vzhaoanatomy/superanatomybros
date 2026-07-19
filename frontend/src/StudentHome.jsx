@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { getGroupedWorlds } from './game/worlds';
-import WorldCard from './game/WorldCard';
+import { loadJoinedWorlds, loadSettings, saveSettings } from './storage';
 import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } from './game/music';
-import { loadSettings, saveSettings } from './storage';
+import WorldCard from './game/WorldCard';
+import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
 import Settings from './Settings';
@@ -31,20 +31,21 @@ const panelButtonStyle = {
   textAlign: 'left',
 };
 
-export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinClassroom }) {
+// The student-only entry point (served at /play) — a code-entry screen plus
+// whatever's already in this device's library (storage.loadJoinedWorlds()),
+// never the teacher's full authoring menu. A world played once stays in the
+// library and can be replayed any number of times; joining a second code
+// (a new unit, a different class) just adds to it.
+export default function StudentHome({ onSelectWorld }) {
+  const [joined, setJoined] = useState(loadJoinedWorlds());
+  const [showJoin, setShowJoin] = useState(joined.length === 0);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
-  const { myDecks, templates } = getGroupedWorlds();
 
   useEffect(() => {
-    // SFX preference restores safely on load (it's just a boolean gate, no
-    // audio call involved). Music intentionally does NOT auto-resume here —
-    // browsers block AudioContext playback without a user gesture, so
-    // forcing it on at mount would silently fail and leave the toggle
-    // reading "On" while nothing plays. Starting music stays a real click.
     const settings = loadSettings();
     setSfxOn(setSfxEnabled(settings.sfxOn));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,30 +63,40 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
     saveSettings({ musicOn, sfxOn: next });
   }
 
+  if (showJoin) {
+    return (
+      <JoinClassroom
+        onExit={() => setShowJoin(false)}
+        onJoined={() => {
+          setJoined(loadJoinedWorlds());
+          setShowJoin(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24 }}>
       <div className="title-banner">
         <h1>Super Anatomy Bros</h1>
       </div>
-      <p className="tagline-ribbon">
-        Anatomy and Physiology Edition — Collect as many coins as you can. Highest score wins!
-      </p>
-      <div style={{ display: 'flex', gap: 24, justifyContent: 'center', alignItems: 'flex-start', maxWidth: 1100, margin: '24px auto 0', flexWrap: 'wrap' }}>
+      <p className="tagline-ribbon">Enter your teacher's code to play. Highest score wins!</p>
+      <div
+        style={{
+          display: 'flex',
+          gap: 24,
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          maxWidth: 1100,
+          margin: '24px auto 0',
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 820 }}>
-          {myDecks.length > 0 && (
-            <>
-              <p style={sectionHeaderStyle}>⭐ My Decks</p>
-              <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                {myDecks.map((world) => (
-                  <WorldCard key={world.id} world={world} onSelect={onSelect} />
-                ))}
-              </div>
-            </>
-          )}
-          <p style={sectionHeaderStyle}>Templates — edit to customize</p>
+          <p style={sectionHeaderStyle}>📚 Your Classes</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-            {templates.map((world) => (
-              <WorldCard key={world.id} world={world} onSelect={onSelect} />
+            {joined.map((world) => (
+              <WorldCard key={world.id} world={world} onSelect={onSelectWorld} />
             ))}
           </div>
         </div>
@@ -103,6 +114,13 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
         >
           <button
             type="button"
+            style={{ ...panelButtonStyle, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
+            onClick={() => setShowJoin(true)}
+          >
+            ⭐ Join Another Class
+          </button>
+          <button
+            type="button"
             style={{ ...panelButtonStyle, background: '#2ecc71', border: '2px solid #1e8449', color: '#0a1a0a' }}
             onClick={() => setShowLeaderboard(true)}
           >
@@ -110,20 +128,6 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
           </button>
           <button type="button" style={panelButtonStyle} onClick={() => setShowHowToPlay(true)}>
             ❓ How to Play
-          </button>
-          <button
-            type="button"
-            style={{ ...panelButtonStyle, background: '#7d3fd6', border: '2px solid #5a2ba0' }}
-            onClick={onOpenTeacherMode}
-          >
-            🎓 Teacher Mode · Custom Vocab
-          </button>
-          <button
-            type="button"
-            style={{ ...panelButtonStyle, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
-            onClick={onOpenJoinClassroom}
-          >
-            ⭐ Join Classroom · Enter Code
           </button>
           <button type="button" style={panelButtonStyle} onClick={() => setShowSettings(true)}>
             ⚙️ Settings

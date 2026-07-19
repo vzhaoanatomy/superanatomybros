@@ -146,13 +146,15 @@ export const WORLDS = [
 ];
 
 // Merges the 7 built-ins (with any Teacher Mode override applied) with
-// locally-created custom worlds and any classroom worlds the player has
-// joined by code. `getWorld`/the menu both read through this rather than the
-// static `WORLDS` array directly, so custom/classroom worlds are playable via
-// the exact same world-select -> character-select -> GameCanvas flow.
+// locally-created custom worlds — this is the *teacher's* authoring list
+// only. `getWorld`/the teacher menu both read through this rather than the
+// static `WORLDS` array directly, so custom worlds are playable via the
+// exact same world-select -> character-select -> GameCanvas flow. Classroom
+// worlds a student has joined by code are deliberately NOT included here —
+// those live entirely in StudentHome.jsx via loadJoinedWorlds() directly, so
+// a teacher's own authoring list never mixes with anyone's play library.
 export function getAllWorlds() {
   const { overrides, custom } = loadCustomWorldData();
-  const joined = loadJoinedWorlds();
 
   const builtIns = WORLDS.map((world) => {
     const override = overrides[world.id];
@@ -163,6 +165,7 @@ export function getAllWorlds() {
       subtitle: override.subtitle ?? world.subtitle,
       defaultDurationMinutes: override.defaultDurationMinutes ?? world.defaultDurationMinutes,
       vocab: override.vocab ?? world.vocab,
+      updatedAt: override.updatedAt,
       customized: true,
       custom: true,
     };
@@ -175,18 +178,27 @@ export function getAllWorlds() {
     custom: true,
   }));
 
-  const joinedWorlds = joined.map((world, i) => ({
-    ...world,
-    index: WORLDS.length + 1 + custom.length + i,
-    isClassroom: true,
-    custom: true,
-  }));
+  return [...builtIns, ...customWorlds];
+}
 
-  return [...builtIns, ...customWorlds, ...joinedWorlds];
+// Teacher's world list, grouped and ordered the way Quizlet groups "my
+// decks" above "templates": anything the teacher has actually touched
+// (edited a built-in, or created from scratch) first — newest edit first —
+// then the untouched built-in templates in their original World 1-7 order.
+export function getGroupedWorlds() {
+  const all = getAllWorlds();
+  const myDecks = all.filter((w) => w.custom).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+  const templates = all.filter((w) => !w.custom);
+  return { myDecks, templates };
 }
 
 export function getWorld(id) {
-  return getAllWorlds().find((w) => w.id === id) ?? WORLDS[0];
+  const found = getAllWorlds().find((w) => w.id === id);
+  if (found) return found;
+  // Not in the teacher's own authoring list — check classroom worlds this
+  // device has joined by code (the student path never touches getAllWorlds).
+  const joined = loadJoinedWorlds().find((w) => w.id === id);
+  return joined ?? WORLDS[0];
 }
 
 export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };

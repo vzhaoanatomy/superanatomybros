@@ -74,7 +74,10 @@ export function buildLevel({ world, durationMinutes }) {
   // a stable, well-distributed PRNG from whatever string it's given; only
   // the string now changes every time.
   const rng = hashSeed(`${world.id}-${durationMinutes}-${Math.random()}`);
-  const difficulty = world.index;
+  // Classroom worlds a student joins by code have no World 1-7 position (see
+  // WorldCard.jsx for the same gap on the card label) — mid-range difficulty
+  // is the sane default rather than propagating undefined into NaN math.
+  const difficulty = world.index ?? 4;
   const vocab = world.vocab;
 
   // A level must be long enough to seed at least one coin per vocab term

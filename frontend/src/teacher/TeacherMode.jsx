@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
-import { getAllWorlds, WORLDS } from '../game/worlds';
-import { loadCustomWorldData, saveCustomWorldData, loadJoinedWorlds, saveJoinedWorlds } from '../storage';
+import { getGroupedWorlds, WORLDS } from '../game/worlds';
+import { loadCustomWorldData, saveCustomWorldData } from '../storage';
 import { publishWorld, updateWorld, uploadWorldMusic } from '../api';
 import WorldBuilderForm from './WorldBuilderForm';
 import MissedTermsPanel from './MissedTermsPanel';
@@ -19,7 +19,7 @@ export default function TeacherMode({ onExit }) {
   const fileInputRef = useRef(null);
   const uploadTargetRef = useRef(null);
 
-  const worlds = getAllWorlds();
+  const { myDecks, templates } = getGroupedWorlds();
 
   function refresh() {
     setVersion((v) => v + 1);
@@ -72,7 +72,7 @@ export default function TeacherMode({ onExit }) {
 
   function handleSaveBuiltInOverride(builtInId, data) {
     const store = loadCustomWorldData();
-    store.overrides[builtInId] = data;
+    store.overrides[builtInId] = { ...data, updatedAt: Date.now() };
     saveCustomWorldData(store);
     setEditing(null);
     refresh();
@@ -80,9 +80,10 @@ export default function TeacherMode({ onExit }) {
 
   function handleSaveCustom(data) {
     const store = loadCustomWorldData();
+    const stamped = { ...data, updatedAt: Date.now() };
     const idx = store.custom.findIndex((w) => w.id === data.id);
-    if (idx >= 0) store.custom[idx] = data;
-    else store.custom.push(data);
+    if (idx >= 0) store.custom[idx] = stamped;
+    else store.custom.push(stamped);
     saveCustomWorldData(store);
     setEditing(null);
     refresh();
@@ -102,10 +103,120 @@ export default function TeacherMode({ onExit }) {
     refresh();
   }
 
-  function handleRemoveJoined(code) {
-    const joined = loadJoinedWorlds().filter((w) => w.code !== code);
-    saveJoinedWorlds(joined);
-    refresh();
+  // Shared row renderer for both the "My Decks" and "Templates" sections
+  // below — every world in this list is one the teacher owns (edited or
+  // authored); joined classroom worlds never reach this screen anymore
+  // (getGroupedWorlds() excludes them — see StudentHome.jsx for those).
+  function renderWorldRow(world) {
+    const isBuiltIn = WORLDS.some((w) => w.id === world.id);
+    return (
+      <div key={world.id} style={t.panel}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <strong style={{ fontSize: 16 }}>
+              {world.custom && '⭐ '}
+              {world.name}
+            </strong>
+            <div style={{ fontSize: 12, color: '#9fb0d0' }}>
+              {world.subtitle} · {world.vocab.length} terms
+              {world.classroomCode && ` · Published: ${world.classroomCode}`}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" style={t.button} onClick={() => setEditing({ world, isBuiltIn })}>
+              Edit
+            </button>
+            {isBuiltIn && world.customized && (
+              <button type="button" style={t.buttonDanger} onClick={() => handleResetToDefaults(world.id)}>
+                Reset to Defaults
+              </button>
+            )}
+            {!isBuiltIn && (
+              <>
+                <button
+                  type="button"
+                  style={{ ...t.button, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
+                  onClick={() => handlePublish(world)}
+                  disabled={publishingId === world.id}
+                >
+                  {publishingId === world.id
+                    ? 'Publishing…'
+                    : world.classroomCode
+                      ? 'Republish'
+                      : 'Publish with Classroom Code'}
+                </button>
+                <button type="button" style={t.buttonDanger} onClick={() => handleDeleteCustom(world.id)}>
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        {!isBuiltIn && world.classroomCode && (
+          <div
+            style={{
+              marginTop: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              background: '#0e1526',
+              borderRadius: 6,
+            }}
+          >
+            <span style={{ fontSize: 13, color: '#9fb0d0' }}>Classroom code:</span>
+            <strong style={{ fontSize: 20, letterSpacing: 4, color: '#ffd23f' }}>{world.classroomCode}</strong>
+            <button
+              type="button"
+              style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => navigator.clipboard?.writeText(world.classroomCode)}
+            >
+              Copy
+            </button>
+            <button
+              type="button"
+              style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => setStatsForId(statsForId === world.id ? null : world.id)}
+            >
+              📊 Missed Terms
+            </button>
+            <button
+              type="button"
+              style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => setAttemptsForId(attemptsForId === world.id ? null : world.id)}
+            >
+              🧑‍🎓 Student Attempts
+            </button>
+            <button
+              type="button"
+              style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => triggerUpload(world)}
+              disabled={uploadingId === world.id}
+            >
+              {uploadingId === world.id ? 'Uploading…' : '🎵 Upload Music'}
+            </button>
+          </div>
+        )}
+        {statsForId === world.id && world.classroomCode && (
+          <MissedTermsPanel code={world.classroomCode} vocab={world.vocab} onClose={() => setStatsForId(null)} />
+        )}
+        {attemptsForId === world.id && world.classroomCode && (
+          <StudentAttemptsPanel
+            code={world.classroomCode}
+            vocab={world.vocab}
+            onClose={() => setAttemptsForId(null)}
+          />
+        )}
+        {publishError?.id === world.id && (
+          <p style={{ color: '#ff8a5c', fontSize: 13, marginTop: 8 }}>{publishError.message}</p>
+        )}
+        {uploadMessage?.id === world.id && (
+          <p style={{ color: uploadMessage.isError ? '#ff8a5c' : '#7de37b', fontSize: 13, marginTop: 8 }}>
+            {uploadMessage.text}
+          </p>
+        )}
+      </div>
+    );
   }
 
   if (editing) {
@@ -147,134 +258,14 @@ export default function TeacherMode({ onExit }) {
           + New Custom World
         </button>
 
-        {worlds.map((world) => {
-          const isBuiltIn = WORLDS.some((w) => w.id === world.id);
-          return (
-            <div key={world.id} style={t.panel}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong style={{ fontSize: 16 }}>
-                    {world.custom && '⭐ '}
-                    {world.name}
-                  </strong>
-                  <div style={{ fontSize: 12, color: '#9fb0d0' }}>
-                    {world.subtitle} · {world.vocab.length} terms
-                    {world.isClassroom && ` · Code: ${world.code}`}
-                    {world.classroomCode && ` · Published: ${world.classroomCode}`}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {world.isClassroom ? (
-                    <button type="button" style={t.buttonDanger} onClick={() => handleRemoveJoined(world.code)}>
-                      Remove
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        style={t.button}
-                        onClick={() => setEditing({ world, isBuiltIn })}
-                      >
-                        Edit
-                      </button>
-                      {isBuiltIn && world.customized && (
-                        <button type="button" style={t.buttonDanger} onClick={() => handleResetToDefaults(world.id)}>
-                          Reset to Defaults
-                        </button>
-                      )}
-                      {!isBuiltIn && (
-                        <>
-                          <button
-                            type="button"
-                            style={{ ...t.button, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
-                            onClick={() => handlePublish(world)}
-                            disabled={publishingId === world.id}
-                          >
-                            {publishingId === world.id
-                              ? 'Publishing…'
-                              : world.classroomCode
-                                ? 'Republish'
-                                : 'Publish with Classroom Code'}
-                          </button>
-                          <button type="button" style={t.buttonDanger} onClick={() => handleDeleteCustom(world.id)}>
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-              {!isBuiltIn && !world.isClassroom && world.classroomCode && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '8px 12px',
-                    background: '#0e1526',
-                    borderRadius: 6,
-                  }}
-                >
-                  <span style={{ fontSize: 13, color: '#9fb0d0' }}>Classroom code:</span>
-                  <strong style={{ fontSize: 20, letterSpacing: 4, color: '#ffd23f' }}>{world.classroomCode}</strong>
-                  <button
-                    type="button"
-                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
-                    onClick={() => navigator.clipboard?.writeText(world.classroomCode)}
-                  >
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
-                    onClick={() => setStatsForId(statsForId === world.id ? null : world.id)}
-                  >
-                    📊 Missed Terms
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
-                    onClick={() => setAttemptsForId(attemptsForId === world.id ? null : world.id)}
-                  >
-                    🧑‍🎓 Student Attempts
-                  </button>
-                  <button
-                    type="button"
-                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
-                    onClick={() => triggerUpload(world)}
-                    disabled={uploadingId === world.id}
-                  >
-                    {uploadingId === world.id ? 'Uploading…' : '🎵 Upload Music'}
-                  </button>
-                </div>
-              )}
-              {statsForId === world.id && world.classroomCode && (
-                <MissedTermsPanel
-                  code={world.classroomCode}
-                  vocab={world.vocab}
-                  onClose={() => setStatsForId(null)}
-                />
-              )}
-              {attemptsForId === world.id && world.classroomCode && (
-                <StudentAttemptsPanel
-                  code={world.classroomCode}
-                  vocab={world.vocab}
-                  onClose={() => setAttemptsForId(null)}
-                />
-              )}
-              {publishError?.id === world.id && (
-                <p style={{ color: '#ff8a5c', fontSize: 13, marginTop: 8 }}>{publishError.message}</p>
-              )}
-              {uploadMessage?.id === world.id && (
-                <p style={{ color: uploadMessage.isError ? '#ff8a5c' : '#7de37b', fontSize: 13, marginTop: 8 }}>
-                  {uploadMessage.text}
-                </p>
-              )}
-            </div>
-          );
-        })}
+        {myDecks.length > 0 && (
+          <>
+            <p style={t.sectionHeader}>⭐ My Decks</p>
+            {myDecks.map((world) => renderWorldRow(world))}
+          </>
+        )}
+        <p style={t.sectionHeader}>Templates — edit to customize</p>
+        {templates.map((world) => renderWorldRow(world))}
       </div>
       <input
         ref={fileInputRef}
