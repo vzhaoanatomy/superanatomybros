@@ -3,6 +3,7 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 15% 20%, rgba(255, 255, 255, 0.6) 0 40px, transparent 41px),
     radial-gradient(circle at 80% 15%, rgba(255, 255, 255, 0.5) 0 30px, transparent 31px),
@@ -213,4 +214,34 @@
   color: #6b7688;
   font-family: ui-monospace, Consolas, monospace;
   background: #0d1117;
+}
+
+@media (max-width: 480px) {
+  .title-banner h1 {
+    font-size: 28px;
+  }
+  .tagline-ribbon {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  .game-page {
+    padding: 8px;
+  }
+  /* Redundant with the on-screen touch controls, and the widest text block
+     most likely to force horizontal scroll on a narrow phone. */
+  .controls-hint {
+    display: none;
+  }
+  /* hud-top/hud-bottom are a fixed-direction flex row normally; letting them
+     wrap keeps long player-ability text from squeezing the music/quit
+     buttons into an awkward mid-wrap alignment. */
+  .hud-top,
+  .hud-bottom {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .hud-stats {
+    min-width: 0;
+    justify-content: flex-start;
+  }
 }

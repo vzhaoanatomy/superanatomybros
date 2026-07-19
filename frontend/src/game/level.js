@@ -124,7 +124,11 @@ export function buildLevel({ world, durationMinutes }) {
     const climbSteps = climbRoll < 0.3 ? 1 : climbRoll < 0.55 ? 2 : climbRoll < 0.85 ? 3 : 4;
 
     let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
-    let cursorY = GROUND_Y - (70 + rng() * 95); // base step: always a single safe jump from the ground, but reaching higher than before
+    // Base step: always a single safe jump from the ground. The floor here
+    // (95, not just "low enough to jump to") is deliberate — it keeps the
+    // gap between the ground and this platform's underside above
+    // PLAYER_HEIGHT (54px) plus a margin, see MIN_CLEARANCE below.
+    let cursorY = GROUND_Y - (95 + rng() * 70);
 
     for (let step = 0; step < climbSteps; step++) {
       const pw = 90 + rng() * 60;
@@ -143,7 +147,13 @@ export function buildLevel({ world, durationMinutes }) {
       }
 
       cursorX += pw * 0.3 + 60 + rng() * (JUMP_DX_CLIMB - 60);
-      cursorY -= 60 + rng() * (JUMP_RISE - 60);
+      // MIN_CLEARANCE (95): a step-to-step decrement below this leaves less
+      // than PLAYER_HEIGHT (54px) of headroom between the platform below
+      // and the one above once the 24px platform thickness is subtracted —
+      // literally too tight for the player's own hitbox to fit through,
+      // which was trapping enemies/power-ups placed on the lower step.
+      const MIN_CLEARANCE = 95;
+      cursorY -= MIN_CLEARANCE + rng() * (JUMP_RISE - MIN_CLEARANCE);
       if (cursorY < 140) break;
     }
   }
@@ -168,6 +178,34 @@ export function buildLevel({ world, durationMinutes }) {
       stepX += stepWidth + 50 + rng() * 30;
       stepY -= 105 + rng() * 20;
     }
+  }
+
+  // The tower loop and the staircase loop above each keep their own steps
+  // spaced apart, but neither knows about the other (or about a neighboring
+  // tower's slot) — two platforms from different generation branches can
+  // still land with overlapping x-spans and end up coincidentally almost
+  // touching in y. This global pass catches that: for any x-overlapping
+  // pair, nudge the higher one further up until every pair clears
+  // PLAYER_HEIGHT (54px) with margin. Bounded/iterative like
+  // clearCoinOfPlatforms above, since closing one gap can open another
+  // against a still-higher platform.
+  const MIN_TOWER_CLEARANCE = 70;
+  for (let pass = 0; pass < 6; pass++) {
+    let changed = false;
+    const blocks = platforms.filter((p) => p.type === 'block');
+    for (const upper of blocks) {
+      for (const lower of blocks) {
+        if (upper === lower || upper.y >= lower.y) continue;
+        const xOverlap = upper.x < lower.x + lower.width && upper.x + upper.width > lower.x;
+        if (!xOverlap) continue;
+        const clearance = lower.y - (upper.y + upper.height);
+        if (clearance < MIN_TOWER_CLEARANCE) {
+          upper.y = Math.max(40, upper.y - (MIN_TOWER_CLEARANCE - clearance));
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
   }
 
   // Every floating "block" platform, any width — used to keep coins clear

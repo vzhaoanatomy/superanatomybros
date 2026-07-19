@@ -1,7 +1,9 @@
+import os
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from codes import unique_code
 from db import scores_collection, term_stats_collection, worlds_collection
@@ -15,6 +17,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Uploaded classroom music lives on disk, served back out at /media/<code>.mp3
+# — one fixed filename per code, so a re-upload just overwrites in place.
+UPLOAD_DIR = "uploads"
+MAX_MUSIC_BYTES = 8 * 1024 * 1024
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 
 
 @app.get("/api/health")
@@ -50,6 +59,31 @@ async def update_world(code: str, payload: WorldPayload):
     update_doc = payload.model_dump()
     await worlds_collection.update_one({"code": code}, {"$set": update_doc})
     return WorldPublishResponse(code=code)
+
+
+@app.post("/api/worlds/{code}/music")
+async def upload_world_music(code: str, file: UploadFile = File(...)):
+    code = code.upper()
+    world = await worlds_collection.find_one({"code": code})
+    if not world:
+        raise HTTPException(status_code=404, detail="World not found")
+
+    is_mp3_type = file.content_type in ("audio/mpeg", "audio/mp3")
+    is_mp3_name = (file.filename or "").lower().endswith(".mp3")
+    if not (is_mp3_type or is_mp3_name):
+        raise HTTPException(status_code=400, detail="Only MP3 files are accepted")
+
+    body = await file.read()
+    if len(body) > MAX_MUSIC_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (8MB max)")
+
+    dest = os.path.join(UPLOAD_DIR, f"{code}.mp3")
+    with open(dest, "wb") as f:
+        f.write(body)
+
+    music_url = f"/media/{code}.mp3"
+    await worlds_collection.update_one({"code": code}, {"$set": {"musicUrl": music_url}})
+    return {"musicUrl": music_url}
 
 
 @app.post("/api/scores/{code}")

@@ -40,10 +40,13 @@ import {
   playFireballSound,
   playStompSound,
   playLevelCompleteDings,
+  setCustomTrack,
+  clearCustomTrack,
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
 import { recordLocalScore, getNickname } from '../storage';
+import { API_BASE } from '../api';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
 import GameOverlays from './GameOverlays';
@@ -172,6 +175,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     const level = buildLevel({ world, durationMinutes });
     const durationSeconds = level.durationSeconds;
     const vocab = world.vocab;
+    if (world.musicUrl) {
+      setCustomTrack(`${API_BASE}${world.musicUrl}`);
+    }
     if (level.koopa) {
       level.koopa.nextThrowAt = scheduleKoopaThrow();
     }
@@ -812,6 +818,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     return () => {
       cancelAnimationFrame(rafId);
+      clearCustomTrack();
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
@@ -844,7 +851,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           />
 
           <TouchControls keysRef={keysRef} />
-          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} />
+          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} character={character} />
         </div>
         <div className="controls-hint">
           Arrows/WASD to move · Space/Up to jump · Down for ability · F to throw fireball (with Fire Flower)

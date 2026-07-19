@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 
+// Sized with vw-relative clamps, not a fixed px, because these only ever
+// render on touch devices (any screen size) — without this, two button
+// groups both anchored 14px from their own edge can overlap in the middle
+// once the game canvas gets narrower than roughly 320px (phone-width).
 const BTN_BASE = {
   userSelect: 'none',
   WebkitTapHighlightColor: 'transparent',
@@ -7,14 +11,14 @@ const BTN_BASE = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 22,
+  fontSize: 'clamp(15px, 4.5vw, 22px)',
   fontWeight: 'bold',
   color: '#fff',
   background: 'rgba(255,255,255,0.16)',
   border: '2px solid rgba(255,255,255,0.4)',
   borderRadius: '50%',
-  width: 56,
-  height: 56,
+  width: 'clamp(34px, 11vw, 56px)',
+  height: 'clamp(34px, 11vw, 56px)',
   padding: 0,
   cursor: 'pointer',
 };
@@ -69,7 +73,12 @@ export default function TouchControls({ keysRef }) {
         </button>
         <button
           type="button"
-          style={{ ...BTN_BASE, width: 68, height: 68, background: 'rgba(120,255,150,0.35)' }}
+          style={{
+            ...BTN_BASE,
+            width: 'clamp(42px, 13vw, 68px)',
+            height: 'clamp(42px, 13vw, 68px)',
+            background: 'rgba(120,255,150,0.35)',
+          }}
           {...press('Space')}
         >
           ⬆

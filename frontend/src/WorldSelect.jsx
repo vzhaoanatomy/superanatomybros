@@ -6,6 +6,7 @@ import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } f
 import { loadSettings, saveSettings } from './storage';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
+import Settings from './Settings';
 
 const ENEMY_LABELS = {
   goomba: 'Goomba-style blob',
@@ -94,6 +95,7 @@ const panelButtonStyle = {
 export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinClassroom }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
   const worlds = getAllWorlds();
@@ -171,16 +173,22 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
           >
             ⭐ Join Classroom · Enter Code
           </button>
-          <button type="button" style={panelButtonStyle} onClick={handleToggleSfx}>
-            {sfxOn ? '🔊 SFX: On' : '🔇 SFX: Off'}
-          </button>
-          <button type="button" style={panelButtonStyle} onClick={handleToggleMusic}>
-            {musicOn ? '♪ Music: On' : '♪ Music: Off'}
+          <button type="button" style={panelButtonStyle} onClick={() => setShowSettings(true)}>
+            ⚙️ Settings
           </button>
         </div>
       </div>
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} />}
       {showLeaderboard && <LocalLeaderboard onClose={() => setShowLeaderboard(false)} />}
+      {showSettings && (
+        <Settings
+          musicOn={musicOn}
+          sfxOn={sfxOn}
+          onToggleMusic={handleToggleMusic}
+          onToggleSfx={handleToggleSfx}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

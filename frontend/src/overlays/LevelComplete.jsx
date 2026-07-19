@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { backdrop, card } from './overlayStyles';
 import { fetchLeaderboard } from '../api';
 import { getNickname } from '../storage';
+import { downloadScoreCard } from '../game/scoreCard';
 import LeaderboardList from '../classroom/LeaderboardList';
 
 const buttonStyle = {
@@ -78,7 +79,17 @@ function Fireworks() {
   );
 }
 
-export default function LevelComplete({ score, timeBonus, hasMissed, onReview, onPlayAgain, onQuit, classroomCode }) {
+export default function LevelComplete({
+  score,
+  timeBonus,
+  hasMissed,
+  onReview,
+  onPlayAgain,
+  onQuit,
+  classroomCode,
+  worldName,
+  characterName,
+}) {
   const [leaderboard, setLeaderboard] = useState(null);
 
   useEffect(() => {
@@ -125,6 +136,15 @@ export default function LevelComplete({ score, timeBonus, hasMissed, onReview, o
               Review Missed Terms
             </button>
           )}
+          <button
+            type="button"
+            onClick={() =>
+              downloadScoreCard({ worldName, characterName, nickname: getNickname(), score, timeBonus })
+            }
+            style={buttonStyle}
+          >
+            📸 Save Score Card
+          </button>
           <button type="button" onClick={onPlayAgain} style={buttonStyle}>
             Play Again
           </button>

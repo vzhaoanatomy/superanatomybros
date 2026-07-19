@@ -4,9 +4,11 @@ import CharacterSelect from './CharacterSelect';
 import WorldSelect from './WorldSelect';
 import TeacherMode from './teacher/TeacherMode';
 import JoinClassroom from './classroom/JoinClassroom';
+import SplashScreen from './SplashScreen';
 import './App.css';
 
 function App() {
+  const [started, setStarted] = useState(false);
   const [worldId, setWorldId] = useState(null);
   const [characterId, setCharacterId] = useState(null);
   const [showTeacherMode, setShowTeacherMode] = useState(false);
@@ -18,7 +20,9 @@ function App() {
   }
 
   let screen;
-  if (showTeacherMode) {
+  if (!started) {
+    screen = <SplashScreen onStart={() => setStarted(true)} />;
+  } else if (showTeacherMode) {
     screen = <TeacherMode onExit={() => setShowTeacherMode(false)} />;
   } else if (showJoinClassroom) {
     screen = (

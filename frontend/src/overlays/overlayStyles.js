@@ -1,5 +1,9 @@
+// `fixed` (not `absolute`) so this always covers the real viewport regardless
+// of scroll position — matters most for page-level modals (Settings, How to
+// Play) on a tall/scrolled mobile page; in-game quiz overlays already sit
+// inside a viewport-sized `.game-viewport`, so this is a no-op change there.
 export const backdrop = {
-  position: 'absolute',
+  position: 'fixed',
   inset: 0,
   display: 'flex',
   alignItems: 'center',

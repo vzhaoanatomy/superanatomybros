@@ -68,6 +68,14 @@ function ensureContext() {
   return audioCtx;
 }
 
+// Resumes the (lazily-created) AudioContext from inside a real user-gesture
+// handler — the splash screen's tap-to-play calls this once so audio doesn't
+// silently fail the first time a sound tries to play on mobile Safari/Chrome.
+export function unlockAudio() {
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+}
+
 function pickNextSection() {
   let choice;
   do {
@@ -153,6 +161,54 @@ function scheduler() {
   }
 }
 
+// A classroom world's uploaded track (if any) takes over the "music" slot
+// entirely in place of the chiptune scheduler — same on/off toggle, same
+// isMusicPlaying() reporting, just a different sound source. Every
+// non-classroom world never sets this, so their behavior is unchanged.
+let activeCustomUrl = null;
+let customAudioEl = null;
+
+function startPlayback() {
+  if (activeCustomUrl) {
+    if (!customAudioEl) customAudioEl = new Audio();
+    if (customAudioEl.src !== activeCustomUrl) customAudioEl.src = activeCustomUrl;
+    customAudioEl.loop = true;
+    customAudioEl.volume = 0.6;
+    customAudioEl.play().catch(() => {});
+    return;
+  }
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  currentStep = 0;
+  currentSectionKey = pickNextSection();
+  nextStepTime = ctx.currentTime + 0.05;
+  schedulerTimer = setInterval(scheduler, SCHEDULE_INTERVAL_MS);
+}
+
+function stopPlayback() {
+  if (customAudioEl) customAudioEl.pause();
+  if (schedulerTimer) clearInterval(schedulerTimer);
+  schedulerTimer = null;
+}
+
+// Both stop whatever source is currently playing before switching, so a
+// world change never leaves the chiptune scheduler and the custom <audio>
+// element running at the same time, and never silently drops music
+// altogether if the toggle stays "on" across the switch.
+export function setCustomTrack(url) {
+  const wasPlaying = playing;
+  if (wasPlaying) stopPlayback();
+  activeCustomUrl = url;
+  if (wasPlaying) startPlayback();
+}
+
+export function clearCustomTrack() {
+  const wasPlaying = playing;
+  if (wasPlaying) stopPlayback();
+  activeCustomUrl = null;
+  if (wasPlaying) startPlayback();
+}
+
 export function isMusicPlaying() {
   return playing;
 }
@@ -160,16 +216,10 @@ export function isMusicPlaying() {
 export function toggleMusic() {
   if (playing) {
     playing = false;
-    if (schedulerTimer) clearInterval(schedulerTimer);
-    schedulerTimer = null;
+    stopPlayback();
   } else {
-    const ctx = ensureContext();
-    if (ctx.state === 'suspended') ctx.resume();
     playing = true;
-    currentStep = 0;
-    currentSectionKey = pickNextSection();
-    nextStepTime = ctx.currentTime + 0.05;
-    schedulerTimer = setInterval(scheduler, SCHEDULE_INTERVAL_MS);
+    startPlayback();
   }
   return playing;
 }

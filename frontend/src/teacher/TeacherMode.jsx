@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getAllWorlds, WORLDS } from '../game/worlds';
 import { loadCustomWorldData, saveCustomWorldData, loadJoinedWorlds, saveJoinedWorlds } from '../storage';
-import { publishWorld, updateWorld } from '../api';
+import { publishWorld, updateWorld, uploadWorldMusic } from '../api';
 import WorldBuilderForm from './WorldBuilderForm';
 import MissedTermsPanel from './MissedTermsPanel';
 import * as t from './teacherStyles';
@@ -12,11 +12,37 @@ export default function TeacherMode({ onExit }) {
   const [publishingId, setPublishingId] = useState(null);
   const [publishError, setPublishError] = useState(null); // { id, message }
   const [statsForId, setStatsForId] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
+  const [uploadMessage, setUploadMessage] = useState(null); // { id, text, isError }
+  const fileInputRef = useRef(null);
+  const uploadTargetRef = useRef(null);
 
   const worlds = getAllWorlds();
 
   function refresh() {
     setVersion((v) => v + 1);
+  }
+
+  function triggerUpload(world) {
+    uploadTargetRef.current = world;
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    const world = uploadTargetRef.current;
+    e.target.value = '';
+    if (!file || !world) return;
+    setUploadingId(world.id);
+    setUploadMessage(null);
+    try {
+      await uploadWorldMusic(world.classroomCode, file);
+      setUploadMessage({ id: world.id, text: '🎵 Music uploaded!', isError: false });
+    } catch (err) {
+      setUploadMessage({ id: world.id, text: err.message, isError: true });
+    } finally {
+      setUploadingId(null);
+    }
   }
 
   async function handlePublish(world) {
@@ -205,6 +231,14 @@ export default function TeacherMode({ onExit }) {
                   >
                     📊 Missed Terms
                   </button>
+                  <button
+                    type="button"
+                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+                    onClick={() => triggerUpload(world)}
+                    disabled={uploadingId === world.id}
+                  >
+                    {uploadingId === world.id ? 'Uploading…' : '🎵 Upload Music'}
+                  </button>
                 </div>
               )}
               {statsForId === world.id && world.classroomCode && (
@@ -217,10 +251,22 @@ export default function TeacherMode({ onExit }) {
               {publishError?.id === world.id && (
                 <p style={{ color: '#ff8a5c', fontSize: 13, marginTop: 8 }}>{publishError.message}</p>
               )}
+              {uploadMessage?.id === world.id && (
+                <p style={{ color: uploadMessage.isError ? '#ff8a5c' : '#7de37b', fontSize: 13, marginTop: 8 }}>
+                  {uploadMessage.text}
+                </p>
+              )}
             </div>
           );
         })}
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/mpeg,.mp3"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
     </div>
   );
 }
