@@ -35,6 +35,9 @@ class ScoreSubmitRequest(BaseModel):
     nickname: str = Field(min_length=1, max_length=24)
     score: int
     missedTermIds: list[str] = []
+    correctTermIds: list[str] = []
+    correctCount: int = 0
+    wrongCount: int = 0
 
 
 class ScoreEntry(BaseModel):
@@ -47,3 +50,17 @@ class ScoreEntry(BaseModel):
 class TermMissStat(BaseModel):
     termId: str
     missCount: int
+
+
+# One per submitted run (inserted, never upserted) — unlike ScoreEntry above
+# (which only keeps a student's best score), this is the full replay history:
+# who played, when, their score for that specific attempt, and which terms
+# they got right/wrong on it.
+class AttemptEntry(BaseModel):
+    nickname: str
+    score: int
+    correctCount: int
+    wrongCount: int
+    correctTermIds: list[str]
+    missedTermIds: list[str]
+    submittedAt: str

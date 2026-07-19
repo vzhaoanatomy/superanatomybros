@@ -4,6 +4,7 @@ import { loadCustomWorldData, saveCustomWorldData, loadJoinedWorlds, saveJoinedW
 import { publishWorld, updateWorld, uploadWorldMusic } from '../api';
 import WorldBuilderForm from './WorldBuilderForm';
 import MissedTermsPanel from './MissedTermsPanel';
+import StudentAttemptsPanel from './StudentAttemptsPanel';
 import * as t from './teacherStyles';
 
 export default function TeacherMode({ onExit }) {
@@ -12,6 +13,7 @@ export default function TeacherMode({ onExit }) {
   const [publishingId, setPublishingId] = useState(null);
   const [publishError, setPublishError] = useState(null); // { id, message }
   const [statsForId, setStatsForId] = useState(null);
+  const [attemptsForId, setAttemptsForId] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
   const [uploadMessage, setUploadMessage] = useState(null); // { id, text, isError }
   const fileInputRef = useRef(null);
@@ -234,6 +236,13 @@ export default function TeacherMode({ onExit }) {
                   <button
                     type="button"
                     style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+                    onClick={() => setAttemptsForId(attemptsForId === world.id ? null : world.id)}
+                  >
+                    🧑‍🎓 Student Attempts
+                  </button>
+                  <button
+                    type="button"
+                    style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
                     onClick={() => triggerUpload(world)}
                     disabled={uploadingId === world.id}
                   >
@@ -246,6 +255,13 @@ export default function TeacherMode({ onExit }) {
                   code={world.classroomCode}
                   vocab={world.vocab}
                   onClose={() => setStatsForId(null)}
+                />
+              )}
+              {attemptsForId === world.id && world.classroomCode && (
+                <StudentAttemptsPanel
+                  code={world.classroomCode}
+                  vocab={world.vocab}
+                  onClose={() => setAttemptsForId(null)}
                 />
               )}
               {publishError?.id === world.id && (

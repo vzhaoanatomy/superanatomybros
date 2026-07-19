@@ -216,6 +216,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       gliding: false,
       pounding: false,
       missedTermIds: new Set(),
+      correctTermIds: new Set(),
+      correctCount: 0,
+      wrongCount: 0,
       durationSeconds,
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
@@ -249,6 +252,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
+      state.wrongCount += 1;
+    }
+
+    function recordCorrect(termId) {
+      state.correctTermIds.add(termId);
+      state.correctCount += 1;
     }
 
     function popup(x, y, text, color) {
@@ -326,6 +335,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.gliding = false;
       state.pounding = false;
       state.missedTermIds = new Set();
+      state.correctTermIds = new Set();
+      state.correctCount = 0;
+      state.wrongCount = 0;
       state.timeRemaining = state.durationSeconds;
       state.lastTimeBonus = 0;
       lastFrameTime = performance.now();
@@ -336,7 +348,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     handlersRef.current.resolveQuiz = (isCorrect) => handlersRef.current._pendingResolve?.(isCorrect);
     handlersRef.current.finishEndOfLevel = (results) => {
       for (const r of results) {
-        if (!r.correct) recordWrong(r.termId);
+        if (r.correct) recordCorrect(r.termId);
+        else recordWrong(r.termId);
       }
       recordLocalScore({
         worldId: world.id,
@@ -347,7 +360,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       });
       if (world.isClassroom) {
         const nickname = getNickname();
-        if (nickname) submitScore(world.code, nickname, state.score, [...state.missedTermIds]).catch(() => {});
+        if (nickname) {
+          submitScore(
+            world.code,
+            nickname,
+            state.score,
+            [...state.missedTermIds],
+            [...state.correctTermIds],
+            state.correctCount,
+            state.wrongCount
+          ).catch(() => {});
+        }
       }
       playLevelCompleteDings();
       setOverlay({ type: 'complete' });
@@ -419,6 +442,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         (isCorrect) => {
           if (isCorrect) {
             boss.hp -= 1;
+            recordCorrect(termId);
           } else {
             recordWrong(termId);
             loseLife();
@@ -557,6 +581,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           level.door.pending = false;
           if (isCorrect) {
             level.door.passed = true;
+            recordCorrect(level.door.termId);
           } else {
             recordWrong(level.door.termId);
           }
@@ -615,6 +640,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
                 state.score += 50;
                 playStompSound();
                 popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
+                recordCorrect(enemy.termId);
               } else {
                 recordWrong(enemy.termId);
                 loseLife();
@@ -672,6 +698,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               const gained = combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
               state.score += gained;
               popup(coin.x + coin.width / 2, coin.y, combo ? `+${gained} Combo!` : `+${gained}`, '#7de37b');
+              recordCorrect(coin.termId);
             } else {
               recordWrong(coin.termId);
               state.score -= COIN_WRONG_PENALTY;

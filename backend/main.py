@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from codes import unique_code
-from db import scores_collection, term_stats_collection, worlds_collection
-from models import ScoreEntry, ScoreSubmitRequest, TermMissStat, WorldPayload, WorldPublishResponse
+from db import attempts_collection, scores_collection, term_stats_collection, worlds_collection
+from models import AttemptEntry, ScoreEntry, ScoreSubmitRequest, TermMissStat, WorldPayload, WorldPublishResponse
 
 app = FastAPI(title="Super Anatomy Bros API")
 
@@ -115,6 +115,22 @@ async def submit_score(code: str, payload: ScoreSubmitRequest):
             {"$inc": {"missCount": 1}},
             upsert=True,
         )
+    # Inserted (not upserted) so every replay is kept, not just the best —
+    # answers "how did this student do on each specific play," which the
+    # $max-based leaderboard above can't, since it only ever keeps one score
+    # per nickname.
+    await attempts_collection.insert_one(
+        {
+            "code": code,
+            "nickname": nickname,
+            "score": payload.score,
+            "correctCount": payload.correctCount,
+            "wrongCount": payload.wrongCount,
+            "correctTermIds": payload.correctTermIds,
+            "missedTermIds": payload.missedTermIds,
+            "submittedAt": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     return {"status": "ok"}
 
 
@@ -131,3 +147,23 @@ async def get_missed_terms(code: str):
     code = code.upper()
     cursor = term_stats_collection.find({"code": code}).sort("missCount", -1)
     return [TermMissStat(termId=doc["termId"], missCount=doc["missCount"]) async for doc in cursor]
+
+
+@app.get("/api/worlds/{code}/attempts", response_model=list[AttemptEntry])
+async def get_attempts(code: str):
+    code = code.upper()
+    # Sorted by nickname then time so every student's plays land together,
+    # oldest first, showing their progression across replays.
+    cursor = attempts_collection.find({"code": code}).sort([("nickname", 1), ("submittedAt", 1)])
+    return [
+        AttemptEntry(
+            nickname=doc["nickname"],
+            score=doc["score"],
+            correctCount=doc["correctCount"],
+            wrongCount=doc["wrongCount"],
+            correctTermIds=doc["correctTermIds"],
+            missedTermIds=doc["missedTermIds"],
+            submittedAt=doc["submittedAt"],
+        )
+        async for doc in cursor
+    ]

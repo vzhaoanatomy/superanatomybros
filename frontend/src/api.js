@@ -43,8 +43,19 @@ export function fetchWorld(code) {
   return request(`/api/worlds/${code}`);
 }
 
-export function submitScore(code, nickname, score, missedTermIds = []) {
-  return request(`/api/scores/${code}`, { method: 'POST', body: JSON.stringify({ nickname, score, missedTermIds }) });
+export function submitScore(
+  code,
+  nickname,
+  score,
+  missedTermIds = [],
+  correctTermIds = [],
+  correctCount = 0,
+  wrongCount = 0
+) {
+  return request(`/api/scores/${code}`, {
+    method: 'POST',
+    body: JSON.stringify({ nickname, score, missedTermIds, correctTermIds, correctCount, wrongCount }),
+  });
 }
 
 export function fetchLeaderboard(code) {
@@ -53,6 +64,10 @@ export function fetchLeaderboard(code) {
 
 export function fetchMissedTerms(code) {
   return request(`/api/worlds/${code}/missed-terms`);
+}
+
+export function fetchAttempts(code) {
+  return request(`/api/worlds/${code}/attempts`);
 }
 
 // Bypasses request()'s hardcoded JSON Content-Type — multipart needs the
