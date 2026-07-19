@@ -76,6 +76,12 @@ export function recordLocalScore(entry) {
   writeJSON(LOCAL_LEADERBOARD_KEY, list.slice(0, LOCAL_LEADERBOARD_MAX));
 }
 
+// Lets a teacher clear this device's local leaderboard between class
+// periods rather than it accumulating across every period indefinitely.
+export function clearLocalLeaderboard() {
+  writeJSON(LOCAL_LEADERBOARD_KEY, []);
+}
+
 export function getNickname() {
   try {
     return localStorage.getItem(NICKNAME_KEY) ?? '';

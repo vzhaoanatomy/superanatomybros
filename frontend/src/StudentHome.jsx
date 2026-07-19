@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { loadJoinedWorlds, loadSettings, saveSettings } from './storage';
+import { getNickname, setNickname, loadJoinedWorlds, loadSettings, saveSettings } from './storage';
 import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } from './game/music';
 import WorldCard from './game/WorldCard';
 import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
-import Settings from './Settings';
 
 const sectionHeaderStyle = {
   width: '100%',
@@ -19,16 +18,41 @@ const sectionHeaderStyle = {
 };
 
 const panelButtonStyle = {
-  padding: '12px 16px',
+  padding: '14px 18px',
   borderRadius: 8,
   border: '2px solid #1a2a4a',
   background: '#22304f',
   color: '#fff',
   fontWeight: 'bold',
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 15,
   width: '100%',
   textAlign: 'left',
+};
+
+const pillButtonStyle = {
+  flex: 1,
+  padding: '12px 10px',
+  borderRadius: 8,
+  border: '2px solid #1a2a4a',
+  background: '#0e1526',
+  color: '#fff',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  fontSize: 13,
+  textAlign: 'center',
+};
+
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 6,
+  border: '2px solid #3a4a6c',
+  background: '#0e1526',
+  color: '#fff',
+  fontSize: 14,
+  fontFamily: 'inherit',
 };
 
 // The student-only entry point (served at /play) — a code-entry screen plus
@@ -41,9 +65,9 @@ export default function StudentHome({ onSelectWorld }) {
   const [showJoin, setShowJoin] = useState(joined.length === 0);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
+  const [nickname, setNicknameState] = useState(getNickname());
 
   useEffect(() => {
     const settings = loadSettings();
@@ -61,6 +85,10 @@ export default function StudentHome({ onSelectWorld }) {
     const next = toggleSfx();
     setSfxOn(next);
     saveSettings({ musicOn, sfxOn: next });
+  }
+
+  function handleNicknameBlur() {
+    setNicknameState(setNickname(nickname));
   }
 
   if (showJoin) {
@@ -87,12 +115,12 @@ export default function StudentHome({ onSelectWorld }) {
           gap: 24,
           justifyContent: 'center',
           alignItems: 'flex-start',
-          maxWidth: 1100,
+          maxWidth: 1200,
           margin: '24px auto 0',
           flexWrap: 'wrap',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 820 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 480px', minWidth: 320 }}>
           <p style={sectionHeaderStyle}>📚 Your Classes</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
             {joined.map((world) => (
@@ -104,20 +132,22 @@ export default function StudentHome({ onSelectWorld }) {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-            width: 220,
+            gap: 12,
+            flex: '1 1 380px',
+            minWidth: 300,
+            maxWidth: 460,
             background: '#0e1526',
             border: '2px solid #22304f',
             borderRadius: 10,
-            padding: 16,
+            padding: 20,
           }}
         >
           <button
             type="button"
-            style={{ ...panelButtonStyle, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
+            style={{ ...panelButtonStyle, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200', fontSize: 17, padding: '18px 20px' }}
             onClick={() => setShowJoin(true)}
           >
-            ⭐ Join Another Class
+            ⭐ Join Class with Code
           </button>
           <button
             type="button"
@@ -129,22 +159,32 @@ export default function StudentHome({ onSelectWorld }) {
           <button type="button" style={panelButtonStyle} onClick={() => setShowHowToPlay(true)}>
             ❓ How to Play
           </button>
-          <button type="button" style={panelButtonStyle} onClick={() => setShowSettings(true)}>
-            ⚙️ Settings
-          </button>
+          <div style={{ textAlign: 'left', marginTop: 8 }}>
+            <label style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', color: '#9fb0d0', marginBottom: 6 }}>
+              Nickname (shown on classroom leaderboards)
+            </label>
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => setNicknameState(e.target.value)}
+              onBlur={handleNicknameBlur}
+              maxLength={24}
+              placeholder="Enter a nickname"
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button type="button" style={pillButtonStyle} onClick={handleToggleSfx}>
+              {sfxOn ? '🔊 SFX: On' : '🔇 SFX: Off'}
+            </button>
+            <button type="button" style={pillButtonStyle} onClick={handleToggleMusic}>
+              {musicOn ? '♪ Music: On' : '♪ Music: Off'}
+            </button>
+          </div>
         </div>
       </div>
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} />}
       {showLeaderboard && <LocalLeaderboard onClose={() => setShowLeaderboard(false)} />}
-      {showSettings && (
-        <Settings
-          musicOn={musicOn}
-          sfxOn={sfxOn}
-          onToggleMusic={handleToggleMusic}
-          onToggleSfx={handleToggleSfx}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 }

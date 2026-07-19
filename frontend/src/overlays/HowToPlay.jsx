@@ -121,10 +121,15 @@ const bodyStyle = {
   lineHeight: 1.6,
 };
 
+const headerRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  margin: '0 0 16px',
+};
+
 const closeButtonStyle = {
-  margin: '20px auto 0',
-  display: 'block',
-  padding: '10px 28px',
+  padding: '8px 14px',
   borderRadius: 6,
   border: '3px solid #000',
   background: '#2ecc71',
@@ -133,6 +138,7 @@ const closeButtonStyle = {
   fontSize: 15,
   cursor: 'pointer',
   fontFamily: FONT,
+  flexShrink: 0,
 };
 
 export default function HowToPlay({ onClose }) {
@@ -151,7 +157,12 @@ export default function HowToPlay({ onClose }) {
           fontFamily: FONT,
         }}
       >
-        <h2 style={{ margin: '0 0 16px', color: '#fff', textAlign: 'center', fontSize: 26 }}>How to Play</h2>
+        <div style={headerRowStyle}>
+          <h2 style={{ margin: 0, color: '#fff', fontSize: 26 }}>How to Play</h2>
+          <button type="button" onClick={onClose} style={closeButtonStyle}>
+            ✕ Close
+          </button>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
           {SECTIONS.map((section) => (
             <div key={section.title} style={cardStyle}>
@@ -192,10 +203,6 @@ export default function HowToPlay({ onClose }) {
             ))}
           </div>
         </div>
-
-        <button type="button" onClick={onClose} style={closeButtonStyle}>
-          Close
-        </button>
       </div>
     </div>
   );

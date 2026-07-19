@@ -261,10 +261,12 @@ export default function TeacherMode({ onExit }) {
         {myDecks.length > 0 && (
           <>
             <p style={t.sectionHeader}>⭐ My Decks</p>
+            <p style={t.sectionSubtext}>Decks you've customized — jump back in.</p>
             {myDecks.map((world) => renderWorldRow(world))}
           </>
         )}
-        <p style={t.sectionHeader}>Templates — edit to customize</p>
+        <p style={t.sectionHeader}>Templates</p>
+        <p style={t.sectionSubtext}>Starting points — pick one to customize.</p>
         {templates.map((world) => renderWorldRow(world))}
       </div>
       <input

@@ -250,6 +250,11 @@ export function buildLevel({ world, durationMinutes }) {
   const solidSegments = groundSegments.filter(([x1, x2]) => x2 - x1 > 160);
   const enemyCount = Math.max(2, Math.round(width / 700 + difficulty * 0.8));
   const baseSpeed = 1.8 + (difficulty - 1) * 0.3;
+  // The player always spawns at x: 60 (see `spawn` below) — the first solid
+  // ground segment starts at x: 0, so without this an enemy's patrol range
+  // could begin just a few dozen pixels from spawn with no time to react.
+  // 340px is roughly one second of run-speed room (5.6px/frame * 60fps).
+  const SPAWN_SAFE_X = 340;
   const enemies = [];
   for (let i = 0; i < enemyCount; i++) {
     const [sx1, sx2] = solidSegments[i % solidSegments.length];
@@ -257,12 +262,19 @@ export function buildLevel({ world, durationMinutes }) {
     const patrolMargin = Math.min(60, segWidth * 0.2);
     const minX = sx1 + patrolMargin;
     const maxX = Math.max(minX + 80, sx2 - patrolMargin);
-    const startX = minX + rng() * Math.max(1, maxX - minX - 42);
+    // A segment whose whole viable range sits inside the safe zone (only
+    // ever the very first segment, which starts at x: 0) gets skipped
+    // rather than clamped in place — clamping minX up to SPAWN_SAFE_X while
+    // leaving maxX derived from a short segment's own sx2 could push the
+    // patrol past that segment's actual ground into open air.
+    if (maxX <= SPAWN_SAFE_X) continue;
+    const clampedMinX = Math.max(minX, SPAWN_SAFE_X);
+    const startX = clampedMinX + rng() * Math.max(1, maxX - clampedMinX - 42);
     enemies.push({
       id: `enemy-${i}`,
       x: startX,
       startX,
-      minX,
+      minX: clampedMinX,
       maxX,
       y: GROUND_Y - 42,
       width: 42,

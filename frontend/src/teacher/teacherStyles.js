@@ -37,7 +37,13 @@ export const sectionHeader = {
   letterSpacing: 0.5,
   textTransform: 'uppercase',
   color: '#9fb0d0',
-  margin: '18px 0 8px',
+  margin: '18px 0 0',
+};
+
+export const sectionSubtext = {
+  fontSize: 12.5,
+  color: '#6d7ea3',
+  margin: '2px 0 8px',
 };
 
 export const label = {

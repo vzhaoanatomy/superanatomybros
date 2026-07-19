@@ -5,7 +5,6 @@ import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } f
 import { loadSettings, saveSettings } from './storage';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
-import Settings from './Settings';
 
 const sectionHeaderStyle = {
   width: '100%',
@@ -15,26 +14,55 @@ const sectionHeaderStyle = {
   textTransform: 'uppercase',
   color: '#9fb0d0',
   textAlign: 'left',
-  margin: '4px 0 2px',
+  margin: '4px 0 0',
+};
+
+const sectionSubtextStyle = {
+  width: '100%',
+  fontSize: 12.5,
+  color: '#6d7ea3',
+  textAlign: 'left',
+  margin: '2px 0 8px',
+};
+
+const myDecksWrapStyle = {
+  width: '100%',
+  border: '2px solid #3a2f5c',
+  background: 'rgba(125, 63, 214, 0.08)',
+  borderRadius: 12,
+  padding: '14px 14px 4px',
+  marginBottom: 4,
 };
 
 const panelButtonStyle = {
-  padding: '12px 16px',
+  padding: '14px 18px',
   borderRadius: 8,
   border: '2px solid #1a2a4a',
   background: '#22304f',
   color: '#fff',
   fontWeight: 'bold',
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 15,
   width: '100%',
   textAlign: 'left',
 };
 
-export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinClassroom }) {
+const pillButtonStyle = {
+  flex: 1,
+  padding: '12px 10px',
+  borderRadius: 8,
+  border: '2px solid #1a2a4a',
+  background: '#0e1526',
+  color: '#fff',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  fontSize: 13,
+  textAlign: 'center',
+};
+
+export default function WorldSelect({ onSelect, onOpenTeacherMode }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
   const { myDecks, templates } = getGroupedWorlds();
@@ -67,22 +95,32 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
       <div className="title-banner">
         <h1>Super Anatomy Bros</h1>
       </div>
-      <p className="tagline-ribbon">
-        Anatomy and Physiology Edition — Collect as many coins as you can. Highest score wins!
-      </p>
-      <div style={{ display: 'flex', gap: 24, justifyContent: 'center', alignItems: 'flex-start', maxWidth: 1100, margin: '24px auto 0', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 820 }}>
+      <p className="tagline-ribbon">Anatomy and Physiology Edition — customize a deck or jump into one below.</p>
+      <div
+        style={{
+          display: 'flex',
+          gap: 24,
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          maxWidth: 1200,
+          margin: '24px auto 0',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 480px', minWidth: 320 }}>
           {myDecks.length > 0 && (
-            <>
+            <div style={myDecksWrapStyle}>
               <p style={sectionHeaderStyle}>⭐ My Decks</p>
-              <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+              <p style={sectionSubtextStyle}>Decks you've customized — jump back in.</p>
+              <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap', paddingBottom: 14 }}>
                 {myDecks.map((world) => (
                   <WorldCard key={world.id} world={world} onSelect={onSelect} />
                 ))}
               </div>
-            </>
+            </div>
           )}
-          <p style={sectionHeaderStyle}>Templates — edit to customize</p>
+          <p style={sectionHeaderStyle}>Templates</p>
+          <p style={sectionSubtextStyle}>Starting points — pick one to customize.</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
             {templates.map((world) => (
               <WorldCard key={world.id} world={world} onSelect={onSelect} />
@@ -93,14 +131,23 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
-            width: 220,
+            gap: 12,
+            flex: '1 1 380px',
+            minWidth: 300,
+            maxWidth: 460,
             background: '#0e1526',
             border: '2px solid #22304f',
             borderRadius: 10,
-            padding: 16,
+            padding: 20,
           }}
         >
+          <button
+            type="button"
+            style={{ ...panelButtonStyle, background: '#7d3fd6', border: '2px solid #5a2ba0', fontSize: 17, padding: '18px 20px' }}
+            onClick={onOpenTeacherMode}
+          >
+            🎓 Teacher Mode · Custom Vocab
+          </button>
           <button
             type="button"
             style={{ ...panelButtonStyle, background: '#2ecc71', border: '2px solid #1e8449', color: '#0a1a0a' }}
@@ -111,36 +158,18 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode, onOpenJoinCla
           <button type="button" style={panelButtonStyle} onClick={() => setShowHowToPlay(true)}>
             ❓ How to Play
           </button>
-          <button
-            type="button"
-            style={{ ...panelButtonStyle, background: '#7d3fd6', border: '2px solid #5a2ba0' }}
-            onClick={onOpenTeacherMode}
-          >
-            🎓 Teacher Mode · Custom Vocab
-          </button>
-          <button
-            type="button"
-            style={{ ...panelButtonStyle, background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
-            onClick={onOpenJoinClassroom}
-          >
-            ⭐ Join Classroom · Enter Code
-          </button>
-          <button type="button" style={panelButtonStyle} onClick={() => setShowSettings(true)}>
-            ⚙️ Settings
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+            <button type="button" style={pillButtonStyle} onClick={handleToggleSfx}>
+              {sfxOn ? '🔊 SFX: On' : '🔇 SFX: Off'}
+            </button>
+            <button type="button" style={pillButtonStyle} onClick={handleToggleMusic}>
+              {musicOn ? '♪ Music: On' : '♪ Music: Off'}
+            </button>
+          </div>
         </div>
       </div>
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} />}
       {showLeaderboard && <LocalLeaderboard onClose={() => setShowLeaderboard(false)} />}
-      {showSettings && (
-        <Settings
-          musicOn={musicOn}
-          sfxOn={sfxOn}
-          onToggleMusic={handleToggleMusic}
-          onToggleSfx={handleToggleSfx}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
     </div>
   );
 }

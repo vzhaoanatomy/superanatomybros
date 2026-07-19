@@ -48,9 +48,26 @@ function CharacterCard({ character, onSelect }) {
   );
 }
 
-export default function CharacterSelect({ onSelect }) {
+const backButtonStyle = {
+  position: 'absolute',
+  top: 20,
+  left: 20,
+  padding: '10px 16px',
+  borderRadius: 6,
+  border: '2px solid #3a4a6c',
+  background: '#22304f',
+  color: '#fff',
+  cursor: 'pointer',
+  fontSize: 14,
+  fontFamily: 'inherit',
+};
+
+export default function CharacterSelect({ onSelect, onBack }) {
   return (
-    <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24 }}>
+    <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24, position: 'relative' }}>
+      <button type="button" style={backButtonStyle} onClick={onBack}>
+        ← Back
+      </button>
       <div className="title-banner">
         <h1 style={{ fontSize: 32 }}>Choose Your Character</h1>
       </div>

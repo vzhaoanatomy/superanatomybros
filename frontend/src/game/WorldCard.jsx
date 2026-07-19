@@ -70,7 +70,7 @@ export default function WorldCard({ world, onSelect }) {
         height={PREVIEW_H}
         style={{ borderRadius: 6, imageRendering: 'pixelated', display: 'block' }}
       />
-      <strong style={{ fontSize: 14 }}>{world.index != null ? `World ${world.index}: ${world.name}` : world.name}</strong>
+      <strong style={{ fontSize: 14 }}>{world.name}</strong>
       <span style={{ fontSize: 12, color: world.palette.accent }}>{ENEMY_LABELS[world.enemyType] ?? world.enemyType}</span>
       {world.isClassroom && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Code: {world.code}</span>}
     </button>
