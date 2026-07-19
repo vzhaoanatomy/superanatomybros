@@ -82,6 +82,14 @@ export function clearLocalLeaderboard() {
   writeJSON(LOCAL_LEADERBOARD_KEY, []);
 }
 
+// Best score for one specific world across every local play — used to show
+// a "Best: N" badge on its deck card before you even click in.
+export function getBestLocalScore(worldId) {
+  const entries = loadLocalLeaderboard().filter((e) => e.worldId === worldId);
+  if (!entries.length) return null;
+  return Math.max(...entries.map((e) => e.score));
+}
+
 export function getNickname() {
   try {
     return localStorage.getItem(NICKNAME_KEY) ?? '';

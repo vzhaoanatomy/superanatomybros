@@ -1044,3 +1044,18 @@ export function drawScorePopup(ctx, popup, now) {
   ctx.restore();
 }
 
+// A small colored dot scatter for a kill/hit — game/juice.js owns the
+// particle physics (position, velocity, lifetime), this just fades each
+// one out over its remaining life.
+export function drawParticles(ctx, particles, now, lifeMs) {
+  ctx.save();
+  for (const p of particles) {
+    const t = Math.min(1, (now - p.createdAt) / lifeMs);
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = p.color;
+    const size = 5 * (1 - t * 0.6);
+    ctx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+  }
+  ctx.restore();
+}
+

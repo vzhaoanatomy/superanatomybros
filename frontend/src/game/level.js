@@ -74,10 +74,12 @@ export function buildLevel({ world, durationMinutes }) {
   // a stable, well-distributed PRNG from whatever string it's given; only
   // the string now changes every time.
   const rng = hashSeed(`${world.id}-${durationMinutes}-${Math.random()}`);
-  // Classroom worlds a student joins by code have no World 1-7 position (see
-  // WorldCard.jsx for the same gap on the card label) — mid-range difficulty
-  // is the sane default rather than propagating undefined into NaN math.
-  const difficulty = world.index ?? 4;
+  // A teacher's own custom deck carries an explicit `difficulty` they picked
+  // in the builder (see WorldBuilderForm.jsx). Built-ins and classroom-
+  // joined worlds fall back to `index` (World 1-7's built-in scaling), and
+  // classroom worlds joined by code have neither — mid-range is the sane
+  // default rather than propagating undefined into NaN math.
+  const difficulty = world.difficulty ?? world.index ?? 4;
   const vocab = world.vocab;
 
   // A level must be long enough to seed at least one coin per vocab term
@@ -379,23 +381,23 @@ export function buildLevel({ world, durationMinutes }) {
     });
   }
 
-  // World 7 only: a final boss blocking the way to the flag, tall enough
-  // that no jump clears it (same trick as the checkpoint door).
+  // Every level ends in a boss blocking the way to the flag, tall enough
+  // that no jump clears it (same trick as the checkpoint door). Used to be
+  // World 7 only, but that index is meaningless for teacher-authored decks
+  // (never 7), which made the game's biggest set-piece invisible to almost
+  // every real play session.
   const flag = { x: width - 100, y: GROUND_Y - 200, width: 20, height: 200 };
   const BOSS_HEIGHT = 240;
-  const boss =
-    world.index === 7
-      ? {
-          x: flag.x - 260,
-          y: GROUND_Y - BOSS_HEIGHT,
-          width: 100,
-          height: BOSS_HEIGHT,
-          hp: 3,
-          maxHp: 3,
-          alive: true,
-          pending: false,
-        }
-      : null;
+  const boss = {
+    x: flag.x - 260,
+    y: GROUND_Y - BOSS_HEIGHT,
+    width: 100,
+    height: BOSS_HEIGHT,
+    hp: 3,
+    maxHp: 3,
+    alive: true,
+    pending: false,
+  };
 
   // Piranha plant: a stationary hazard near the end of the level (before
   // the boss/flag, not blocking the path — it's a threat you have to

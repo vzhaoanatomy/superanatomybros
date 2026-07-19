@@ -14,10 +14,17 @@ export function findTerm(vocab, termId) {
 }
 
 // Builds a single definition-prompt question: the target term's definition
-// plus 4 shuffled term options (1 correct + 3 distractors).
+// plus 4 shuffled term options (1 correct + 3 distractors). Distractors are
+// picked by closest term-length to the correct answer (not pure random) so
+// the right option can't be spotted just by "which one looks different" —
+// the pool is shuffled first so length ties don't resolve the same way
+// every time.
 export function buildQuestion(vocab, termId) {
   const target = findTerm(vocab, termId);
-  const distractors = shuffle(vocab.filter((v) => v.id !== termId)).slice(0, 3);
+  const candidates = shuffle(vocab.filter((v) => v.id !== termId));
+  const distractors = candidates
+    .sort((a, b) => Math.abs(a.term.length - target.term.length) - Math.abs(b.term.length - target.term.length))
+    .slice(0, 3);
   const options = shuffle([target, ...distractors]);
   return {
     termId,

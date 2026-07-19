@@ -42,7 +42,7 @@ export default function LocalLeaderboard({ onClose }) {
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [entries, setEntries] = useState(() =>
     loadLocalLeaderboard().map((e) => ({
-      nickname: `${e.characterName} · ${e.worldName}`,
+      nickname: `${e.nickname || 'Anonymous'} · ${e.worldName}`,
       score: e.score,
     }))
   );

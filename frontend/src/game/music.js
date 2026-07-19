@@ -1,16 +1,9 @@
-// Procedural chiptune background music via the Web Audio API — no audio
-// files, just oscillators. Square lead + triangle harmony (an octave below)
-// + sawtooth bass + a simple kick/snare pulse, ~195 BPM with short staccato
-// notes and an accented downbeat for a bouncy, platformer-ish feel. Six
-// short chord-progression "sections" are picked in a non-consecutive order
-// so the loop doesn't feel like the same 4 bars over and over.
-
-const BPM = 195;
-const BEAT_SEC = 60 / BPM;
-const STEP_SEC = BEAT_SEC / 2; // eighth notes
-const STEPS_PER_SECTION = 16;
-const LOOKAHEAD_SEC = 0.1;
-const SCHEDULE_INTERVAL_MS = 25;
+// Background music is a single looping <audio> element — a bundled
+// 8-bit track (frontend/public/audio/pixelland.mp3) plays by default for
+// every world; a classroom world's own uploaded track takes over the same
+// slot exactly as before, layered on top via setCustomTrack(). SFX below
+// stay on the Web Audio API (procedural oscillators), untouched by this.
+const DEFAULT_TRACK_URL = '/audio/pixelland.mp3';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const freqCache = {};
@@ -32,33 +25,8 @@ function transposeOctave(name, delta) {
   return `${pitch}${parseInt(octaveStr, 10) + delta}`;
 }
 
-// Chord voicings in octave 4 — root, third, fifth, octave.
-const CHORDS = {
-  C: ['C4', 'E4', 'G4', 'C5'],
-  Am: ['A3', 'C4', 'E4', 'A4'],
-  F: ['F3', 'A3', 'C4', 'F4'],
-  G: ['G3', 'B3', 'D4', 'G4'],
-};
-
-// Each section: a 4-chord progression (one chord per 4-step group) plus an
-// arpeggio index pattern applied within each group.
-const SECTIONS = {
-  A: { progression: ['C', 'F', 'G', 'C'], pattern: [0, 1, 2, 3] },
-  B: { progression: ['Am', 'F', 'C', 'G'], pattern: [0, 2, 1, 3] },
-  C: { progression: ['F', 'G', 'Am', 'C'], pattern: [2, 1, 0, 3] },
-  D: { progression: ['C', 'G', 'Am', 'F'], pattern: [0, 1, 3, 2] },
-  E: { progression: ['G', 'C', 'F', 'G'], pattern: [3, 2, 1, 0] },
-  F: { progression: ['Am', 'G', 'F', 'G'], pattern: [0, 3, 1, 2] },
-};
-const SECTION_KEYS = Object.keys(SECTIONS);
-
 let audioCtx = null;
 let playing = false;
-let schedulerTimer = null;
-let nextStepTime = 0;
-let currentStep = 0;
-let currentSectionKey = null;
-let recentSections = [];
 
 function ensureContext() {
   if (!audioCtx) {
@@ -69,21 +37,11 @@ function ensureContext() {
 }
 
 // Resumes the (lazily-created) AudioContext from inside a real user-gesture
-// handler — the splash screen's tap-to-play calls this once so audio doesn't
+// handler — App.jsx's first-tap listener calls this once so audio doesn't
 // silently fail the first time a sound tries to play on mobile Safari/Chrome.
 export function unlockAudio() {
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
-}
-
-function pickNextSection() {
-  let choice;
-  do {
-    choice = SECTION_KEYS[Math.floor(Math.random() * SECTION_KEYS.length)];
-  } while (recentSections.includes(choice) && recentSections.length < SECTION_KEYS.length - 1);
-  recentSections.push(choice);
-  if (recentSections.length > 2) recentSections.shift();
-  return choice;
 }
 
 function playTone(ctx, freq, startTime, duration, type, peakGain) {
@@ -99,113 +57,42 @@ function playTone(ctx, freq, startTime, duration, type, peakGain) {
   osc.stop(startTime + duration + 0.02);
 }
 
-function playKick(ctx, startTime) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(120, startTime);
-  osc.frequency.exponentialRampToValueAtTime(40, startTime + 0.12);
-  gain.gain.setValueAtTime(0.5, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(startTime);
-  osc.stop(startTime + 0.16);
-}
-
-function playSnare(ctx, startTime) {
-  const bufferSize = Math.floor(ctx.sampleRate * 0.1);
-  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  noise.buffer = buffer;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.28, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
-  noise.connect(gain).connect(ctx.destination);
-  noise.start(startTime);
-}
-
-function scheduleStep(step, time) {
-  const ctx = audioCtx;
-  const section = SECTIONS[currentSectionKey];
-  const groupIndex = Math.floor(step / 4);
-  const chord = CHORDS[section.progression[groupIndex]];
-  const chordTone = chord[section.pattern[step % 4]];
-
-  // Short, staccato notes with an accented downbeat give a bouncy,
-  // platformer "hop" feel rather than a smooth legato line.
-  const isDownbeat = step % 4 === 0;
-  const leadNote = transposeOctave(chordTone, 1);
-  playTone(ctx, noteFreq(leadNote), time, STEP_SEC * 0.55, 'square', isDownbeat ? 0.15 : 0.1);
-  playTone(ctx, noteFreq(transposeOctave(leadNote, -1)), time, STEP_SEC * 0.55, 'triangle', 0.07);
-
-  if (step % 4 === 0) {
-    const rootNote = transposeOctave(chord[0], -1);
-    playTone(ctx, noteFreq(rootNote), time, STEP_SEC * 4 * 0.95, 'sawtooth', 0.08);
-  }
-  if (step === 0 || step === 8) playKick(ctx, time);
-  if (step === 4 || step === 12) playSnare(ctx, time);
-}
-
-function scheduler() {
-  const ctx = audioCtx;
-  while (nextStepTime < ctx.currentTime + LOOKAHEAD_SEC) {
-    scheduleStep(currentStep, nextStepTime);
-    nextStepTime += STEP_SEC;
-    currentStep++;
-    if (currentStep >= STEPS_PER_SECTION) {
-      currentStep = 0;
-      currentSectionKey = pickNextSection();
-    }
-  }
-}
-
-// A classroom world's uploaded track (if any) takes over the "music" slot
-// entirely in place of the chiptune scheduler — same on/off toggle, same
-// isMusicPlaying() reporting, just a different sound source. Every
-// non-classroom world never sets this, so their behavior is unchanged.
-let activeCustomUrl = null;
-let customAudioEl = null;
+let activeTrackUrl = DEFAULT_TRACK_URL;
+let audioEl = null;
+let loadedUrl = null;
 
 function startPlayback() {
-  if (activeCustomUrl) {
-    if (!customAudioEl) customAudioEl = new Audio();
-    if (customAudioEl.src !== activeCustomUrl) customAudioEl.src = activeCustomUrl;
-    customAudioEl.loop = true;
-    customAudioEl.volume = 0.6;
-    customAudioEl.play().catch(() => {});
-    return;
+  if (!audioEl) audioEl = new Audio();
+  // Tracked separately from audioEl.src (which the browser resolves to a
+  // full absolute URL) so a relative activeTrackUrl doesn't look "changed"
+  // on every single toggle and reset playback position each time.
+  if (loadedUrl !== activeTrackUrl) {
+    audioEl.src = activeTrackUrl;
+    loadedUrl = activeTrackUrl;
   }
-  const ctx = ensureContext();
-  if (ctx.state === 'suspended') ctx.resume();
-  currentStep = 0;
-  currentSectionKey = pickNextSection();
-  nextStepTime = ctx.currentTime + 0.05;
-  schedulerTimer = setInterval(scheduler, SCHEDULE_INTERVAL_MS);
+  audioEl.loop = true;
+  audioEl.volume = 0.6;
+  audioEl.play().catch(() => {});
 }
 
 function stopPlayback() {
-  if (customAudioEl) customAudioEl.pause();
-  if (schedulerTimer) clearInterval(schedulerTimer);
-  schedulerTimer = null;
+  if (audioEl) audioEl.pause();
 }
 
-// Both stop whatever source is currently playing before switching, so a
-// world change never leaves the chiptune scheduler and the custom <audio>
-// element running at the same time, and never silently drops music
-// altogether if the toggle stays "on" across the switch.
+// Both stop whatever's currently playing before switching, so a world
+// change never leaves two tracks briefly overlapping, and never silently
+// drops music altogether if the toggle stays "on" across the switch.
 export function setCustomTrack(url) {
   const wasPlaying = playing;
   if (wasPlaying) stopPlayback();
-  activeCustomUrl = url;
+  activeTrackUrl = url;
   if (wasPlaying) startPlayback();
 }
 
 export function clearCustomTrack() {
   const wasPlaying = playing;
   if (wasPlaying) stopPlayback();
-  activeCustomUrl = null;
+  activeTrackUrl = DEFAULT_TRACK_URL;
   if (wasPlaying) startPlayback();
 }
 

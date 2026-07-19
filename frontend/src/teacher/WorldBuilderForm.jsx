@@ -20,12 +20,23 @@ function slugifyName(name) {
 // vocab" (built-in override or custom-world edit) — `isBuiltIn` controls
 // whether the theme pickers (enemy/palette) show, since built-in edits keep
 // the built-in's own theme.
+// Difficulty feeds level.js's difficulty scaling (gap size, enemy count/
+// speed, platform count — see buildLevel) the same way a built-in's World
+// 1-7 index always has. A brand-new custom world has no such index, so it
+// silently defaulted to a fixed medium — this makes that an actual choice.
+const DIFFICULTY_OPTIONS = [
+  { label: 'Easy', value: 2 },
+  { label: 'Medium', value: 4 },
+  { label: 'Hard', value: 6 },
+];
+
 export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCancel }) {
   const [name, setName] = useState(initialWorld?.name ?? '');
   const [subtitle, setSubtitle] = useState(initialWorld?.subtitle ?? '');
   const [durationMinutes, setDurationMinutes] = useState(initialWorld?.defaultDurationMinutes ?? 3);
   const [enemyType, setEnemyType] = useState(initialWorld?.enemyType ?? ENEMY_TYPE_OPTIONS[0].type);
   const [paletteKey, setPaletteKey] = useState(PALETTE_PRESETS[0].key);
+  const [difficulty, setDifficulty] = useState(initialWorld?.difficulty ?? 4);
   const [vocabText, setVocabText] = useState(vocabToText(initialWorld?.vocab));
   const [preview, setPreview] = useState(() => {
     if (!initialWorld?.vocab?.length) return null;
@@ -56,6 +67,7 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         enemyType,
         palette,
         defaultDurationMinutes: Number(durationMinutes),
+        difficulty,
         vocab: parsed.terms,
         classroomCode: initialWorld?.classroomCode,
       });
@@ -101,6 +113,25 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
               </option>
             ))}
           </select>
+
+          <label style={t.label}>Difficulty</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {DIFFICULTY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setDifficulty(opt.value)}
+                style={{
+                  ...t.button,
+                  flex: 1,
+                  background: difficulty === opt.value ? '#7d3fd6' : t.button.background,
+                  border: difficulty === opt.value ? '2px solid #5a2ba0' : t.button.border,
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </>
       )}
 

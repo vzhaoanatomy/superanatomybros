@@ -4,6 +4,7 @@ import { fetchLeaderboard } from '../api';
 import { getNickname } from '../storage';
 import { downloadScoreCard } from '../game/scoreCard';
 import LeaderboardList from '../classroom/LeaderboardList';
+import LocalLeaderboard from '../classroom/LocalLeaderboard';
 
 const buttonStyle = {
   padding: '12px 16px',
@@ -91,6 +92,7 @@ export default function LevelComplete({
   characterName,
 }) {
   const [leaderboard, setLeaderboard] = useState(null);
+  const [showLocalLeaderboard, setShowLocalLeaderboard] = useState(false);
 
   useEffect(() => {
     if (!classroomCode) return;
@@ -145,6 +147,9 @@ export default function LevelComplete({
           >
             📸 Save Score Card
           </button>
+          <button type="button" onClick={() => setShowLocalLeaderboard(true)} style={buttonStyle}>
+            🏆 Check Leaderboard
+          </button>
           <button type="button" onClick={onPlayAgain} style={buttonStyle}>
             Play Again
           </button>
@@ -153,6 +158,7 @@ export default function LevelComplete({
           </button>
         </div>
       </div>
+      {showLocalLeaderboard && <LocalLeaderboard onClose={() => setShowLocalLeaderboard(false)} />}
     </div>
   );
 }

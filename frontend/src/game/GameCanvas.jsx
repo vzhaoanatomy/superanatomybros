@@ -31,7 +31,18 @@ import {
   drawSolidEgg,
   drawScorePopup,
   SCORE_POPUP_MS,
+  drawParticles,
 } from './spriteRenderer';
+import {
+  createJuiceState,
+  shake,
+  hitPause,
+  isHitPaused,
+  burst,
+  tick as tickJuice,
+  getShakeOffset,
+  PARTICLE_LIFE_MS,
+} from './juice';
 import {
   toggleMusic,
   isMusicPlaying,
@@ -207,6 +218,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       tongueUntil: 0,
     };
 
+    const juice = createJuiceState();
+
     const state = {
       camera: 0,
       score: 0,
@@ -241,11 +254,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     function toggleGlossary() {
       if (glossaryOpen) {
         glossaryOpen = false;
-        pausedRef.current = false;
+        resume();
         setOverlay(null);
       } else if (!pausedRef.current) {
         glossaryOpen = true;
-        pausedRef.current = true;
+        pause();
         setOverlay({ type: 'glossary' });
       }
     }
@@ -262,6 +275,32 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     function popup(x, y, text, color) {
       state.scorePopups.push({ x, y, text, color, createdAt: performance.now() });
+    }
+
+    // Every timed buff (star, post-hit invulnerability) is stored as an
+    // absolute performance.now() deadline, but quiz overlays freeze the game
+    // without freezing that clock — so answering a question mid-star was
+    // silently burning down real invincibility time. pause()/resume() are
+    // the single choke point every overlay routes through instead of
+    // touching pausedRef directly, so the elapsed pause span can be added
+    // back onto those deadlines. The pause() no-op guard also means the
+    // boss's chained 3-question sequence (each sub-question re-opens a
+    // quiz) counts as one continuous pause, not three stacked ones.
+    let pauseStartedAt = null;
+    function pause() {
+      if (pausedRef.current) return;
+      pausedRef.current = true;
+      pauseStartedAt = performance.now();
+    }
+    function resume() {
+      if (!pausedRef.current) return;
+      pausedRef.current = false;
+      if (pauseStartedAt != null) {
+        const pausedMs = performance.now() - pauseStartedAt;
+        player.starUntil += pausedMs;
+        player.invulnerableUntil += pausedMs;
+        pauseStartedAt = null;
+      }
     }
 
     function respawnPlayer() {
@@ -340,8 +379,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.wrongCount = 0;
       state.timeRemaining = state.durationSeconds;
       state.lastTimeBonus = 0;
+      juice.particles = [];
+      juice.shakeIntensity = 0;
+      juice.hitPauseUntil = 0;
       lastFrameTime = performance.now();
       pausedRef.current = false;
+      pauseStartedAt = null;
       setOverlay(null);
     }
 
@@ -355,6 +398,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         worldId: world.id,
         worldName: world.name,
         characterName: character.name,
+        nickname: getNickname(),
         score: state.score,
         date: new Date().toISOString(),
       });
@@ -412,12 +456,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           state.score += INSTANT_KILL_SCORE;
           playStompSound();
           popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+          shake(juice, 6);
+          burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ffd23f', 10);
         }
       }
     }
 
     function openQuiz(type, question, onResolve) {
-      pausedRef.current = true;
+      pause();
       handlersRef.current._pendingResolve = (isCorrect) => {
         handlersRef.current._pendingResolve = null;
         onResolve(isCorrect);
@@ -425,7 +471,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         // battle's 3-question sequence) — if it did, a fresh _pendingResolve
         // is already set, so skip the unpause/clear that would stomp it.
         if (!handlersRef.current._pendingResolve) {
-          pausedRef.current = false;
+          resume();
           setOverlay(null);
         }
       };
@@ -443,6 +489,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (isCorrect) {
             boss.hp -= 1;
             recordCorrect(termId);
+            shake(juice, 8);
+            hitPause(juice, 70);
+            burst(juice, boss.x + boss.width / 2, boss.y + boss.height / 2, '#ff8ac0', 12);
           } else {
             recordWrong(termId);
             loseLife();
@@ -452,6 +501,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             boss.pending = false;
             state.score += BOSS_DEFEAT_SCORE;
             playSuccessFanfare();
+            shake(juice, 16);
+            burst(juice, boss.x + boss.width / 2, boss.y + boss.height / 2, '#ffd23f', 32);
           } else if (questionNum < 3) {
             openBossQuestion(questionNum + 1);
           } else {
@@ -523,6 +574,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             state.solidEggs.push({ x: enemy.x, y: enemy.y, width: enemy.width, height: enemy.height });
             playStompSound();
             popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 8);
             break;
           }
         }
@@ -630,6 +682,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             state.score += INSTANT_KILL_SCORE;
             playStompSound();
             popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+            shake(juice, 5);
+            hitPause(juice, 60);
+            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ffd23f', 8);
           } else if (performance.now() >= player.invulnerableUntil) {
             enemy.pending = true;
             const question = buildQuestion(vocab, enemy.termId);
@@ -640,6 +695,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
                 state.score += 50;
                 playStompSound();
                 popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
+                burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 10);
                 recordCorrect(enemy.termId);
               } else {
                 recordWrong(enemy.termId);
@@ -667,6 +723,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               state.score += INSTANT_KILL_SCORE;
               playStompSound();
               popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+              burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ff8a5c', 8);
               break;
             }
           }
@@ -698,6 +755,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               const gained = combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
               state.score += gained;
               popup(coin.x + coin.width / 2, coin.y, combo ? `+${gained} Combo!` : `+${gained}`, '#7de37b');
+              if (combo) burst(juice, coin.x + coin.width / 2, coin.y, '#ffd23f', 14);
               recordCorrect(coin.termId);
             } else {
               recordWrong(coin.termId);
@@ -746,7 +804,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         state.lastTimeBonus = bonus;
         playSuccessFanfare();
         const questions = buildEndOfLevelQuestions(vocab, [...state.missedTermIds]);
-        pausedRef.current = true;
+        pause();
         setOverlay({ type: 'endOfLevel', questions });
       }
 
@@ -760,8 +818,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const verticalOffset = canvasHeight - (level.groundY + GROUND_HEIGHT);
       drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, canvasHeight - GROUND_HEIGHT);
 
+      const shakeOffset = getShakeOffset(juice);
       ctx.save();
-      ctx.translate(-state.camera, verticalOffset);
+      ctx.translate(-state.camera + shakeOffset.x, verticalOffset + shakeOffset.y);
 
       for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
       for (const coin of level.coins) drawCoin(ctx, coin);
@@ -793,6 +852,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (state.scorePopups.length) {
         state.scorePopups = state.scorePopups.filter((p) => now - p.createdAt < SCORE_POPUP_MS);
       }
+      drawParticles(ctx, juice.particles, now, PARTICLE_LIFE_MS);
 
       ctx.restore();
 
@@ -835,8 +895,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const now = performance.now();
       const dt = Math.min((now - lastFrameTime) / 1000, 1);
       lastFrameTime = now;
-      if (!pausedRef.current) {
+      // Hit-pause freezes physics AND the juice sim for a couple frames on
+      // a big impact — a real "impact frame," not just a number changing.
+      if (!pausedRef.current && !isHitPaused(juice)) {
         updatePhysics(dt);
+        tickJuice(juice, dt);
       }
       draw();
       rafId = requestAnimationFrame(loop);

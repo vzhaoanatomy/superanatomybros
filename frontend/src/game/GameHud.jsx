@@ -23,10 +23,7 @@ export default function GameHud({
         </div>
         <div className="hud-title">
           <div className="hud-world-name">{world.name}</div>
-          <div className="hud-world-sub">
-            World {world.index}
-            {world.subtitle ? `: ${world.subtitle}` : ''}
-          </div>
+          {world.subtitle && <div className="hud-world-sub">{world.subtitle}</div>}
         </div>
         <div className="hud-stats">
           <span className={timeClass}>⏱ {formatClock(hud?.timeRemaining ?? world.defaultDurationMinutes * 60)}</span>

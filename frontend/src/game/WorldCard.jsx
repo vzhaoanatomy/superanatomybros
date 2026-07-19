@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { CHARACTERS } from './characters';
 import { drawBackground, drawPlayer } from './spriteRenderer';
+import { getBestLocalScore } from '../storage';
 
 const ENEMY_LABELS = {
   goomba: 'Goomba-style blob',
@@ -25,6 +26,7 @@ export default function WorldCard({ world, onSelect }) {
   // that numbering only exists for the teacher's own built-in/custom list —
   // so this falls back to a stable pick rather than NaN.
   const heroId = CHARACTERS[Math.max(0, (world.index ?? 1) - 1) % CHARACTERS.length].id;
+  const bestScore = getBestLocalScore(world.id);
 
   useEffect(() => {
     const ctx = canvasRef.current.getContext('2d');
@@ -72,6 +74,7 @@ export default function WorldCard({ world, onSelect }) {
       />
       <strong style={{ fontSize: 14 }}>{world.name}</strong>
       <span style={{ fontSize: 12, color: world.palette.accent }}>{ENEMY_LABELS[world.enemyType] ?? world.enemyType}</span>
+      {bestScore != null && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Best: {bestScore}</span>}
       {world.isClassroom && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Code: {world.code}</span>}
     </button>
   );
