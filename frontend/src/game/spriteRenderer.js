@@ -78,9 +78,28 @@ export function drawBackground(ctx, width, height, palette, camera = 0, groundY 
 const BRICK_W = 40;
 const BRICK_H = 20;
 
+// Lightens (positive amount) or darkens (negative) a #rrggbb color by a
+// flat per-channel offset, clamped to a valid byte range.
+function shadeHex(hex, amount) {
+  const num = parseInt(hex.slice(1), 16);
+  const clamp = (v) => Math.min(255, Math.max(0, v));
+  const r = clamp(((num >> 16) & 0xff) + amount);
+  const g = clamp(((num >> 8) & 0xff) + amount);
+  const b = clamp((num & 0xff) + amount);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Floating/climbable platforms get a beveled, light-to-dark gradient face
+// (the ground itself stays flat via drawGroundStrip below — only these
+// count as "the platform" for that treatment).
 function drawBlock(ctx, platform, palette) {
   const { x, y, width, height } = platform;
-  ctx.fillStyle = palette?.ground ?? '#4a3323';
+  const base = palette?.ground ?? '#4a3323';
+  const gradient = ctx.createLinearGradient(x, y, x, y + height);
+  gradient.addColorStop(0, shadeHex(base, 35));
+  gradient.addColorStop(0.5, base);
+  gradient.addColorStop(1, shadeHex(base, -30));
+  ctx.fillStyle = gradient;
   ctx.fillRect(x, y, width, height);
 
   ctx.strokeStyle = 'rgba(0,0,0,0.28)';

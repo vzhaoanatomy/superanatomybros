@@ -68,6 +68,30 @@ function pickMysteryBoxReward(rng) {
   return MYSTERY_BOX_REWARDS[0].type;
 }
 
+// Shared "is this platform slot a box or plain?" decision — used for both
+// a tower's main step and its bridge extensions (see buildLevel), which is
+// what produces rows mixing "?" boxes with plain blocks rather than every
+// box being an isolated single platform.
+function makePlatformOrBox(rng, mysteryBoxes, x, y, width, height) {
+  if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
+    const boxWidth = 40;
+    const box = {
+      id: `mysterybox-${mysteryBoxes.length}`,
+      x: x + (width - boxWidth) / 2,
+      y,
+      width: boxWidth,
+      height,
+      type: 'mysteryBox',
+      reward: pickMysteryBoxReward(rng),
+      used: false,
+      bumpUntil: 0,
+    };
+    mysteryBoxes.push(box);
+    return box;
+  }
+  return { x, y, width, height, type: 'block' };
+}
+
 function buildGroundSegments(rng, width, difficulty) {
   const minSeg = Math.max(260, 520 - difficulty * 30);
   const maxSeg = minSeg + 280;
@@ -150,10 +174,30 @@ export function buildLevel({ world, durationMinutes }) {
     // common case rather than the exception, biased toward taller stacks,
     // so the level reads as real vertical climbing instead of one low
     // platform floating above the ground.
+    // Only the tower's base step (below) is ever reached by jumping from
+    // the ground — every step after that is jumped to from the previous
+    // step instead, already covered by the jump-chain math. So only the
+    // base needs solid ground under it: find where this slot actually
+    // overlaps groundSegments (computed above, before this loop) and skip
+    // the whole tower if the slot sits entirely over a gap.
+    const slotSolidRanges = groundSegments
+      .map(([gx1, gx2]) => [Math.max(gx1, slotStart), Math.min(gx2, slotEnd)])
+      .filter(([lo, hi]) => hi - lo > 40);
+    if (!slotSolidRanges.length) continue;
+
     const climbRoll = rng();
     const climbSteps = climbRoll < 0.3 ? 1 : climbRoll < 0.55 ? 2 : climbRoll < 0.85 ? 3 : 4;
 
-    let cursorX = slotStart + 20 + rng() * Math.max(0, slotWidth * 0.15);
+    const [baseLo, baseHi] = slotSolidRanges[Math.floor(rng() * slotSolidRanges.length)];
+    // Pick the base step's width *before* its x — a step that rolls into a
+    // mystery box gets its 40px box centered within this footprint (see
+    // makePlatformOrBox), which can shift the box's actual x well to the
+    // right of cursorX. Validating only cursorX against solid ground let
+    // boxes land past the edge of solid ground into a gap; sizing the
+    // footprint to fit inside [baseLo, baseHi] up front guarantees the
+    // whole step — box or not — stays over solid ground.
+    const baseWidth = Math.min(90 + rng() * 60, Math.max(40, baseHi - baseLo));
+    let cursorX = baseLo + rng() * Math.max(0, (baseHi - baseLo) - baseWidth);
     // Base step: always a single safe jump from the ground. The floor here
     // (95, not just "low enough to jump to") is deliberate — it keeps the
     // gap between the ground and this platform's underside above
@@ -161,31 +205,10 @@ export function buildLevel({ world, durationMinutes }) {
     let cursorY = GROUND_Y - (95 + rng() * 70);
 
     for (let step = 0; step < climbSteps; step++) {
-      const pw = 90 + rng() * 60;
+      const pw = step === 0 ? baseWidth : 90 + rng() * 60;
       if (cursorX + pw > slotEnd) break;
 
-      // A mystery box takes this step's spot instead of a plain platform —
-      // centered in the same footprint pw reserved, so the cursor-advance
-      // math right below stays keyed to pw regardless of which one got
-      // placed, and reachability tuning is untouched either way.
-      if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
-        const boxWidth = 40;
-        const box = {
-          id: `mysterybox-${mysteryBoxes.length}`,
-          x: cursorX + (pw - boxWidth) / 2,
-          y: cursorY,
-          width: boxWidth,
-          height: 24,
-          type: 'mysteryBox',
-          reward: pickMysteryBoxReward(rng),
-          used: false,
-          bumpUntil: 0,
-        };
-        platforms.push(box);
-        mysteryBoxes.push(box);
-      } else {
-        platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
-      }
+      platforms.push(makePlatformOrBox(rng, mysteryBoxes, cursorX, cursorY, pw, 24));
 
       // Occasionally add a same-height bridge platform beside this step —
       // an easy horizontal hop, not a climb, so no reachability risk.
@@ -193,8 +216,22 @@ export function buildLevel({ world, durationMinutes }) {
         const bridgeX = cursorX + pw + 40 + rng() * 20;
         const bridgeW = 80 + rng() * 50;
         if (bridgeX + bridgeW <= slotEnd) {
-          platforms.push({ x: bridgeX, y: cursorY, width: bridgeW, height: 24, type: 'block' });
+          platforms.push(makePlatformOrBox(rng, mysteryBoxes, bridgeX, cursorY, bridgeW, 24));
+          const rowEndX = bridgeX + bridgeW;
           cursorX = bridgeX;
+
+          // A second, rarer bridge extends the row to 3 — each slot in the
+          // row rolls its own box-or-plain chance independently (via
+          // makePlatformOrBox), which is what produces short rows mixing
+          // "?" boxes with plain blocks rather than every box standing
+          // alone.
+          if (rng() < 0.15 && rowEndX + 60 <= slotEnd) {
+            const bridge2X = rowEndX + 40 + rng() * 20;
+            const bridge2W = 80 + rng() * 50;
+            if (bridge2X + bridge2W <= slotEnd) {
+              platforms.push(makePlatformOrBox(rng, mysteryBoxes, bridge2X, cursorY, bridge2W, 24));
+            }
+          }
         }
       }
 
