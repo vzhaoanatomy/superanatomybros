@@ -68,28 +68,52 @@ function pickMysteryBoxReward(rng) {
   return MYSTERY_BOX_REWARDS[0].type;
 }
 
-// Shared "is this platform slot a box or plain?" decision — used for both
-// a tower's main step and its bridge extensions (see buildLevel), which is
-// what produces rows mixing "?" boxes with plain blocks rather than every
-// box being an isolated single platform.
-function makePlatformOrBox(rng, mysteryBoxes, x, y, width, height) {
-  if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
-    const boxWidth = 40;
-    const box = {
-      id: `mysterybox-${mysteryBoxes.length}`,
-      x: x + (width - boxWidth) / 2,
-      y,
-      width: boxWidth,
-      height,
-      type: 'mysteryBox',
-      reward: pickMysteryBoxReward(rng),
-      used: false,
-      bumpUntil: 0,
-    };
-    mysteryBoxes.push(box);
-    return box;
+// Classic Mario block size — a tower step that rolls into a mystery box
+// becomes a row of these touching square tiles (1-3 wide) instead of one
+// box centered on a wide plank, matching the reference row-of-blocks look.
+const TILE = 40;
+
+function makeMysteryBox(rng, mysteryBoxes, x, y) {
+  const box = {
+    id: `mysterybox-${mysteryBoxes.length}`,
+    x,
+    y,
+    width: TILE,
+    height: TILE,
+    type: 'mysteryBox',
+    reward: pickMysteryBoxReward(rng),
+    used: false,
+    bumpUntil: 0,
+  };
+  mysteryBoxes.push(box);
+  return box;
+}
+
+// One tile in a mystery-box row: `forceBox` guarantees at least one "?" per
+// row (so a single-tile row is always a box, and multi-tile rows always
+// have one) while the rest independently roll box-vs-plain, producing rows
+// that mix "?" boxes with plain tiles rather than a uniform block of boxes.
+function makeRowTile(rng, mysteryBoxes, x, y, forceBox) {
+  const wantsBox = forceBox || rng() < 0.5;
+  if (wantsBox && mysteryBoxes.length < MAX_MYSTERY_BOXES) {
+    return makeMysteryBox(rng, mysteryBoxes, x, y);
   }
-  return { x, y, width, height, type: 'block' };
+  return { x, y, width: TILE, height: TILE, type: 'tile' };
+}
+
+// Lays down a row of 1-3 touching square tiles centered within a step's
+// [x, x + footprintWidth] span, guaranteeing at least one becomes a mystery
+// box. Used in place of a single wide plank whenever a tower step "rolls
+// into" a mystery box (see the tower-climb loop in buildLevel).
+function makeMysteryRow(rng, mysteryBoxes, x, y, footprintWidth, platforms) {
+  const maxTiles = Math.max(1, Math.min(3, Math.floor(footprintWidth / TILE)));
+  const roll = rng();
+  const tileCount = roll < 0.55 ? 1 : roll < 0.85 ? Math.min(2, maxTiles) : maxTiles;
+  const rowX = x + Math.max(0, (footprintWidth - tileCount * TILE) / 2);
+  const boxSlot = Math.floor(rng() * tileCount);
+  for (let t = 0; t < tileCount; t++) {
+    platforms.push(makeRowTile(rng, mysteryBoxes, rowX + t * TILE, y, t === boxSlot));
+  }
 }
 
 function buildGroundSegments(rng, width, difficulty) {
@@ -190,58 +214,39 @@ export function buildLevel({ world, durationMinutes }) {
 
     const [baseLo, baseHi] = slotSolidRanges[Math.floor(rng() * slotSolidRanges.length)];
     // Pick the base step's width *before* its x — a step that rolls into a
-    // mystery box gets its 40px box centered within this footprint (see
-    // makePlatformOrBox), which can shift the box's actual x well to the
-    // right of cursorX. Validating only cursorX against solid ground let
-    // boxes land past the edge of solid ground into a gap; sizing the
-    // footprint to fit inside [baseLo, baseHi] up front guarantees the
-    // whole step — box or not — stays over solid ground.
+    // mystery-box row (see makeMysteryRow) centers 1-3 square tiles within
+    // this footprint, which can shift them right of cursorX. Validating
+    // only cursorX against solid ground let tiles land past the edge of
+    // solid ground into a gap; sizing the footprint to fit inside
+    // [baseLo, baseHi] up front guarantees the whole step — row or plank —
+    // stays over solid ground.
     const baseWidth = Math.min(90 + rng() * 60, Math.max(40, baseHi - baseLo));
     let cursorX = baseLo + rng() * Math.max(0, (baseHi - baseLo) - baseWidth);
     // Base step: always a single safe jump from the ground. The floor here
-    // (95, not just "low enough to jump to") is deliberate — it keeps the
-    // gap between the ground and this platform's underside above
-    // PLAYER_HEIGHT (54px) plus a margin, see MIN_CLEARANCE below.
-    let cursorY = GROUND_Y - (95 + rng() * 70);
+    // (110, not just "low enough to jump to") is deliberate — a mystery-box
+    // row tile is 40px thick (see TILE above), so it keeps the gap between
+    // the ground and this step's underside above PLAYER_HEIGHT (54px) plus
+    // a margin, see MIN_CLEARANCE below.
+    let cursorY = GROUND_Y - (110 + rng() * 70);
 
     for (let step = 0; step < climbSteps; step++) {
       const pw = step === 0 ? baseWidth : 90 + rng() * 60;
       if (cursorX + pw > slotEnd) break;
 
-      platforms.push(makePlatformOrBox(rng, mysteryBoxes, cursorX, cursorY, pw, 24));
-
-      // Occasionally add a same-height bridge platform beside this step —
-      // an easy horizontal hop, not a climb, so no reachability risk.
-      if (rng() < 0.3 && cursorX + pw + 60 <= slotEnd) {
-        const bridgeX = cursorX + pw + 40 + rng() * 20;
-        const bridgeW = 80 + rng() * 50;
-        if (bridgeX + bridgeW <= slotEnd) {
-          platforms.push(makePlatformOrBox(rng, mysteryBoxes, bridgeX, cursorY, bridgeW, 24));
-          const rowEndX = bridgeX + bridgeW;
-          cursorX = bridgeX;
-
-          // A second, rarer bridge extends the row to 3 — each slot in the
-          // row rolls its own box-or-plain chance independently (via
-          // makePlatformOrBox), which is what produces short rows mixing
-          // "?" boxes with plain blocks rather than every box standing
-          // alone.
-          if (rng() < 0.15 && rowEndX + 60 <= slotEnd) {
-            const bridge2X = rowEndX + 40 + rng() * 20;
-            const bridge2W = 80 + rng() * 50;
-            if (bridge2X + bridge2W <= slotEnd) {
-              platforms.push(makePlatformOrBox(rng, mysteryBoxes, bridge2X, cursorY, bridge2W, 24));
-            }
-          }
-        }
+      if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
+        makeMysteryRow(rng, mysteryBoxes, cursorX, cursorY, pw, platforms);
+      } else {
+        platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
       }
 
       cursorX += pw * 0.3 + 60 + rng() * (JUMP_DX_CLIMB - 60);
-      // MIN_CLEARANCE (95): a step-to-step decrement below this leaves less
-      // than PLAYER_HEIGHT (54px) of headroom between the platform below
-      // and the one above once the 24px platform thickness is subtracted —
-      // literally too tight for the player's own hitbox to fit through,
-      // which was trapping enemies/power-ups placed on the lower step.
-      const MIN_CLEARANCE = 95;
+      // MIN_CLEARANCE (110): a step-to-step decrement below this leaves
+      // less than PLAYER_HEIGHT (54px) of headroom between the platform
+      // below and the one above once a 40px-thick mystery-box row tile
+      // (the tallest thing a step can become) is subtracted — literally
+      // too tight for the player's own hitbox to fit through, which was
+      // trapping enemies/power-ups placed on the lower step.
+      const MIN_CLEARANCE = 110;
       cursorY -= MIN_CLEARANCE + rng() * (JUMP_RISE - MIN_CLEARANCE);
       if (cursorY < 140) break;
     }
@@ -281,7 +286,7 @@ export function buildLevel({ world, durationMinutes }) {
   const MIN_TOWER_CLEARANCE = 70;
   for (let pass = 0; pass < 6; pass++) {
     let changed = false;
-    const blocks = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox');
+    const blocks = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile');
     for (const upper of blocks) {
       for (const lower of blocks) {
         if (upper === lower || upper.y >= lower.y) continue;
@@ -307,7 +312,7 @@ export function buildLevel({ world, durationMinutes }) {
   // for clearCoinOfPlatforms below, same as any other block, even though
   // they're excluded from blockPlatforms (too narrow at 40px for the
   // width>=90 patrol/power-up eligibility filter that reads from it).
-  const allBlockPlatforms = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox');
+  const allBlockPlatforms = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile');
   const blockPlatforms = allBlockPlatforms.filter((p) => p.width >= 90);
 
   // Coins are spaced out for runner-style pacing (not a quiz every second) —

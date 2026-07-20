@@ -184,11 +184,34 @@ function drawMysteryBox(ctx, box) {
   ctx.restore();
 }
 
+// The plain tile beside a "?" box in a mystery-box row — same bordered,
+// riveted square shape as drawMysteryBox so the two read as one contiguous
+// row of classic Mario blocks, just without the gold fill or "?" glyph.
+function drawBlockTile(ctx, tile, palette) {
+  const { x, y, width, height } = tile;
+  const base = palette?.ground ?? '#4a3323';
+
+  ctx.fillStyle = shadeHex(base, 12);
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = shadeHex(base, -45);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+
+  ctx.fillStyle = shadeHex(base, -25);
+  const rivet = 3;
+  ctx.fillRect(x + 3, y + 3, rivet, rivet);
+  ctx.fillRect(x + width - 6, y + 3, rivet, rivet);
+  ctx.fillRect(x + 3, y + height - 6, rivet, rivet);
+  ctx.fillRect(x + width - 6, y + height - 6, rivet, rivet);
+}
+
 export function drawPlatform(ctx, platform, palette) {
   if (platform.type === 'ground') {
     drawGroundStrip(ctx, platform, palette);
   } else if (platform.type === 'mysteryBox') {
     drawMysteryBox(ctx, platform);
+  } else if (platform.type === 'tile') {
+    drawBlockTile(ctx, platform, palette);
   } else {
     drawBlock(ctx, platform, palette);
   }
