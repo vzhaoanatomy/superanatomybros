@@ -3,7 +3,6 @@ import EnemyEncounter from '../overlays/EnemyEncounter';
 import DoorQuiz from '../overlays/DoorQuiz';
 import BossEncounter from '../overlays/BossEncounter';
 import PipeQuiz from '../overlays/PipeQuiz';
-import BonusRoom from '../overlays/BonusRoom';
 import EndOfLevelQuiz from '../overlays/EndOfLevelQuiz';
 import ReviewMissedTerms from '../overlays/ReviewMissedTerms';
 import TermGlossary from '../overlays/TermGlossary';
@@ -20,7 +19,6 @@ export default function GameOverlays({ overlay, h, onQuit, world, character }) {
       {overlay?.type === 'door' && <DoorQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
       {overlay?.type === 'boss' && <BossEncounter question={overlay.question} onAnswer={h.resolveQuiz} />}
       {overlay?.type === 'pipe' && <PipeQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
-      {overlay?.type === 'bonus' && <BonusRoom coins={overlay.question.coins} onContinue={h.closeBonusRoom} />}
       {overlay?.type === 'endOfLevel' && (
         <EndOfLevelQuiz questions={overlay.questions} onFinish={h.finishEndOfLevel} />
       )}

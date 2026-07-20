@@ -8,7 +8,7 @@ import {
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
 } from './constants';
-import { buildLevel, GROUND_HEIGHT } from './level';
+import { buildLevel, buildBonusRoom, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
 import { getWorld } from './worlds';
 import { buildQuestion, buildEndOfLevelQuestions, findTerm } from './vocab';
@@ -32,6 +32,8 @@ import {
   drawScorePopup,
   SCORE_POPUP_MS,
   drawParticles,
+  drawBonusBackground,
+  drawBonusHud,
 } from './spriteRenderer';
 import {
   createJuiceState,
@@ -50,6 +52,7 @@ import {
   playStarPowerSound,
   playFireballSound,
   playStompSound,
+  playCorrectChime,
   playLevelCompleteDings,
   setCustomTrack,
   clearCustomTrack,
@@ -99,7 +102,12 @@ const MOUNT_SPEED_MULTIPLIER = 1.5;
 const MAX_LIVES = 5;
 const BOSS_DEFEAT_SCORE = 1500;
 const PIPE_QUESTIONS = 2;
-const PIPE_BONUS_COINS = 120;
+const BONUS_ROOM_SECONDS = 10;
+const BONUS_COIN_VALUE = 10;
+// How far the player visibly sinks into (or rises out of) the pipe during
+// the entry/exit cutscene — see beginPipeEntry/exitBonusRoom.
+const PIPE_TRANSITION_MS = 350;
+const PIPE_SINK_DEPTH = 46;
 const FIREBALL_SPEED = 10;
 const FIREBALL_COOLDOWN_MS = 350;
 const FIREBALL_MAX_TRAVEL = 650;
@@ -263,6 +271,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       solidEggs: [],
       scorePopups: [],
       poppedItems: [],
+      bonusRoom: null,
+      pipeTransition: null,
     };
 
     let lastFrameTime = performance.now();
@@ -416,6 +426,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.solidEggs = [];
       state.scorePopups = [];
       state.poppedItems = [];
+      state.bonusRoom = null;
+      state.pipeTransition = null;
       state.score = 0;
       state.lives = 3;
       state.coinsCollected = 0;
@@ -438,11 +450,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     handlersRef.current.resolveQuiz = (isCorrect) => handlersRef.current._pendingResolve?.(isCorrect);
-    handlersRef.current.closeBonusRoom = () => {
-      handlersRef.current._pendingResolve = null;
-      resume();
-      setOverlay(null);
-    };
     handlersRef.current.finishEndOfLevel = (results) => {
       for (const r of results) {
         if (r.correct) recordCorrect(r.termId);
@@ -653,29 +660,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           } else {
             pipe.used = true;
             pipe.pending = false;
-            // openQuiz's wrapper auto-resumes/closes the overlay right after
-            // this callback returns *unless* a fresh _pendingResolve is set
-            // (see openQuiz above, same trick the boss fight's question
-            // chain uses) — without this, that auto-close would immediately
-            // wipe out the bonus room overlay openBonusRoom sets below.
-            handlersRef.current._pendingResolve = () => {};
-            openBonusRoom();
+            beginPipeEntry();
           }
         } else {
           recordWrong(termId);
           pipe.pending = false;
         }
       });
-    }
-
-    // The coin total is awarded immediately — the overlay's count-up is a
-    // celebratory readout of that already-final score, not a live meter
-    // (see BonusRoom.jsx).
-    function openBonusRoom() {
-      state.score += PIPE_BONUS_COINS;
-      playSuccessFanfare();
-      pause();
-      setOverlay({ type: 'bonus', question: { coins: PIPE_BONUS_COINS } });
     }
 
     // Standing on top of (not just touching) a not-yet-used pipe, matching
@@ -691,7 +682,138 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       return null;
     }
 
+    // The player visibly sinks straight down into the pipe at their current
+    // spot (see updatePipeTransition/PIPE_SINK_DEPTH) before the scene cuts
+    // to the bonus room — a beat of physical continuity instead of an
+    // instant teleport. Runs through the normal physics loop (not paused),
+    // it just locks out input for its short duration (see the early-return
+    // in updatePhysics).
+    function beginPipeEntry() {
+      const returnSpot = { x: player.x, y: player.y };
+      player.vx = 0;
+      player.vy = 0;
+      state.pipeTransition = {
+        phase: 'down',
+        startedAt: performance.now(),
+        startY: player.y,
+        onComplete: () => enterBonusRoom(returnSpot),
+      };
+    }
+
+    function enterBonusRoom(returnSpot) {
+      const room = buildBonusRoom();
+      state.bonusRoom = { ...room, timeLeft: BONUS_ROOM_SECONDS, collected: 0, returnSpot };
+      // Spawns a little above the floor so gravity carries them the rest of
+      // the way down — reads as "dropping into" the room rather than
+      // appearing already standing.
+      player.x = 40;
+      player.y = room.groundY - player.height - 60;
+      player.vx = 0;
+      player.vy = 0;
+      player.onGround = false;
+      playSuccessFanfare();
+    }
+
+    function exitBonusRoom() {
+      const room = state.bonusRoom;
+      state.bonusRoom = null;
+      player.x = room.returnSpot.x;
+      player.y = room.returnSpot.y + PIPE_SINK_DEPTH;
+      player.vx = 0;
+      player.vy = 0;
+      player.invulnerableUntil = performance.now() + INVULN_MS;
+      if (room.collected > 0) {
+        popup(player.x + player.width / 2, room.returnSpot.y - 10, `🪙 x${room.collected}`, '#ffd23f');
+      }
+      state.pipeTransition = { phase: 'up', startedAt: performance.now(), startY: player.y, onComplete: () => {} };
+    }
+
+    // Drives the sink/rise cutscene — player.y is the only thing that
+    // moves, everything else (camera, other entities) stays frozen since
+    // updatePhysics returns right after calling this.
+    function updatePipeTransition() {
+      const t = state.pipeTransition;
+      const progress = Math.min(1, (performance.now() - t.startedAt) / PIPE_TRANSITION_MS);
+      player.y = t.phase === 'down' ? t.startY + progress * PIPE_SINK_DEPTH : t.startY - progress * PIPE_SINK_DEPTH;
+      if (progress >= 1) {
+        const onComplete = t.onComplete;
+        state.pipeTransition = null;
+        onComplete();
+      }
+    }
+
+    // A stripped-down movement/collision pass against the bonus room's own
+    // tiny platform set instead of the main level — no enemies, quizzes,
+    // doors, or fireballs to worry about, just running, jumping, and
+    // touch-to-collect coins against a countdown.
+    function updateBonusRoomPhysics(dt) {
+      const room = state.bonusRoom;
+      room.timeLeft -= dt;
+      if (room.timeLeft <= 0) {
+        exitBonusRoom();
+        return;
+      }
+
+      const keys = keysRef.current;
+      const left = [...LEFT_KEYS].some((k) => keys.has(k));
+      const right = [...RIGHT_KEYS].some((k) => keys.has(k));
+      const jumpHeld = [...JUMP_KEYS].some((k) => keys.has(k));
+
+      if (left && !right) {
+        player.vx = -RUN_SPEED;
+        player.facing = -1;
+      } else if (right && !left) {
+        player.vx = RUN_SPEED;
+        player.facing = 1;
+      } else {
+        player.vx = 0;
+      }
+
+      if (jumpHeld && player.onGround) {
+        player.vy = JUMP_VELOCITY;
+        player.onGround = false;
+      }
+      if (!jumpHeld && player.vy < JUMP_CUTOFF_VELOCITY) {
+        player.vy = JUMP_CUTOFF_VELOCITY;
+      }
+      player.vy = Math.min(player.vy + GRAVITY, MAX_FALL_SPEED);
+
+      player.x += player.vx;
+      player.x = Math.max(0, Math.min(player.x, room.width - player.width));
+      resolveHorizontal(player, room.platforms);
+
+      player.y += player.vy;
+      resolveVertical(player, room.platforms);
+
+      for (const coin of room.coins) {
+        if (coin.collected) continue;
+        if (!aabbOverlap(player, coin)) continue;
+        coin.collected = true;
+        room.collected += 1;
+        state.score += BONUS_COIN_VALUE;
+        playCorrectChime();
+        popup(coin.x + coin.width / 2, coin.y, `+${BONUS_COIN_VALUE}`, '#ffd23f');
+      }
+
+      state.camera = Math.max(
+        0,
+        Math.min(player.x + player.width / 2 - canvasWidth / 2, Math.max(0, room.width - canvasWidth))
+      );
+    }
+
     function updatePhysics(dt) {
+      // Pipe entry/exit and the bonus room itself run their own stripped-
+      // down update instead of the main level's — bypassing the main-level
+      // timer, door/boss/enemy/coin checks, etc. entirely while active.
+      if (state.pipeTransition) {
+        updatePipeTransition();
+        return;
+      }
+      if (state.bonusRoom) {
+        updateBonusRoomPhysics(dt);
+        return;
+      }
+
       state.timeRemaining -= dt;
       if (state.timeRemaining <= 0) {
         state.timeRemaining = state.durationSeconds;
@@ -1002,38 +1124,50 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function draw() {
-      const verticalOffset = canvasHeight - (level.groundY + GROUND_HEIGHT);
-      drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, canvasHeight - GROUND_HEIGHT);
+      const now = performance.now();
+      const inBonusRoom = !!state.bonusRoom;
+      const activeGroundY = inBonusRoom ? state.bonusRoom.groundY : level.groundY;
+      const activePlatforms = inBonusRoom ? state.bonusRoom.platforms : level.platforms;
+      const activeCoins = inBonusRoom ? state.bonusRoom.coins : level.coins;
+
+      const verticalOffset = canvasHeight - (activeGroundY + GROUND_HEIGHT);
+      if (inBonusRoom) {
+        drawBonusBackground(ctx, canvasWidth, canvasHeight);
+      } else {
+        drawBackground(ctx, canvasWidth, canvasHeight, world.palette, state.camera, canvasHeight - GROUND_HEIGHT);
+      }
 
       const shakeOffset = getShakeOffset(juice);
       ctx.save();
       ctx.translate(-state.camera + shakeOffset.x, verticalOffset + shakeOffset.y);
 
-      const now = performance.now();
-      for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
-      for (const coin of level.coins) drawCoin(ctx, coin);
-      for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
-      for (const enemy of level.enemies) {
-        if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, world.enemyType, now);
+      for (const p of activePlatforms) drawPlatform(ctx, p, world.palette);
+      for (const coin of activeCoins) drawCoin(ctx, coin);
+
+      if (!inBonusRoom) {
+        for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
+        for (const enemy of level.enemies) {
+          if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, world.enemyType, now);
+        }
+        if (level.boss) drawBoss(ctx, level.boss);
+        if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
+        if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
+        drawDoor(ctx, level.door);
+        drawFlag(ctx, level.flag);
+        for (const shell of state.shells) {
+          if (shell.alive) drawShell(ctx, shell);
+        }
+        for (const fireball of state.fireballs) {
+          if (fireball.alive) drawFireball(ctx, fireball);
+        }
+        for (const egg of state.solidEggs) drawSolidEgg(ctx, egg);
       }
-      if (level.boss) drawBoss(ctx, level.boss);
-      if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
-      if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
-      drawDoor(ctx, level.door);
-      drawFlag(ctx, level.flag);
-      for (const shell of state.shells) {
-        if (shell.alive) drawShell(ctx, shell);
-      }
-      for (const fireball of state.fireballs) {
-        if (fireball.alive) drawFireball(ctx, fireball);
-      }
-      for (const egg of state.solidEggs) drawSolidEgg(ctx, egg);
 
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
       const invincible = now < player.starUntil;
-      if (player.mounted) drawDinoMount(ctx, player);
+      if (player.mounted && !inBonusRoom) drawDinoMount(ctx, player);
       drawPlayer(ctx, player, characterId, { flashing, invincible, big: player.big });
-      if (player.mounted) drawTongueFlick(ctx, player);
+      if (player.mounted && !inBonusRoom) drawTongueFlick(ctx, player);
 
       for (const p of state.scorePopups) drawScorePopup(ctx, p, now);
       if (state.scorePopups.length) {
@@ -1045,18 +1179,24 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // out of the box for the first 35% of the animation, then falls to
       // settle just below it for the rest. Purely visual; the reward
       // itself already applied the instant the box was bumped.
-      for (const item of state.poppedItems) {
-        const t = Math.min(1, (now - item.createdAt) / POPPED_ITEM_MS);
-        const riseT = Math.min(1, t / 0.35);
-        const fallT = Math.max(0, (t - 0.35) / 0.65);
-        const y = item.boxY - 28 * Math.sin(riseT * (Math.PI / 2)) + fallT * fallT * 68;
-        drawPowerUp(ctx, { x: item.x, y, width: POPPED_ITEM_SIZE, height: POPPED_ITEM_SIZE, type: item.type, collected: false });
-      }
-      if (state.poppedItems.length) {
-        state.poppedItems = state.poppedItems.filter((item) => now - item.createdAt < POPPED_ITEM_MS);
+      if (!inBonusRoom) {
+        for (const item of state.poppedItems) {
+          const t = Math.min(1, (now - item.createdAt) / POPPED_ITEM_MS);
+          const riseT = Math.min(1, t / 0.35);
+          const fallT = Math.max(0, (t - 0.35) / 0.65);
+          const y = item.boxY - 28 * Math.sin(riseT * (Math.PI / 2)) + fallT * fallT * 68;
+          drawPowerUp(ctx, { x: item.x, y, width: POPPED_ITEM_SIZE, height: POPPED_ITEM_SIZE, type: item.type, collected: false });
+        }
+        if (state.poppedItems.length) {
+          state.poppedItems = state.poppedItems.filter((item) => now - item.createdAt < POPPED_ITEM_MS);
+        }
       }
 
       ctx.restore();
+
+      if (inBonusRoom) {
+        drawBonusHud(ctx, canvasWidth, state.bonusRoom);
+      }
 
       if (now - lastHudPush > HUD_PUSH_INTERVAL_MS) {
         lastHudPush = now;

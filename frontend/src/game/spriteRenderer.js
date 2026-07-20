@@ -75,6 +75,42 @@ export function drawBackground(ctx, width, height, palette, camera = 0, groundY 
   tileAcross(ctx, width, camera, 0.3, 1800 * scale, (cx) => drawPipe(ctx, cx, groundY, scale));
 }
 
+// Flat, dim, and windowless — reads as "underground" so a pipe bonus room
+// feels like somewhere else, not just a recolored outdoor level.
+export function drawBonusBackground(ctx, width, height) {
+  ctx.fillStyle = '#1a1030';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  for (let y = 0; y < height; y += 40) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
+
+// Countdown + coin tally pinned to the top of the canvas while a pipe
+// bonus room is active — drawn outside the camera-translated group so it
+// stays fixed on screen regardless of how far the player wanders.
+export function drawBonusHud(ctx, width, room) {
+  const label = `⏱ ${Math.max(0, Math.ceil(room.timeLeft))}s   🪙 ${room.collected}/${room.coins.length}`;
+  ctx.font = 'bold 18px ui-monospace, Consolas, monospace';
+  ctx.textAlign = 'center';
+  const textWidth = ctx.measureText(label).width;
+  const boxW = textWidth + 28;
+  const boxX = width / 2 - boxW / 2;
+  ctx.fillStyle = 'rgba(10,6,20,0.85)';
+  ctx.fillRect(boxX, 10, boxW, 34);
+  ctx.strokeStyle = '#ffd23f';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(boxX, 10, boxW, 34);
+  ctx.fillStyle = '#ffd23f';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, width / 2, 10 + 17);
+  ctx.textBaseline = 'alphabetic';
+}
+
 const BRICK_W = 40;
 const BRICK_H = 20;
 

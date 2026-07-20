@@ -552,3 +552,33 @@ export function buildLevel({ world, durationMinutes }) {
     koopa,
   };
 }
+
+// A small enclosed "coin heaven" room a bonus pipe drops the player into
+// (see GameCanvas.jsx's beginPipeEntry/enterBonusRoom) — a flat floor, a
+// low ceiling to keep it feeling enclosed, two step platforms to climb for
+// the higher coins, and enough coins to make the trip worth it inside a
+// short timer. Fixed/deterministic (not seeded) since it's a quick side
+// trip, not part of the level's own layout.
+export const BONUS_ROOM_WIDTH = 640;
+export const BONUS_ROOM_GROUND_Y = 380;
+
+export function buildBonusRoom() {
+  const width = BONUS_ROOM_WIDTH;
+  const groundY = BONUS_ROOM_GROUND_Y;
+  const platforms = [
+    { x: 0, y: groundY, width, height: GROUND_HEIGHT, type: 'ground' },
+    { x: 0, y: 20, width, height: 20, type: 'block' },
+    { x: 220, y: groundY - 90, width: 120, height: 20, type: 'block' },
+    { x: 420, y: groundY - 150, width: 120, height: 20, type: 'block' },
+  ];
+
+  const coins = [];
+  let coinId = 0;
+  const addCoin = (x, y) => coins.push({ id: `bonus-coin-${coinId++}`, x, y, width: 24, height: 24, collected: false });
+
+  for (let x = 30; x <= width - 50; x += 58) addCoin(x, groundY - 40);
+  for (let x = 232; x < 220 + 120 - 20; x += 50) addCoin(x, groundY - 90 - 34);
+  for (let x = 432; x < 420 + 120 - 20; x += 50) addCoin(x, groundY - 150 - 34);
+
+  return { width, groundY, platforms, coins };
+}
