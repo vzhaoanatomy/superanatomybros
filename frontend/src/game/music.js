@@ -96,6 +96,18 @@ export function clearCustomTrack() {
   if (wasPlaying) startPlayback();
 }
 
+// Silences the background <audio> element without touching the user's
+// on/off toggle (`playing`) — used while a pipe bonus room's own
+// synthesized track (see playBonusRoomMusic) takes over, so the two never
+// play at once and the main track picks back up exactly where it left off.
+export function duckBackgroundMusic() {
+  stopPlayback();
+}
+
+export function unduckBackgroundMusic() {
+  if (playing) startPlayback();
+}
+
 export function isMusicPlaying() {
   return playing;
 }
@@ -193,6 +205,54 @@ export function playFireballSound() {
   osc.connect(gain).connect(ctx.destination);
   osc.start(t);
   osc.stop(t + 0.17);
+}
+
+// A bright single bell "ding" — played the instant any mystery box is
+// bumped, before the reward-specific feedback (coin pop or power-up pop)
+// plays, so every box gives the same immediate "that worked" cue.
+export function playMysteryBoxDing() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t = ctx.currentTime;
+  playTone(ctx, noteFreq('B5'), t, 0.16, 'sine', 0.22);
+  playTone(ctx, noteFreq('B6'), t, 0.16, 'triangle', 0.09);
+}
+
+// A quick ascending sparkle — played right after the ding specifically
+// when the reward is a power-up (not a coin), so catching one feels like
+// a bigger deal than a plain coin.
+export function playPowerUpPopSound() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const notes = ['C5', 'E5', 'G5', 'C6'];
+  notes.forEach((n, i) => {
+    playTone(ctx, noteFreq(n), t0 + i * 0.055, 0.16, 'square', 0.15);
+  });
+}
+
+// A fast, driving 8-bit loop for the pipe bonus room — deliberately more
+// urgent/upbeat than the calm main-level track, since the room is a timed
+// dash. Entirely pre-scheduled for the room's fixed duration on the audio
+// clock (same trick as playStarPowerSound below), so it can't be cut short
+// by rAF/setTimeout throttling in a backgrounded tab, and needs no manual
+// stop call — it just runs out exactly when the room's own timer does.
+export function playBonusRoomMusic(durationMs) {
+  if (!playing) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const stepDur = 0.15;
+  const totalSteps = Math.ceil(durationMs / 1000 / stepDur);
+  const bassPattern = ['C3', 'C3', 'G3', 'C3', 'C3', 'C3', 'A3', 'G3'];
+  const leadPattern = ['C5', 'E5', 'G5', 'E5', 'C5', 'D5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5'];
+  for (let i = 0; i < totalSteps; i++) {
+    const start = t0 + i * stepDur;
+    playTone(ctx, noteFreq(bassPattern[i % bassPattern.length]), start, stepDur * 0.85, 'square', 0.13);
+    playTone(ctx, noteFreq(leadPattern[i % leadPattern.length]), start, stepDur * 0.5, 'triangle', 0.1);
+  }
 }
 
 // A quick downward "stomp" blip — played whenever an enemy is defeated

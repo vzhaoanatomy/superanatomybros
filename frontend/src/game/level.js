@@ -2,6 +2,11 @@ import { WIDTH_BY_DURATION, DURATION_SECONDS } from './worlds';
 
 export const GROUND_Y = 460;
 export const GROUND_HEIGHT = 80;
+// Wide plank/staircase platform thickness — thicker than the old 24px so
+// they read as substantial brick slabs (see the reference screenshot),
+// still well clear of MIN_CLEARANCE (110, sized for the tallest thing a
+// step can become) so step-to-step headroom is untouched.
+const PLATFORM_HEIGHT = 32;
 
 function hashSeed(str) {
   let h = 1779033703 ^ str.length;
@@ -239,7 +244,7 @@ export function buildLevel({ world, durationMinutes }) {
       if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
         makeMysteryRow(rng, mysteryBoxes, cursorX, cursorY, pw, platforms);
       } else {
-        platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
+        platforms.push({ x: cursorX, y: cursorY, width: pw, height: PLATFORM_HEIGHT, type: 'block' });
       }
 
       cursorX += pw * 0.3 + 60 + rng() * (JUMP_DX_CLIMB - 60);
@@ -268,7 +273,7 @@ export function buildLevel({ world, durationMinutes }) {
     const stepCount = 3;
     for (let step = 0; step < stepCount; step++) {
       const stepWidth = 90;
-      platforms.push({ x: stepX, y: stepY, width: stepWidth, height: 24, type: 'block' });
+      platforms.push({ x: stepX, y: stepY, width: stepWidth, height: PLATFORM_HEIGHT, type: 'block' });
       if (step === stepCount - 1) {
         bonusCoinSpots.push({ x: stepX + stepWidth / 2 - 10, y: stepY - 40 });
       }

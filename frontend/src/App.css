@@ -270,7 +270,7 @@
   font-family: ui-monospace, Consolas, monospace;
   text-align: center;
   pointer-events: none;
-  animation: power-flash-fade 2.8s ease forwards;
+  animation: power-flash-fade 6s ease forwards;
 }
 
 .power-flash strong {

@@ -34,6 +34,9 @@ import {
   drawParticles,
   drawBonusBackground,
   drawBonusHud,
+  drawPoppedItem,
+  POPPED_ITEM_MS,
+  POPPED_ITEM_SIZE,
 } from './spriteRenderer';
 import {
   createJuiceState,
@@ -54,6 +57,11 @@ import {
   playStompSound,
   playCorrectChime,
   playLevelCompleteDings,
+  playMysteryBoxDing,
+  playPowerUpPopSound,
+  playBonusRoomMusic,
+  duckBackgroundMusic,
+  unduckBackgroundMusic,
   setCustomTrack,
   clearCustomTrack,
 } from './music';
@@ -87,7 +95,10 @@ const GROUND_POUND_RADIUS = 90;
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 const HUD_PUSH_INTERVAL_MS = 100;
 const TERM_FLASH_MS = 2000;
-const POWER_UP_FLASH_MS = 2800;
+// Long enough to survive being covered by a quiz overlay right after — the
+// dismiss timer runs on real wall-clock time regardless of the game's own
+// pause state, so a slow answer could otherwise eat the whole flash.
+const POWER_UP_FLASH_MS = 6000;
 // What each mystery-box power-up does and, where there's a key for it, how
 // to use it — shown as a flash the moment it's caught so the player isn't
 // left guessing what they just picked up (see flashPowerUp/triggerMysteryBox).
@@ -561,21 +572,26 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       fireFlower: '🌺 Fire Flower!',
       star: '⭐ Star!',
     };
-    // Slow enough that the popped sprite is clearly readable before it's
-    // gone — the previous 450ms flashed past too fast to tell what it was.
-    const POPPED_ITEM_MS = 1100;
-    const POPPED_ITEM_SIZE = 30;
 
     function triggerMysteryBox(box) {
       box.used = true;
       box.bumpUntil = performance.now() + 220;
-      playStompSound();
+      playMysteryBoxDing();
       shake(juice, 4);
       burst(juice, box.x + box.width / 2, box.y, '#ffd23f', 10);
       if (box.reward === 'coin10' || box.reward === 'coin50') {
         const amount = box.reward === 'coin10' ? 10 : 50;
         state.score += amount;
-        popup(box.x + box.width / 2, box.y - 10, `+${amount}`, '#7de37b');
+        // A coin visibly pops out and carries its own point value instead
+        // of a plain floating score number — reuses the same pop-and-land
+        // flourish as a power-up reward (see drawPoppedItem).
+        state.poppedItems.push({
+          type: box.reward,
+          label: `+${amount}`,
+          x: box.x + box.width / 2 - POPPED_ITEM_SIZE / 2,
+          boxY: box.y,
+          createdAt: performance.now(),
+        });
       } else {
         // The reward applies right here, same as always — the popped item
         // below is purely a cosmetic "it physically came out of the box"
@@ -585,6 +601,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         applyPowerUp(box.reward);
         popup(box.x + box.width / 2, box.y - 10, MYSTERY_BOX_REWARD_LABELS[box.reward], '#ffd23f');
         flashPowerUp(box.reward);
+        playPowerUpPopSound();
         state.poppedItems.push({
           type: box.reward,
           x: box.x + box.width / 2 - POPPED_ITEM_SIZE / 2,
@@ -712,6 +729,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.vy = 0;
       player.onGround = false;
       playSuccessFanfare();
+      // The room's own fast, rhythmic track takes over from the calm main
+      // background music for exactly the room's duration (see
+      // playBonusRoomMusic) — ducked, not stopped, so the main track picks
+      // back up right where it left off on exit.
+      duckBackgroundMusic();
+      playBonusRoomMusic(BONUS_ROOM_SECONDS * 1000);
     }
 
     function exitBonusRoom() {
@@ -722,6 +745,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.vx = 0;
       player.vy = 0;
       player.invulnerableUntil = performance.now() + INVULN_MS;
+      unduckBackgroundMusic();
       if (room.collected > 0) {
         popup(player.x + player.width / 2, room.returnSpot.y - 10, `🪙 x${room.collected}`, '#ffd23f');
       }
@@ -1175,18 +1199,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       drawParticles(ctx, juice.particles, now, PARTICLE_LIFE_MS);
 
-      // Pop-and-land flourish for a mystery box's power-up reward — rises
-      // out of the box for the first 35% of the animation, then falls to
-      // settle just below it for the rest. Purely visual; the reward
-      // itself already applied the instant the box was bumped.
       if (!inBonusRoom) {
-        for (const item of state.poppedItems) {
-          const t = Math.min(1, (now - item.createdAt) / POPPED_ITEM_MS);
-          const riseT = Math.min(1, t / 0.35);
-          const fallT = Math.max(0, (t - 0.35) / 0.65);
-          const y = item.boxY - 28 * Math.sin(riseT * (Math.PI / 2)) + fallT * fallT * 68;
-          drawPowerUp(ctx, { x: item.x, y, width: POPPED_ITEM_SIZE, height: POPPED_ITEM_SIZE, type: item.type, collected: false });
-        }
+        for (const item of state.poppedItems) drawPoppedItem(ctx, item, now);
         if (state.poppedItems.length) {
           state.poppedItems = state.poppedItems.filter((item) => now - item.createdAt < POPPED_ITEM_MS);
         }

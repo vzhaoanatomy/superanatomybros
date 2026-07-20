@@ -199,7 +199,11 @@ function drawMysteryBox(ctx, box) {
     return;
   }
 
-  ctx.fillStyle = '#f2b632';
+  // A slow brightness pulse (not a jarring blink) draws the eye toward
+  // unused boxes without being distracting across a level full of them —
+  // every box pulses on the same clock, not staggered per box.
+  const pulse = (Math.sin(now / 260) + 1) / 2; // 0..1
+  ctx.fillStyle = shadeHex('#f2b632', pulse * 45);
   ctx.fillRect(x, drawY, width, height);
   ctx.strokeStyle = '#7a4a10';
   ctx.lineWidth = 2;
@@ -212,8 +216,10 @@ function drawMysteryBox(ctx, box) {
   ctx.fillRect(x + 3, drawY + height - 6, rivet, rivet);
   ctx.fillRect(x + width - 6, drawY + height - 6, rivet, rivet);
 
+  // The "?" fills almost the whole box now instead of reading as a small
+  // label inside it — the box's whole job is "notice me."
   ctx.fillStyle = '#1a1200';
-  ctx.font = `bold ${Math.round(height * 0.55)}px ui-monospace, Consolas, monospace`;
+  ctx.font = `bold ${Math.round(height * 0.9)}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('?', x + width / 2, drawY + height / 2 + 1);
@@ -227,7 +233,13 @@ function drawBlockTile(ctx, tile, palette) {
   const { x, y, width, height } = tile;
   const base = palette?.ground ?? '#4a3323';
 
-  ctx.fillStyle = shadeHex(base, 12);
+  // Same light-to-dark gradient as the wide plank platforms (drawBlock)
+  // so every platform in the level reads as one consistent brick material.
+  const gradient = ctx.createLinearGradient(x, y, x, y + height);
+  gradient.addColorStop(0, shadeHex(base, 40));
+  gradient.addColorStop(0.5, shadeHex(base, 10));
+  gradient.addColorStop(1, shadeHex(base, -35));
+  ctx.fillStyle = gradient;
   ctx.fillRect(x, y, width, height);
   ctx.strokeStyle = shadeHex(base, -45);
   ctx.lineWidth = 2;
@@ -269,7 +281,27 @@ function drawFunctionalPipe(ctx, pipe) {
     ctx.font = '16px ui-monospace, Consolas, monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd23f';
-    ctx.fillText('🪙', x + width / 2, y - 10);
+    ctx.fillText('🪙', x + width / 2, y - 34);
+
+    // A bouncing down-arrow directly over the opening — the coin alone
+    // read as "something's here" but not "here's what to do about it."
+    const bob = Math.sin(performance.now() / 260) * 4;
+    const cx = x + width / 2;
+    const arrowY = y - 12 + bob;
+    ctx.fillStyle = '#fff8dc';
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, arrowY - 6);
+    ctx.lineTo(cx + 8, arrowY - 6);
+    ctx.lineTo(cx + 8, arrowY);
+    ctx.lineTo(cx + 14, arrowY);
+    ctx.lineTo(cx, arrowY + 12);
+    ctx.lineTo(cx - 14, arrowY);
+    ctx.lineTo(cx - 8, arrowY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
 }
 
@@ -913,7 +945,7 @@ const ENEMY_RENDERERS = {
   dragonling: drawDragonling,
 };
 
-const SQUISH_MS = 220;
+const SQUISH_MS = 700;
 
 // A defeated enemy briefly flattens toward the ground instead of just
 // vanishing — the transform squashes vertically and bulges horizontally
@@ -1264,6 +1296,38 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
 
   if (opts.flashing) {
     ctx.restore();
+  }
+}
+
+// Slow enough that the popped sprite is clearly readable before it's gone
+// — an earlier 450ms flashed past too fast to tell what it was.
+export const POPPED_ITEM_MS = 1100;
+export const POPPED_ITEM_SIZE = 30;
+
+// Pop-and-land flourish for whatever a mystery box produced — rises out of
+// the box for the first 35% of its life, then falls to settle just below
+// it for the rest. The reward itself already applied the instant the box
+// was bumped (see GameCanvas.jsx's triggerMysteryBox), so this is purely
+// cosmetic. Coin rewards show their point value riding along with the
+// coin; power-up rewards just show the item itself.
+export function drawPoppedItem(ctx, item, now) {
+  const t = Math.min(1, (now - item.createdAt) / POPPED_ITEM_MS);
+  const riseT = Math.min(1, t / 0.35);
+  const fallT = Math.max(0, (t - 0.35) / 0.65);
+  const y = item.boxY - 28 * Math.sin(riseT * (Math.PI / 2)) + fallT * fallT * 68;
+  const { x } = item;
+  const size = POPPED_ITEM_SIZE;
+
+  if (item.type === 'coin10' || item.type === 'coin50') {
+    drawCoin(ctx, { x, y, width: size, height: size, collected: false });
+    ctx.font = 'bold 14px ui-monospace, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillText(item.label, x + size / 2 + 1, y - 5);
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText(item.label, x + size / 2, y - 6);
+  } else {
+    drawPowerUp(ctx, { x, y, width: size, height: size, type: item.type, collected: false });
   }
 }
 
