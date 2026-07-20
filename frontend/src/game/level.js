@@ -47,8 +47,8 @@ function clearCoinOfPlatforms(cx, cy, blockPlatforms) {
 // Mystery boxes take the place of an occasional climbing step (see the
 // tower-climb loop in buildLevel) — coin bonuses are the common case,
 // power-ups less so, and the +50 "jackpot" coin is rarest.
-const MYSTERY_BOX_CHANCE = 0.18;
-const MAX_MYSTERY_BOXES = 5;
+const MYSTERY_BOX_CHANCE = 0.5;
+const MAX_MYSTERY_BOXES = 20;
 const MYSTERY_BOX_REWARDS = [
   { type: 'coin10', weight: 5 },
   { type: 'mushroom', weight: 2 },
