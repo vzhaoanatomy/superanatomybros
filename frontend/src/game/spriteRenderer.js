@@ -513,47 +513,84 @@ export function drawSolidEgg(ctx, egg) {
   });
 }
 
-// A shimmering portal rather than a plain pole — the visible oval is wider
-// than the (narrower) collision box, which is fine since it's pure flourish;
-// the invisible hitbox stays exactly door.width/height for jump-over blocking.
-// A real door (not the old swirling portal) with a floating "CHECKPOINT"
-// label above it — reaching it and answering correctly moves the player's
-// respawn point here for the rest of the run (see GameCanvas.jsx's
-// lastCheckpoint).
+// The door's *collision box* stays tall (door.height spans from near the
+// screen top down to the ground) so the player can't just jump over the
+// checkpoint — but a human-proportioned door alone wouldn't read as a wall
+// you can't get past. So the visible door is drawn at realistic proportions
+// (roughly 2x player height, sitting on the ground) set into a stone wall
+// that fills the rest of the collision box above it — reads as "a locked
+// door in a wall," not an oversized door. Reaching it and answering
+// correctly moves the player's respawn point here for the rest of the run
+// (see GameCanvas.jsx's lastCheckpoint).
 export function drawDoor(ctx, door) {
   if (door.passed) return;
   const { x, y, width, height } = door;
-  const visualW = 44;
-  const doorX = x + width / 2 - visualW / 2;
+  const cx = x + width / 2;
+  const groundLevel = y + height;
+
+  const doorW = 52;
+  const doorH = 108;
+  const doorX = cx - doorW / 2;
+  const doorY = groundLevel - doorH;
+
+  const wallW = doorW + 24;
+  const wallX = cx - wallW / 2;
+  const wallH = doorY - y;
+
+  if (wallH > 0) {
+    ctx.fillStyle = '#7a8088';
+    ctx.fillRect(wallX, y, wallW, wallH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.lineWidth = 1;
+    const brickH = 18;
+    let row = 0;
+    for (let ry = y; ry < doorY; ry += brickH, row++) {
+      const rowH = Math.min(brickH, doorY - ry);
+      ctx.beginPath();
+      ctx.moveTo(wallX, ry);
+      ctx.lineTo(wallX + wallW, ry);
+      ctx.stroke();
+      const offset = row % 2 === 0 ? 0 : 18;
+      for (let bx = wallX + offset; bx < wallX + wallW; bx += 36) {
+        ctx.beginPath();
+        ctx.moveTo(bx, ry);
+        ctx.lineTo(bx, ry + rowH);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = '#565b62';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(wallX, y, wallW, wallH);
+  }
 
   ctx.fillStyle = '#4a2f18';
-  ctx.fillRect(doorX - 4, y - 4, visualW + 8, height + 8);
+  ctx.fillRect(doorX - 4, doorY - 4, doorW + 8, doorH + 8);
 
   ctx.fillStyle = '#8a5a2a';
-  ctx.fillRect(doorX, y, visualW, height);
+  ctx.fillRect(doorX, doorY, doorW, doorH);
 
   ctx.strokeStyle = '#5a3a1a';
   ctx.lineWidth = 2;
-  ctx.strokeRect(doorX + 5, y + height * 0.08, visualW - 10, height * 0.38);
-  ctx.strokeRect(doorX + 5, y + height * 0.54, visualW - 10, height * 0.38);
+  ctx.strokeRect(doorX + 6, doorY + doorH * 0.08, doorW - 12, doorH * 0.38);
+  ctx.strokeRect(doorX + 6, doorY + doorH * 0.54, doorW - 12, doorH * 0.38);
 
   ctx.fillStyle = '#ffd23f';
   ctx.beginPath();
-  ctx.arc(doorX + visualW - 9, y + height / 2, 4, 0, Math.PI * 2);
+  ctx.arc(doorX + doorW - 10, doorY + doorH / 2, 4, 0, Math.PI * 2);
   ctx.fill();
 
-  const cx = x + width / 2;
   const labelText = 'CHECKPOINT';
   ctx.font = 'bold 12px ui-monospace, Consolas, monospace';
   ctx.textAlign = 'center';
   const textWidth = ctx.measureText(labelText).width;
+  const labelY = y - 14;
   ctx.fillStyle = 'rgba(15, 10, 5, 0.85)';
-  ctx.fillRect(cx - textWidth / 2 - 8, y - 30, textWidth + 16, 20);
+  ctx.fillRect(cx - textWidth / 2 - 8, labelY - 14, textWidth + 16, 20);
   ctx.strokeStyle = '#ffd23f';
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(cx - textWidth / 2 - 8, y - 30, textWidth + 16, 20);
+  ctx.strokeRect(cx - textWidth / 2 - 8, labelY - 14, textWidth + 16, 20);
   ctx.fillStyle = '#ffd23f';
-  ctx.fillText(labelText, cx, y - 16);
+  ctx.fillText(labelText, cx, labelY);
 }
 
 export function drawFlag(ctx, flag) {

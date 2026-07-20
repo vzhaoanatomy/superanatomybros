@@ -84,6 +84,16 @@ const GROUND_POUND_RADIUS = 90;
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 const HUD_PUSH_INTERVAL_MS = 100;
 const TERM_FLASH_MS = 2000;
+const POWER_UP_FLASH_MS = 2800;
+// What each mystery-box power-up does and, where there's a key for it, how
+// to use it — shown as a flash the moment it's caught so the player isn't
+// left guessing what they just picked up (see flashPowerUp/triggerMysteryBox).
+const POWER_UP_HELP = {
+  mushroom: { icon: '🍄', label: 'Mushroom!', hint: "You're Big now — absorbs one hit before you power down." },
+  star: { icon: '⭐', label: 'Star Power!', hint: "Invincible for a few seconds — run through enemies!" },
+  egg: { icon: '🥚', label: 'Egg caught!', hint: 'Press Down/S to flick your tongue and grab enemies.' },
+  fireFlower: { icon: '🌺', label: 'Fire Flower!', hint: 'Press F to throw fireballs.' },
+};
 const STAR_DURATION_MS = 8000;
 const MOUNT_SPEED_MULTIPLIER = 1.5;
 const MAX_LIVES = 5;
@@ -175,6 +185,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   // Brief term+definition reinforcement shown over live gameplay right
   // after a quiz resolves — non-blocking, purely a review aid.
   const [termFlash, setTermFlash] = useState(null);
+  // Brief "what did I just catch, and how do I use it" reminder shown the
+  // moment a mystery box pops a power-up — see POWER_UP_HELP/flashPowerUp.
+  const [powerUpFlash, setPowerUpFlash] = useState(null);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
@@ -318,6 +331,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (termFlashTimer) clearTimeout(termFlashTimer);
       setTermFlash({ id: performance.now(), term, definition, correct });
       termFlashTimer = setTimeout(() => setTermFlash(null), TERM_FLASH_MS);
+    }
+
+    let powerUpFlashTimer = null;
+    function flashPowerUp(type) {
+      const info = POWER_UP_HELP[type];
+      if (!info) return;
+      if (powerUpFlashTimer) clearTimeout(powerUpFlashTimer);
+      setPowerUpFlash({ id: performance.now(), ...info });
+      powerUpFlashTimer = setTimeout(() => setPowerUpFlash(null), POWER_UP_FLASH_MS);
     }
 
     function respawnPlayer() {
@@ -517,8 +539,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       fireFlower: '🌺 Fire Flower!',
       star: '⭐ Star!',
     };
-    const POPPED_ITEM_MS = 450;
-    const POPPED_ITEM_SIZE = 28;
+    // Slow enough that the popped sprite is clearly readable before it's
+    // gone — the previous 450ms flashed past too fast to tell what it was.
+    const POPPED_ITEM_MS = 1100;
+    const POPPED_ITEM_SIZE = 30;
 
     function triggerMysteryBox(box) {
       box.used = true;
@@ -538,6 +562,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         // simulated item would actually land).
         applyPowerUp(box.reward);
         popup(box.x + box.width / 2, box.y - 10, MYSTERY_BOX_REWARD_LABELS[box.reward], '#ffd23f');
+        flashPowerUp(box.reward);
         state.poppedItems.push({
           type: box.reward,
           x: box.x + box.width / 2 - POPPED_ITEM_SIZE / 2,
@@ -1005,6 +1030,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       cancelAnimationFrame(rafId);
       clearCustomTrack();
       if (termFlashTimer) clearTimeout(termFlashTimer);
+      if (powerUpFlashTimer) clearTimeout(powerUpFlashTimer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
@@ -1048,6 +1074,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
                 {termFlash.correct ? '✓' : '✗'} {termFlash.term}
               </strong>
               <span>{termFlash.definition}</span>
+            </div>
+          )}
+          {powerUpFlash && (
+            <div key={powerUpFlash.id} className="power-flash">
+              <strong>
+                {powerUpFlash.icon} {powerUpFlash.label}
+              </strong>
+              <span>{powerUpFlash.hint}</span>
             </div>
           )}
         </div>
