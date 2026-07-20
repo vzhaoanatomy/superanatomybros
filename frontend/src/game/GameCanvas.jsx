@@ -481,6 +481,56 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
     }
 
+    // Shared "put the player into this form" logic — ground-collected
+    // power-ups and mystery-box rewards both funnel through this, so the
+    // two sources can never drift out of sync with each other.
+    function applyPowerUp(type) {
+      // Big / mounted / fire are mutually exclusive "forms" (Mario-style —
+      // you're small, big, riding, or fire, never more than one at once):
+      // picking up a new one clears whichever you already had. Star is a
+      // separate timed buff layered on top of whatever form you're in, so
+      // it's untouched here.
+      if (type === 'mushroom') {
+        state.lives = Math.min(MAX_LIVES, state.lives + 1);
+        player.big = true;
+        player.mounted = false;
+        player.hasFire = false;
+      } else if (type === 'star') {
+        player.starUntil = performance.now() + STAR_DURATION_MS;
+        playStarPowerSound(STAR_DURATION_MS);
+      } else if (type === 'egg') {
+        player.mounted = true;
+        player.big = false;
+        player.hasFire = false;
+      } else if (type === 'fireFlower') {
+        player.hasFire = true;
+        player.big = false;
+        player.mounted = false;
+      }
+    }
+
+    const MYSTERY_BOX_REWARD_LABELS = {
+      mushroom: '🍄 Mushroom!',
+      egg: '🥚 Egg!',
+      fireFlower: '🌺 Fire Flower!',
+    };
+
+    function triggerMysteryBox(box) {
+      box.used = true;
+      box.bumpUntil = performance.now() + 220;
+      playStompSound();
+      shake(juice, 4);
+      burst(juice, box.x + box.width / 2, box.y, '#ffd23f', 10);
+      if (box.reward === 'coin10' || box.reward === 'coin50') {
+        const amount = box.reward === 'coin10' ? 10 : 50;
+        state.score += amount;
+        popup(box.x + box.width / 2, box.y - 10, `+${amount}`, '#7de37b');
+      } else {
+        applyPowerUp(box.reward);
+        popup(box.x + box.width / 2, box.y - 10, MYSTERY_BOX_REWARD_LABELS[box.reward], '#ffd23f');
+      }
+    }
+
     function openQuiz(type, question, onResolve) {
       pause();
       handlersRef.current._pendingResolve = (isCorrect) => {
@@ -674,7 +724,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       resolveHorizontal(player, solids);
 
+      // Checked at the raw pre-resolution position, not after — resolveVertical
+      // (below) snaps the player's top edge to sit exactly on a solid's
+      // underside once it stops them, which reads as touching, not
+      // overlapping, so a check placed after it would miss every bump.
+      const wasMovingUp = player.vy < 0;
       player.y += player.vy;
+      if (wasMovingUp && !pausedRef.current) {
+        for (const box of level.mysteryBoxes) {
+          if (!box.used && aabbOverlap(player, box)) triggerMysteryBox(box);
+        }
+      }
       resolveVertical(player, solids);
 
       if (player.pounding && player.onGround) {
@@ -797,28 +857,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (p.collected) continue;
           if (!aabbOverlap(player, p)) continue;
           p.collected = true;
-          // Big / mounted / fire are mutually exclusive "forms" (Mario-style
-          // — you're small, big, riding, or fire, never more than one at
-          // once): picking up a new one clears whichever you already had.
-          // Star is a separate timed buff layered on top of whatever form
-          // you're in, so it's untouched here.
-          if (p.type === 'mushroom') {
-            state.lives = Math.min(MAX_LIVES, state.lives + 1);
-            player.big = true;
-            player.mounted = false;
-            player.hasFire = false;
-          } else if (p.type === 'star') {
-            player.starUntil = performance.now() + STAR_DURATION_MS;
-            playStarPowerSound(STAR_DURATION_MS);
-          } else if (p.type === 'egg') {
-            player.mounted = true;
-            player.big = false;
-            player.hasFire = false;
-          } else if (p.type === 'fireFlower') {
-            player.hasFire = true;
-            player.big = false;
-            player.mounted = false;
-          }
+          applyPowerUp(p.type);
         }
       }
 

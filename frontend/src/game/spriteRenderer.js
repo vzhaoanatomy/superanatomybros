@@ -23,6 +23,33 @@ function drawTree(ctx, cx, groundY, scale, color) {
   ctx.fill();
 }
 
+// A decorative Mario-style pipe — no collision, purely background flavor.
+// Spaced far apart in drawBackground below so only a handful ever appear
+// across a level.
+function drawPipe(ctx, cx, groundY, scale) {
+  const bodyW = 46 * scale;
+  const bodyH = 70 * scale;
+  const capW = 58 * scale;
+  const capH = 16 * scale;
+  const x = cx - bodyW / 2;
+  const bodyY = groundY - bodyH;
+
+  ctx.fillStyle = '#2e9e4f';
+  ctx.fillRect(x, bodyY + capH, bodyW, bodyH - capH);
+  ctx.fillStyle = '#237a3c';
+  ctx.fillRect(x, bodyY + capH, bodyW * 0.22, bodyH - capH);
+
+  ctx.fillStyle = '#33b25a';
+  ctx.fillRect(cx - capW / 2, bodyY, capW, capH);
+  ctx.fillStyle = '#237a3c';
+  ctx.fillRect(cx - capW / 2, bodyY, capW, 4 * scale);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(cx - capW / 2, bodyY, capW, capH);
+  ctx.strokeRect(x, bodyY + capH, bodyW, bodyH - capH);
+}
+
 // Tiles `drawOne(screenX)` endlessly across the visible width with a slow
 // parallax offset, so the skyline never runs out no matter how far the
 // level scrolls.
@@ -45,6 +72,7 @@ export function drawBackground(ctx, width, height, palette, camera = 0, groundY 
   tileAcross(ctx, width, camera, 0.05, 420 * scale, (cx) => drawCloud(ctx, cx, height * 0.12, scale));
   tileAcross(ctx, width, camera, 0.08, 560 * scale, (cx) => drawCloud(ctx, cx, height * 0.22, 0.7 * scale));
   tileAcross(ctx, width, camera, 0.3, 170 * scale, (cx) => drawTree(ctx, cx, groundY, scale, palette?.hills ?? '#2e7d46'));
+  tileAcross(ctx, width, camera, 0.3, 1800 * scale, (cx) => drawPipe(ctx, cx, groundY, scale));
 }
 
 const BRICK_W = 40;
@@ -92,9 +120,56 @@ function drawGroundStrip(ctx, platform, palette) {
   ctx.fillRect(x, y + 10, width, 3);
 }
 
+const MYSTERY_BOX_BUMP_MS = 220;
+
+// Gold "?" block while unused (bump it from below for a reward — see
+// GameCanvas.jsx's triggerMysteryBox); a flat dulled block once spent,
+// same as classic Mario's "used block" look. Squishes upward briefly on
+// the hit via box.bumpUntil, set by the same trigger.
+function drawMysteryBox(ctx, box) {
+  const { x, y, width, height } = box;
+  const now = performance.now();
+  const bumping = now < box.bumpUntil;
+  const bumpT = bumping ? 1 - (box.bumpUntil - now) / MYSTERY_BOX_BUMP_MS : 0;
+  const drawY = bumping ? y - Math.sin(bumpT * Math.PI) * 6 : y;
+
+  ctx.save();
+  if (box.used) {
+    ctx.fillStyle = '#7a5a3a';
+    ctx.fillRect(x, drawY, width, height);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, drawY + 0.5, width - 1, height - 1);
+    ctx.restore();
+    return;
+  }
+
+  ctx.fillStyle = '#f2b632';
+  ctx.fillRect(x, drawY, width, height);
+  ctx.strokeStyle = '#7a4a10';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, drawY + 1, width - 2, height - 2);
+
+  ctx.fillStyle = '#c98a1a';
+  const rivet = 3;
+  ctx.fillRect(x + 3, drawY + 3, rivet, rivet);
+  ctx.fillRect(x + width - 6, drawY + 3, rivet, rivet);
+  ctx.fillRect(x + 3, drawY + height - 6, rivet, rivet);
+  ctx.fillRect(x + width - 6, drawY + height - 6, rivet, rivet);
+
+  ctx.fillStyle = '#1a1200';
+  ctx.font = `bold ${Math.round(height * 0.55)}px ui-monospace, Consolas, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', x + width / 2, drawY + height / 2 + 1);
+  ctx.restore();
+}
+
 export function drawPlatform(ctx, platform, palette) {
   if (platform.type === 'ground') {
     drawGroundStrip(ctx, platform, palette);
+  } else if (platform.type === 'mysteryBox') {
+    drawMysteryBox(ctx, platform);
   } else {
     drawBlock(ctx, platform, palette);
   }

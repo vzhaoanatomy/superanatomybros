@@ -12,7 +12,7 @@ export const WORLDS = [
     subtitle: 'Anatomical & Regional Terms',
     enemyType: 'goomba',
     defaultDurationMinutes: 3,
-    palette: { sky: '#5fa8e8', hills: '#3aa65a', ground: '#8b5a2b', platform: '#8b5a2b', accent: '#ffd23f' },
+    palette: { sky: '#68b5f8', hills: '#3ccc67', ground: '#bb7029', platform: '#bb7029', accent: '#ffd85a' },
     vocab: [
       { id: 'anterior', term: 'Anterior', definition: 'Toward the front of the body.' },
       { id: 'posterior', term: 'Posterior', definition: 'Toward the back of the body.' },
@@ -33,7 +33,7 @@ export const WORLDS = [
     subtitle: 'Integumentary System',
     enemyType: 'skinBlob',
     defaultDurationMinutes: 3,
-    palette: { sky: '#ffc2d1', hills: '#e8899c', ground: '#c97b8a', platform: '#c97b8a', accent: '#ff2f76' },
+    palette: { sky: '#ffcbd7', hills: '#f491a4', ground: '#d88696', platform: '#d88696', accent: '#ff4c89' },
     vocab: [
       { id: 'epidermis', term: 'Epidermis', definition: 'The outer, protective layer of the skin.' },
       { id: 'dermis', term: 'Dermis', definition: 'The layer of skin beneath the epidermis containing vessels and nerves.' },
@@ -52,7 +52,7 @@ export const WORLDS = [
     subtitle: 'Skeletal System',
     enemyType: 'skeleton',
     defaultDurationMinutes: 3,
-    palette: { sky: '#cfd6e4', hills: '#9aa3b5', ground: '#8f8975', platform: '#8f8975', accent: '#5a4a8f' },
+    palette: { sky: '#d4dbea', hills: '#a6afc2', ground: '#a19b86', platform: '#a19b86', accent: '#6750b2' },
     vocab: [
       { id: 'cranium', term: 'Cranium', definition: 'The part of the skull that encloses the brain.' },
       { id: 'vertebra', term: 'Vertebra', definition: 'One of the bones that make up the spinal column.' },
@@ -71,7 +71,7 @@ export const WORLDS = [
     subtitle: 'Muscular System',
     enemyType: 'muscleBrawler',
     defaultDurationMinutes: 3,
-    palette: { sky: '#ff9e80', hills: '#e2694a', ground: '#a8402c', platform: '#a8402c', accent: '#ffffff' },
+    palette: { sky: '#ffac92', hills: '#f47555', ground: '#d94224', platform: '#d94224', accent: '#ffffff' },
     vocab: [
       { id: 'tendon', term: 'Tendon', definition: 'Connective tissue that attaches muscle to bone.' },
       { id: 'ligament', term: 'Ligament', definition: 'Connective tissue that attaches bone to bone.' },
@@ -90,7 +90,7 @@ export const WORLDS = [
     subtitle: 'Nervous System',
     enemyType: 'neuron',
     defaultDurationMinutes: 3,
-    palette: { sky: '#c9b8ff', hills: '#a190e8', ground: '#6a5acd', platform: '#6a5acd', accent: '#00b8d9' },
+    palette: { sky: '#d1c2ff', hills: '#a997f4', ground: '#7766df', platform: '#7766df', accent: '#03d9ff' },
     vocab: [
       { id: 'neuron', term: 'Neuron', definition: 'A nerve cell that transmits electrical and chemical signals.' },
       { id: 'synapse', term: 'Synapse', definition: 'The junction where a signal passes from one neuron to another.' },
@@ -109,7 +109,7 @@ export const WORLDS = [
     subtitle: 'Cardiovascular System',
     enemyType: 'clot',
     defaultDurationMinutes: 3,
-    palette: { sky: '#e8536b', hills: '#b8324a', ground: '#5c1e2a', platform: '#5c1e2a', accent: '#ffd23f' },
+    palette: { sky: '#f95d76', hills: '#db3553', ground: '#8f2237', platform: '#8f2237', accent: '#ffd85a' },
     vocab: [
       { id: 'aorta', term: 'Aorta', definition: 'The largest artery, carrying oxygen-rich blood away from the heart.' },
       { id: 'atrium', term: 'Atrium', definition: 'An upper chamber of the heart that receives incoming blood.' },
@@ -128,10 +128,7 @@ export const WORLDS = [
     subtitle: 'Cat Dissection',
     enemyType: 'labCat',
     defaultDurationMinutes: 3,
-    // Final world — this is where the Phase 5 boss battle (dragon, HP bar
-    // near the flag) will live, per the "boss fight moves to World 7"
-    // decision. The regular patrol enemies stay lab-cat themed either way.
-    palette: { sky: '#b8f2d8', hills: '#7fdba0', ground: '#3d8c5f', platform: '#3d8c5f', accent: '#1f6b45' },
+    palette: { sky: '#bcf9de', hills: '#88e9ab', ground: '#40b572', platform: '#40b572', accent: '#1f9f5f' },
     vocab: [
       { id: 'whiskers', term: 'Vibrissae', definition: "The technical term for a cat's whiskers, used for sensing surroundings." },
       { id: 'claw', term: 'Retractable Claw', definition: 'A claw that can be pulled back into a protective sheath.' },

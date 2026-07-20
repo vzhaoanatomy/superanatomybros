@@ -44,6 +44,29 @@ function clearCoinOfPlatforms(cx, cy, blockPlatforms) {
   return Math.max(40, y);
 }
 
+// Mystery boxes take the place of an occasional climbing step (see the
+// tower-climb loop in buildLevel) — coin bonuses are the common case,
+// power-ups less so, and the +50 "jackpot" coin is rarest.
+const MYSTERY_BOX_CHANCE = 0.18;
+const MAX_MYSTERY_BOXES = 5;
+const MYSTERY_BOX_REWARDS = [
+  { type: 'coin10', weight: 5 },
+  { type: 'mushroom', weight: 2 },
+  { type: 'egg', weight: 2 },
+  { type: 'fireFlower', weight: 2 },
+  { type: 'coin50', weight: 1 },
+];
+const MYSTERY_BOX_REWARD_TOTAL = MYSTERY_BOX_REWARDS.reduce((sum, r) => sum + r.weight, 0);
+
+function pickMysteryBoxReward(rng) {
+  let roll = rng() * MYSTERY_BOX_REWARD_TOTAL;
+  for (const r of MYSTERY_BOX_REWARDS) {
+    if (roll < r.weight) return r.type;
+    roll -= r.weight;
+  }
+  return MYSTERY_BOX_REWARDS[0].type;
+}
+
 function buildGroundSegments(rng, width, difficulty) {
   const minSeg = Math.max(260, 520 - difficulty * 30);
   const maxSeg = minSeg + 280;
@@ -118,6 +141,7 @@ export function buildLevel({ world, durationMinutes }) {
   const platformCount = Math.round(width / 500 + difficulty * 1.2);
   const usableWidth = width - 600;
   const slotWidth = usableWidth / platformCount;
+  const mysteryBoxes = [];
   for (let i = 0; i < platformCount; i++) {
     const slotStart = 250 + i * slotWidth;
     const slotEnd = slotStart + slotWidth - 20;
@@ -138,7 +162,29 @@ export function buildLevel({ world, durationMinutes }) {
     for (let step = 0; step < climbSteps; step++) {
       const pw = 90 + rng() * 60;
       if (cursorX + pw > slotEnd) break;
-      platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
+
+      // A mystery box takes this step's spot instead of a plain platform —
+      // centered in the same footprint pw reserved, so the cursor-advance
+      // math right below stays keyed to pw regardless of which one got
+      // placed, and reachability tuning is untouched either way.
+      if (mysteryBoxes.length < MAX_MYSTERY_BOXES && rng() < MYSTERY_BOX_CHANCE) {
+        const boxWidth = 40;
+        const box = {
+          id: `mysterybox-${mysteryBoxes.length}`,
+          x: cursorX + (pw - boxWidth) / 2,
+          y: cursorY,
+          width: boxWidth,
+          height: 24,
+          type: 'mysteryBox',
+          reward: pickMysteryBoxReward(rng),
+          used: false,
+          bumpUntil: 0,
+        };
+        platforms.push(box);
+        mysteryBoxes.push(box);
+      } else {
+        platforms.push({ x: cursorX, y: cursorY, width: pw, height: 24, type: 'block' });
+      }
 
       // Occasionally add a same-height bridge platform beside this step —
       // an easy horizontal hop, not a climb, so no reachability risk.
@@ -197,7 +243,7 @@ export function buildLevel({ world, durationMinutes }) {
   const MIN_TOWER_CLEARANCE = 70;
   for (let pass = 0; pass < 6; pass++) {
     let changed = false;
-    const blocks = platforms.filter((p) => p.type === 'block');
+    const blocks = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox');
     for (const upper of blocks) {
       for (const lower of blocks) {
         if (upper === lower || upper.y >= lower.y) continue;
@@ -219,7 +265,11 @@ export function buildLevel({ world, durationMinutes }) {
   // power-up placement; the odd narrower "bridge" platform is still solid
   // ground a coin can end up embedded in, so the coin check can't use that
   // same filtered list.
-  const allBlockPlatforms = platforms.filter((p) => p.type === 'block');
+  // Mystery boxes count as "solid floating things a coin shouldn't overlap"
+  // for clearCoinOfPlatforms below, same as any other block, even though
+  // they're excluded from blockPlatforms (too narrow at 40px for the
+  // width>=90 patrol/power-up eligibility filter that reads from it).
+  const allBlockPlatforms = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox');
   const blockPlatforms = allBlockPlatforms.filter((p) => p.width >= 90);
 
   // Coins are spaced out for runner-style pacing (not a quiz every second) —
@@ -449,6 +499,7 @@ export function buildLevel({ world, durationMinutes }) {
     groundY: GROUND_Y,
     spawn: { x: 60, y: GROUND_Y - 200 },
     platforms,
+    mysteryBoxes,
     coins,
     enemies,
     door,
