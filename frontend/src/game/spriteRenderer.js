@@ -205,6 +205,38 @@ function drawBlockTile(ctx, tile, palette) {
   ctx.fillRect(x + width - 6, y + height - 6, rivet, rivet);
 }
 
+// The functional warp pipe (not the decorative background one drawn by
+// drawPipe/drawBackground) — solid, standable, and marked with a floating
+// coin while its bonus hasn't been claimed yet (see GameCanvas.jsx's
+// findPipeUnderPlayer) so it reads as interactive rather than scenery.
+function drawFunctionalPipe(ctx, pipe) {
+  const { x, y, width, height } = pipe;
+  const capH = Math.min(18, height * 0.22);
+  const capOverhang = 6;
+
+  ctx.fillStyle = '#2e9e4f';
+  ctx.fillRect(x, y + capH, width, height - capH);
+  ctx.fillStyle = '#237a3c';
+  ctx.fillRect(x, y + capH, width * 0.22, height - capH);
+
+  ctx.fillStyle = '#33b25a';
+  ctx.fillRect(x - capOverhang, y, width + capOverhang * 2, capH);
+  ctx.fillStyle = '#237a3c';
+  ctx.fillRect(x - capOverhang, y, width + capOverhang * 2, capH * 0.3);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - capOverhang, y, width + capOverhang * 2, capH);
+  ctx.strokeRect(x, y + capH, width, height - capH);
+
+  if (!pipe.used) {
+    ctx.font = '16px ui-monospace, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('🪙', x + width / 2, y - 10);
+  }
+}
+
 export function drawPlatform(ctx, platform, palette) {
   if (platform.type === 'ground') {
     drawGroundStrip(ctx, platform, palette);
@@ -212,6 +244,8 @@ export function drawPlatform(ctx, platform, palette) {
     drawMysteryBox(ctx, platform);
   } else if (platform.type === 'tile') {
     drawBlockTile(ctx, platform, palette);
+  } else if (platform.type === 'pipe') {
+    drawFunctionalPipe(ctx, platform);
   } else {
     drawBlock(ctx, platform, palette);
   }
@@ -843,8 +877,30 @@ const ENEMY_RENDERERS = {
   dragonling: drawDragonling,
 };
 
-export function drawEnemy(ctx, enemy, enemyType) {
-  (ENEMY_RENDERERS[enemyType] ?? drawGoomba)(ctx, enemy);
+const SQUISH_MS = 220;
+
+// A defeated enemy briefly flattens toward the ground instead of just
+// vanishing — the transform squashes vertically and bulges horizontally
+// around the sprite's own bottom-center, so every enemy renderer gets the
+// effect for free without knowing about it. `now` defaults to a fresh call
+// so existing call sites (still passing only 2 args) keep working.
+export function drawEnemy(ctx, enemy, enemyType, now = performance.now()) {
+  const renderer = ENEMY_RENDERERS[enemyType] ?? drawGoomba;
+  if (enemy.alive) {
+    renderer(ctx, enemy);
+    return;
+  }
+  if (!enemy.deadAt || now - enemy.deadAt >= SQUISH_MS) return;
+  const t = (now - enemy.deadAt) / SQUISH_MS;
+  const cx = enemy.x + enemy.width / 2;
+  const bottom = enemy.y + enemy.height;
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, 1 - t * 0.7);
+  ctx.translate(cx, bottom);
+  ctx.scale(1 + t * 0.35, Math.max(0.08, 1 - t));
+  ctx.translate(-cx, -bottom);
+  renderer(ctx, enemy);
+  ctx.restore();
 }
 
 // World 7 final boss — a scaled-up dragonling with an HP bar hovering above.

@@ -433,6 +433,41 @@ export function buildLevel({ world, durationMinutes }) {
     termId: null,
   };
 
+  // A functional warp pipe — stand on top and press Down to answer a couple
+  // of questions for a bonus coin room (see GameCanvas.jsx's
+  // findPipeUnderPlayer/openPipeQuestion). Placed on a wide-enough stretch
+  // of solid ground, clear of spawn, the checkpoint door, and the end-of-
+  // level boss/piranha cluster so it never reads as blocking the main path.
+  const PIPE_WIDTH = 52;
+  const PIPE_HEIGHT = 74;
+  const pipeCandidates = groundSegments.filter(([gx1, gx2]) => {
+    if (gx2 - gx1 < 260) return false;
+    if (gx1 < 700 || gx2 > width * 0.8) return false;
+    if (gx1 < doorX + 260 && gx2 > doorX - 260) return false;
+    return true;
+  });
+  const bonusPipes = [];
+  const pipeCount = Math.min(pipeCandidates.length, width > 8000 ? 2 : 1);
+  for (let i = 0; i < pipeCount; i++) {
+    const segIndex = Math.min(
+      Math.floor(((i + 0.5) / pipeCount) * pipeCandidates.length),
+      pipeCandidates.length - 1
+    );
+    const [gx1, gx2] = pipeCandidates[segIndex];
+    const pipe = {
+      id: `pipe-${i}`,
+      x: gx1 + (gx2 - gx1) / 2 - PIPE_WIDTH / 2,
+      y: GROUND_Y - PIPE_HEIGHT,
+      width: PIPE_WIDTH,
+      height: PIPE_HEIGHT,
+      type: 'pipe',
+      used: false,
+      pending: false,
+    };
+    platforms.push(pipe);
+    bonusPipes.push(pipe);
+  }
+
   // Power-ups no longer sit out in the open — they only ever come from
   // bumping a mystery box (see the tower-climb loop above and
   // triggerMysteryBox in GameCanvas.jsx), same as classic Mario. This array
@@ -509,6 +544,7 @@ export function buildLevel({ world, durationMinutes }) {
     coins,
     enemies,
     door,
+    bonusPipes,
     powerUps,
     boss,
     flag,

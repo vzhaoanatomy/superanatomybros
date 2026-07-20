@@ -98,6 +98,8 @@ const STAR_DURATION_MS = 8000;
 const MOUNT_SPEED_MULTIPLIER = 1.5;
 const MAX_LIVES = 5;
 const BOSS_DEFEAT_SCORE = 1500;
+const PIPE_QUESTIONS = 2;
+const PIPE_BONUS_COINS = 120;
 const FIREBALL_SPEED = 10;
 const FIREBALL_COOLDOWN_MS = 350;
 const FIREBALL_MAX_TRAVEL = 650;
@@ -308,6 +310,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     // back onto those deadlines. The pause() no-op guard also means the
     // boss's chained 3-question sequence (each sub-question re-opens a
     // quiz) counts as one continuous pause, not three stacked ones.
+    // Edge-triggered (not held) so standing on a pipe with Down held doesn't
+    // reopen the quiz every frame — set only on the actual keydown transition
+    // in handleKeyDown below, consumed once per press in updatePhysics.
+    let pipeEnterRequested = false;
     let pauseStartedAt = null;
     function pause() {
       if (pausedRef.current) return;
@@ -432,6 +438,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     handlersRef.current.resolveQuiz = (isCorrect) => handlersRef.current._pendingResolve?.(isCorrect);
+    handlersRef.current.closeBonusRoom = () => {
+      handlersRef.current._pendingResolve = null;
+      resume();
+      setOverlay(null);
+    };
     handlersRef.current.finishEndOfLevel = (results) => {
       for (const r of results) {
         if (r.correct) recordCorrect(r.termId);
@@ -481,6 +492,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         toggleGlossary();
         return;
       }
+      if (DOWN_KEYS.has(e.code) && !keysRef.current.has(e.code)) {
+        pipeEnterRequested = true;
+      }
       keysRef.current.add(e.code);
     }
     function handleKeyUp(e) {
@@ -496,6 +510,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         const dy = enemy.y + enemy.height / 2 - (player.y + player.height / 2);
         if (Math.hypot(dx, dy) <= GROUND_POUND_RADIUS) {
           enemy.alive = false;
+          enemy.deadAt = performance.now();
           state.score += INSTANT_KILL_SCORE;
           playStompSound();
           popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
@@ -624,6 +639,58 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       );
     }
 
+    // A wrong answer just closes the quiz without unlocking anything — the
+    // pipe stays un-used (see level.js) so the player can climb back on top
+    // and try again, same "wrong stays blocked" shape as the checkpoint door.
+    function openPipeQuestion(pipe, questionNum) {
+      const termId = nextTermId();
+      const question = buildQuestion(vocab, termId);
+      openQuiz('pipe', { ...question, questionNum, totalQuestions: PIPE_QUESTIONS }, (isCorrect) => {
+        if (isCorrect) {
+          recordCorrect(termId);
+          if (questionNum < PIPE_QUESTIONS) {
+            openPipeQuestion(pipe, questionNum + 1);
+          } else {
+            pipe.used = true;
+            pipe.pending = false;
+            // openQuiz's wrapper auto-resumes/closes the overlay right after
+            // this callback returns *unless* a fresh _pendingResolve is set
+            // (see openQuiz above, same trick the boss fight's question
+            // chain uses) — without this, that auto-close would immediately
+            // wipe out the bonus room overlay openBonusRoom sets below.
+            handlersRef.current._pendingResolve = () => {};
+            openBonusRoom();
+          }
+        } else {
+          recordWrong(termId);
+          pipe.pending = false;
+        }
+      });
+    }
+
+    // The coin total is awarded immediately — the overlay's count-up is a
+    // celebratory readout of that already-final score, not a live meter
+    // (see BonusRoom.jsx).
+    function openBonusRoom() {
+      state.score += PIPE_BONUS_COINS;
+      playSuccessFanfare();
+      pause();
+      setOverlay({ type: 'bonus', question: { coins: PIPE_BONUS_COINS } });
+    }
+
+    // Standing on top of (not just touching) a not-yet-used pipe, matching
+    // classic Mario's "walk onto the pipe, press Down to enter."
+    function findPipeUnderPlayer() {
+      if (!player.onGround) return null;
+      for (const pipe of level.bonusPipes) {
+        if (pipe.used || pipe.pending) continue;
+        const withinX = player.x + player.width > pipe.x && player.x < pipe.x + pipe.width;
+        const onTop = Math.abs(player.y + player.height - pipe.y) < 4;
+        if (withinX && onTop) return pipe;
+      }
+      return null;
+    }
+
     function updatePhysics(dt) {
       state.timeRemaining -= dt;
       if (state.timeRemaining <= 0) {
@@ -637,6 +704,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const jumpHeld = [...JUMP_KEYS].some((k) => keys.has(k));
       const downHeld = [...DOWN_KEYS].some((k) => keys.has(k));
       const fireHeld = [...FIRE_KEYS].some((k) => keys.has(k));
+
+      if (pipeEnterRequested) {
+        pipeEnterRequested = false;
+        if (!pausedRef.current) {
+          const pipe = findPipeUnderPlayer();
+          if (pipe) {
+            pipe.pending = true;
+            openPipeQuestion(pipe, 1);
+          }
+        }
+      }
 
       if (
         fireHeld &&
@@ -679,6 +757,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (!enemy.alive || enemy.pending) continue;
           if (aabbOverlap(tongueBox, enemy)) {
             enemy.alive = false;
+            enemy.deadAt = performance.now();
             state.score += INSTANT_KILL_SCORE;
             // A solid, permanent egg is left behind exactly where the enemy
             // stood (already resting on the ground/platform it patrolled) —
@@ -805,6 +884,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
           if (player.pounding || bigStomping || performance.now() < player.starUntil) {
             enemy.alive = false;
+            enemy.deadAt = performance.now();
             state.score += INSTANT_KILL_SCORE;
             playStompSound();
             popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
@@ -818,6 +898,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               enemy.pending = false;
               if (isCorrect) {
                 enemy.alive = false;
+                enemy.deadAt = performance.now();
                 state.score += 50;
                 playStompSound();
                 popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
@@ -845,6 +926,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             if (!enemy.alive || enemy.pending) continue;
             if (aabbOverlap(fireball, enemy)) {
               enemy.alive = false;
+              enemy.deadAt = performance.now();
               fireball.alive = false;
               state.score += INSTANT_KILL_SCORE;
               playStompSound();
@@ -927,11 +1009,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       ctx.save();
       ctx.translate(-state.camera + shakeOffset.x, verticalOffset + shakeOffset.y);
 
+      const now = performance.now();
       for (const p of level.platforms) drawPlatform(ctx, p, world.palette);
       for (const coin of level.coins) drawCoin(ctx, coin);
       for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
       for (const enemy of level.enemies) {
-        if (enemy.alive) drawEnemy(ctx, enemy, world.enemyType);
+        if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, world.enemyType, now);
       }
       if (level.boss) drawBoss(ctx, level.boss);
       if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
@@ -946,7 +1029,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       for (const egg of state.solidEggs) drawSolidEgg(ctx, egg);
 
-      const now = performance.now();
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
       const invincible = now < player.starUntil;
       if (player.mounted) drawDinoMount(ctx, player);
