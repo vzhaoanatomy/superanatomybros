@@ -447,7 +447,10 @@ export function buildLevel({ world, durationMinutes }) {
     return true;
   });
   const bonusPipes = [];
-  const pipeCount = Math.min(pipeCandidates.length, width > 8000 ? 2 : 1);
+  // Two pipes per level (when the layout has room for them) — each tagged
+  // with a different roomVariant so GameCanvas.jsx's enterBonusRoom builds
+  // a distinct bonus room per pipe rather than the same one twice.
+  const pipeCount = Math.min(pipeCandidates.length, 2);
   for (let i = 0; i < pipeCount; i++) {
     const segIndex = Math.min(
       Math.floor(((i + 0.5) / pipeCount) * pipeCandidates.length),
@@ -463,6 +466,7 @@ export function buildLevel({ world, durationMinutes }) {
       type: 'pipe',
       used: false,
       pending: false,
+      roomVariant: i,
     };
     platforms.push(pipe);
     bonusPipes.push(pipe);
@@ -554,31 +558,120 @@ export function buildLevel({ world, durationMinutes }) {
 }
 
 // A small enclosed "coin heaven" room a bonus pipe drops the player into
-// (see GameCanvas.jsx's beginPipeEntry/enterBonusRoom) — a flat floor, a
-// low ceiling to keep it feeling enclosed, two step platforms to climb for
-// the higher coins, and enough coins to make the trip worth it inside a
-// short timer. Fixed/deterministic (not seeded) since it's a quick side
-// trip, not part of the level's own layout.
-export const BONUS_ROOM_WIDTH = 640;
+// (see GameCanvas.jsx's beginPipeEntry/enterBonusRoom) — a wide flat floor
+// (an easy baseline tier of coins anyone can walk up) topped with a much
+// harder vertical/horizontal gauntlet of narrow platforms and mid-air-only
+// coins, sized against the same jump physics the main level's tower-climb
+// uses (~150px rise / ~180px reach per jump is about the practical limit —
+// see JUMP_RISE/JUMP_DX_CLIMB in buildLevel above) so clearing it takes a
+// real, precise jump every time. Two distinct hand-built layouts (see
+// ROOM_VARIANTS) so the level's two pipes don't feel like the same room.
+export const BONUS_ROOM_WIDTH = 1100;
 export const BONUS_ROOM_GROUND_Y = 380;
+const BONUS_CEILING_Y = 0;
+const BONUS_CEILING_HEIGHT = 20;
 
-export function buildBonusRoom() {
+function makeCoinFactory() {
+  let coinId = 0;
+  return (coins, x, y) => coins.push({ id: `bonus-coin-${coinId++}`, x, y, width: 24, height: 24, collected: false });
+}
+
+function addFloorCoins(coins, addCoin, width, groundY) {
+  for (let x = 30; x <= width - 50; x += 60) addCoin(coins, x, groundY - 40);
+}
+
+// "Sky Steps" — a narrow ascending staircase (each step just wide enough
+// to land on) climbing up and to the right, a coin waiting on every step,
+// then a 3-coin jackpot on the last and highest one. A separate pair of
+// coins floats between two platforms further along with nothing under
+// them at all — has to be grabbed mid-jump, not landed on.
+function buildSkyStepsRoom() {
   const width = BONUS_ROOM_WIDTH;
   const groundY = BONUS_ROOM_GROUND_Y;
   const platforms = [
     { x: 0, y: groundY, width, height: GROUND_HEIGHT, type: 'ground' },
-    { x: 0, y: 20, width, height: 20, type: 'block' },
-    { x: 220, y: groundY - 90, width: 120, height: 20, type: 'block' },
-    { x: 420, y: groundY - 150, width: 120, height: 20, type: 'block' },
+    { x: 0, y: BONUS_CEILING_Y, width, height: BONUS_CEILING_HEIGHT, type: 'block' },
   ];
-
   const coins = [];
-  let coinId = 0;
-  const addCoin = (x, y) => coins.push({ id: `bonus-coin-${coinId++}`, x, y, width: 24, height: 24, collected: false });
+  const addCoin = makeCoinFactory();
+  addFloorCoins(coins, addCoin, width, groundY);
 
-  for (let x = 30; x <= width - 50; x += 58) addCoin(x, groundY - 40);
-  for (let x = 232; x < 220 + 120 - 20; x += 50) addCoin(x, groundY - 90 - 34);
-  for (let x = 432; x < 420 + 120 - 20; x += 50) addCoin(x, groundY - 150 - 34);
+  const stepW = 68;
+  let stepX = 170;
+  let stepY = groundY - 105;
+  for (let i = 0; i < 4; i++) {
+    platforms.push({ x: stepX, y: stepY, width: stepW, height: 20, type: 'block' });
+    addCoin(coins, stepX + stepW / 2 - 12, stepY - 34);
+    stepX += 155;
+    stepY -= 68;
+  }
+  // Jackpot cluster on the final (highest, hardest-to-reach) step.
+  addCoin(coins, stepX - 155 + stepW / 2 - 30, stepY + 68 - 60);
+  addCoin(coins, stepX - 155 + stepW / 2, stepY + 68 - 60);
+  addCoin(coins, stepX - 155 + stepW / 2 + 30, stepY + 68 - 60);
+
+  // Two mid-height "catch" platforms with a pair of coins floating in the
+  // open gap between them — no platform underneath, so grabbing them means
+  // jumping through at the top of the arc, not landing.
+  const midY = groundY - 130;
+  platforms.push({ x: 700, y: midY, width: 90, height: 20, type: 'block' });
+  platforms.push({ x: 940, y: midY, width: 90, height: 20, type: 'block' });
+  addCoin(coins, 820, midY - 60);
+  addCoin(coins, 860, midY - 60);
 
   return { width, groundY, platforms, coins };
+}
+
+// "Zigzag Gauntlet" — a chain of small platforms alternating high/low
+// across the full width, each a near-max horizontal jump from the last,
+// with coins floating in the gaps between them that can only be grabbed
+// mid-air. Ends on an isolated island reachable only by the single longest
+// jump in the room, holding the jackpot.
+function buildZigzagRoom() {
+  const width = BONUS_ROOM_WIDTH;
+  const groundY = BONUS_ROOM_GROUND_Y;
+  const platforms = [
+    { x: 0, y: groundY, width, height: GROUND_HEIGHT, type: 'ground' },
+    { x: 0, y: BONUS_CEILING_Y, width, height: BONUS_CEILING_HEIGHT, type: 'block' },
+  ];
+  const coins = [];
+  const addCoin = makeCoinFactory();
+  addFloorCoins(coins, addCoin, width, groundY);
+
+  const zigW = 80;
+  const highY = groundY - 175;
+  const lowY = groundY - 90;
+  let zigX = 150;
+  for (let i = 0; i < 5; i++) {
+    const y = i % 2 === 0 ? lowY : highY;
+    platforms.push({ x: zigX, y, width: zigW, height: 20, type: 'block' });
+    addCoin(coins, zigX + zigW / 2 - 12, y - 34);
+    if (i > 0) {
+      // Floats in the open gap this step just jumped across.
+      const prevX = zigX - 175;
+      addCoin(coins, (prevX + zigX) / 2 + 10, (y + (i % 2 === 0 ? highY : lowY)) / 2 - 20);
+    }
+    zigX += 175;
+  }
+
+  // The island: one last, longest jump (~180px) to a small platform with
+  // the jackpot cluster.
+  const islandX = zigX + 10;
+  const islandY = groundY - 140;
+  platforms.push({ x: islandX, y: islandY, width: 100, height: 20, type: 'block' });
+  addCoin(coins, islandX + 20, islandY - 34);
+  addCoin(coins, islandX + 50, islandY - 34);
+  addCoin(coins, islandX + 80, islandY - 34);
+
+  return { width, groundY, platforms, coins };
+}
+
+const ROOM_VARIANTS = [buildSkyStepsRoom, buildZigzagRoom];
+
+// `variant` picks which hand-built layout to use — GameCanvas passes a
+// different one per pipe (see level.js's bonusPipes below) so a level's
+// two pipes never lead to the same room.
+export function buildBonusRoom(variant = 0) {
+  const build = ROOM_VARIANTS[variant % ROOM_VARIANTS.length];
+  return build();
 }

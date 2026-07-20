@@ -660,7 +660,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           } else {
             pipe.used = true;
             pipe.pending = false;
-            beginPipeEntry();
+            beginPipeEntry(pipe.roomVariant);
           }
         } else {
           recordWrong(termId);
@@ -688,7 +688,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     // instant teleport. Runs through the normal physics loop (not paused),
     // it just locks out input for its short duration (see the early-return
     // in updatePhysics).
-    function beginPipeEntry() {
+    function beginPipeEntry(roomVariant) {
       const returnSpot = { x: player.x, y: player.y };
       player.vx = 0;
       player.vy = 0;
@@ -696,12 +696,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         phase: 'down',
         startedAt: performance.now(),
         startY: player.y,
-        onComplete: () => enterBonusRoom(returnSpot),
+        onComplete: () => enterBonusRoom(returnSpot, roomVariant),
       };
     }
 
-    function enterBonusRoom(returnSpot) {
-      const room = buildBonusRoom();
+    function enterBonusRoom(returnSpot, roomVariant) {
+      const room = buildBonusRoom(roomVariant);
       state.bonusRoom = { ...room, timeLeft: BONUS_ROOM_SECONDS, collected: 0, returnSpot };
       // Spawns a little above the floor so gravity carries them the rest of
       // the way down — reads as "dropping into" the room rather than
