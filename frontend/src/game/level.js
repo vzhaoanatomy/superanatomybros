@@ -54,6 +54,7 @@ const MYSTERY_BOX_REWARDS = [
   { type: 'mushroom', weight: 2 },
   { type: 'egg', weight: 2 },
   { type: 'fireFlower', weight: 2 },
+  { type: 'star', weight: 2 },
   { type: 'coin50', weight: 1 },
 ];
 const MYSTERY_BOX_REWARD_TOTAL = MYSTERY_BOX_REWARDS.reduce((sum, r) => sum + r.weight, 0);
@@ -387,52 +388,12 @@ export function buildLevel({ world, durationMinutes }) {
     termId: null,
   };
 
-  // Mushroom + egg sit directly above a solid ground segment at a low,
-  // always-walkable height, so they never carry the reachability risk
-  // floating platforms do. The y-range is bounded on both ends: never so
-  // low it sinks into the ground, never so high a standing player's
-  // bounding box (top at GROUND_Y - PLAYER_HEIGHT) fails to overlap its
-  // bottom edge.
-  const POWER_UP_SIZE = 28;
-  const groundPowerUpTypes = ['mushroom', 'egg'];
-  const groundPowerUpCount = Math.max(groundPowerUpTypes.length, Math.round(width / 3000));
+  // Power-ups no longer sit out in the open — they only ever come from
+  // bumping a mystery box (see the tower-climb loop above and
+  // triggerMysteryBox in GameCanvas.jsx), same as classic Mario. This array
+  // stays for GameCanvas.jsx/spriteRenderer.js's existing touch-collection
+  // and draw code to iterate — it's just never populated here anymore.
   const powerUps = [];
-  for (let i = 0; i < groundPowerUpCount; i++) {
-    const [sx1, sx2] = solidSegments[(i + 1) % solidSegments.length];
-    const margin = 80;
-    const segSpan = Math.max(40, sx2 - sx1 - margin * 2);
-    powerUps.push({
-      id: `power-ground-${i}`,
-      type: groundPowerUpTypes[i % groundPowerUpTypes.length],
-      x: sx1 + margin + rng() * segSpan,
-      y: GROUND_Y - (34 + rng() * 38),
-      width: POWER_UP_SIZE,
-      height: POWER_UP_SIZE,
-      collected: false,
-    });
-  }
-
-  // Star and fire flower sit on the highest floating platforms instead —
-  // grabbing the strongest power-ups takes real platforming skill rather
-  // than just walking down the ground path.
-  const platformPowerUpTypes = ['star', 'fireFlower'];
-  const highestPlatforms = [...blockPlatforms].sort((a, b) => a.y - b.y);
-  const platformPowerUpCount = Math.min(
-    highestPlatforms.length,
-    Math.max(platformPowerUpTypes.length, Math.round(width / 3500))
-  );
-  for (let i = 0; i < platformPowerUpCount; i++) {
-    const platform = highestPlatforms[i];
-    powerUps.push({
-      id: `power-platform-${i}`,
-      type: platformPowerUpTypes[i % platformPowerUpTypes.length],
-      x: platform.x + platform.width / 2 - POWER_UP_SIZE / 2,
-      y: platform.y - POWER_UP_SIZE - 6,
-      width: POWER_UP_SIZE,
-      height: POWER_UP_SIZE,
-      collected: false,
-    });
-  }
 
   // Every level ends in a boss blocking the way to the flag, tall enough
   // that no jump clears it (same trick as the checkpoint door). Used to be

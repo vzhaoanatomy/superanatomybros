@@ -247,6 +247,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       shells: [],
       solidEggs: [],
       scorePopups: [],
+      poppedItems: [],
     };
 
     let lastFrameTime = performance.now();
@@ -386,6 +387,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.shells = [];
       state.solidEggs = [];
       state.scorePopups = [];
+      state.poppedItems = [];
       state.score = 0;
       state.lives = 3;
       state.coinsCollected = 0;
@@ -513,7 +515,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       mushroom: '🍄 Mushroom!',
       egg: '🥚 Egg!',
       fireFlower: '🌺 Fire Flower!',
+      star: '⭐ Star!',
     };
+    const POPPED_ITEM_MS = 450;
+    const POPPED_ITEM_SIZE = 28;
 
     function triggerMysteryBox(box) {
       box.used = true;
@@ -526,8 +531,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         state.score += amount;
         popup(box.x + box.width / 2, box.y - 10, `+${amount}`, '#7de37b');
       } else {
+        // The reward applies right here, same as always — the popped item
+        // below is purely a cosmetic "it physically came out of the box"
+        // flourish layered on top, not a catch-it-or-lose-it mechanic (the
+        // player's jump usually carries them past the box by the time a
+        // simulated item would actually land).
         applyPowerUp(box.reward);
         popup(box.x + box.width / 2, box.y - 10, MYSTERY_BOX_REWARD_LABELS[box.reward], '#ffd23f');
+        state.poppedItems.push({
+          type: box.reward,
+          x: box.x + box.width / 2 - POPPED_ITEM_SIZE / 2,
+          boxY: box.y,
+          createdAt: performance.now(),
+        });
       }
     }
 
@@ -917,6 +933,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         state.scorePopups = state.scorePopups.filter((p) => now - p.createdAt < SCORE_POPUP_MS);
       }
       drawParticles(ctx, juice.particles, now, PARTICLE_LIFE_MS);
+
+      // Pop-and-land flourish for a mystery box's power-up reward — rises
+      // out of the box for the first 35% of the animation, then falls to
+      // settle just below it for the rest. Purely visual; the reward
+      // itself already applied the instant the box was bumped.
+      for (const item of state.poppedItems) {
+        const t = Math.min(1, (now - item.createdAt) / POPPED_ITEM_MS);
+        const riseT = Math.min(1, t / 0.35);
+        const fallT = Math.max(0, (t - 0.35) / 0.65);
+        const y = item.boxY - 28 * Math.sin(riseT * (Math.PI / 2)) + fallT * fallT * 68;
+        drawPowerUp(ctx, { x: item.x, y, width: POPPED_ITEM_SIZE, height: POPPED_ITEM_SIZE, type: item.type, collected: false });
+      }
+      if (state.poppedItems.length) {
+        state.poppedItems = state.poppedItems.filter((item) => now - item.createdAt < POPPED_ITEM_MS);
+      }
 
       ctx.restore();
 
