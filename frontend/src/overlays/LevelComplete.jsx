@@ -135,7 +135,7 @@ export default function LevelComplete({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {hasMissed && (
             <button type="button" onClick={onReview} style={{ ...buttonStyle, border: '2px solid #ffd23f' }}>
-              Review Missed Terms
+              🗂️ Patient Case File
             </button>
           )}
           <button

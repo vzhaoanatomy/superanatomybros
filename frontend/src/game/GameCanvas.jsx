@@ -36,6 +36,7 @@ import {
   drawParticles,
   drawBonusBackground,
   drawBonusHud,
+  drawLoreCard,
   drawPoppedItem,
   POPPED_ITEM_MS,
   POPPED_ITEM_SIZE,
@@ -119,6 +120,8 @@ const BOSS_DEFEAT_SCORE = 1500;
 const PIPE_QUESTIONS = 2;
 const BONUS_ROOM_SECONDS = 10;
 const BONUS_COIN_VALUE = 10;
+const LORE_CARD_SCORE = 25;
+const LORE_FLASH_MS = 6000;
 // How far the player visibly sinks into (or rises out of) the pipe during
 // the entry/exit cutscene — see beginPipeEntry/exitBonusRoom. Sink depth is
 // deliberately more than PLAYER_HEIGHT so they're fully hidden behind the
@@ -223,6 +226,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   // Brief "what did I just catch, and how do I use it" reminder shown the
   // moment a mystery box pops a power-up — see POWER_UP_HELP/flashPowerUp.
   const [powerUpFlash, setPowerUpFlash] = useState(null);
+  // The fact revealed by a bonus-room lore card — see flashLore.
+  const [loreFlash, setLoreFlash] = useState(null);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
@@ -470,6 +475,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (powerUpFlashTimer) clearTimeout(powerUpFlashTimer);
       setPowerUpFlash({ id: performance.now(), ...info });
       powerUpFlashTimer = setTimeout(() => setPowerUpFlash(null), POWER_UP_FLASH_MS);
+    }
+
+    let loreFlashTimer = null;
+    function flashLore(fact) {
+      if (!fact) return;
+      if (loreFlashTimer) clearTimeout(loreFlashTimer);
+      setLoreFlash({ id: performance.now(), fact });
+      loreFlashTimer = setTimeout(() => setLoreFlash(null), LORE_FLASH_MS);
     }
 
     function respawnPlayer() {
@@ -902,7 +915,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function enterBonusRoom(returnSpot, roomVariant) {
-      const room = buildBonusRoom(roomVariant);
+      const facts = world.funFacts;
+      const fact = facts && facts.length ? facts[Math.floor(Math.random() * facts.length)] : null;
+      const room = buildBonusRoom(roomVariant, fact);
       state.bonusRoom = { ...room, timeLeft: BONUS_ROOM_SECONDS, collected: 0, returnSpot };
       // Spawns a little above the floor so gravity carries them the rest of
       // the way down — reads as "dropping into" the room rather than
@@ -1008,6 +1023,16 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         state.score += BONUS_COIN_VALUE;
         playCorrectChime();
         popup(coin.x + coin.width / 2, coin.y, `+${BONUS_COIN_VALUE}`, '#ffd23f');
+      }
+
+      for (const loreCard of room.loreCards) {
+        if (loreCard.collected) continue;
+        if (!aabbOverlap(player, loreCard)) continue;
+        loreCard.collected = true;
+        state.score += LORE_CARD_SCORE;
+        playMysteryBoxDing();
+        popup(loreCard.x + loreCard.width / 2, loreCard.y, `+${LORE_CARD_SCORE}`, '#ffd23f');
+        flashLore(loreCard.fact);
       }
 
       state.camera = Math.max(
@@ -1378,6 +1403,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       for (const p of activePlatforms) drawPlatform(ctx, p, world.palette);
       for (const coin of activeCoins) drawCoin(ctx, coin);
+      if (inBonusRoom) {
+        for (const loreCard of state.bonusRoom.loreCards) drawLoreCard(ctx, loreCard);
+      }
 
       if (!inBonusRoom) {
         for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
@@ -1480,13 +1508,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
     window.addEventListener('resize', handleResize);
 
-    // Show the mission-briefing overlay on a fresh level start — never on a
-    // crash-recovery resume, since a returning player already got it and
-    // just wants to keep playing where they left off.
-    if (!savedProgress) {
-      pause();
-      setOverlay({ type: 'intro' });
-    }
+    // Show the mission-briefing overlay every time a level loads. It used
+    // to skip this on a crash-recovery resume, but that made it look
+    // broken/inconsistent in practice (silently absent whenever an old
+    // localStorage save for that world+character was still around) —
+    // showing it unconditionally is simpler and never wrong to see again.
+    pause();
+    setOverlay({ type: 'intro' });
 
     let rafId;
     function loop() {
@@ -1509,6 +1537,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       clearCustomTrack();
       if (termFlashTimer) clearTimeout(termFlashTimer);
       if (powerUpFlashTimer) clearTimeout(powerUpFlashTimer);
+      if (loreFlashTimer) clearTimeout(loreFlashTimer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
@@ -1569,6 +1598,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
                 {powerUpFlash.icon} {powerUpFlash.label}
               </strong>
               <span>{powerUpFlash.hint}</span>
+            </div>
+          )}
+          {loreFlash && (
+            <div key={loreFlash.id} className="lore-flash">
+              <strong>💡 Did You Know?</strong>
+              <span>{loreFlash.fact}</span>
             </div>
           )}
         </div>

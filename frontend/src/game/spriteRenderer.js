@@ -408,6 +408,61 @@ export function drawCoin(ctx, coin) {
   ctx.fill();
 }
 
+// A rare bonus-room collectible — a little index card with a gold star,
+// gently bobbing/glowing so it reads as special next to the plain coins
+// around it. Reveals a fun clinical fact about the world's system when
+// collected (see flashLore in GameCanvas.jsx).
+export function drawLoreCard(ctx, card) {
+  if (card.collected) return;
+  const now = performance.now();
+  const bob = Math.sin(now / 300) * 3;
+  const cx = card.x + card.width / 2;
+  const cy = card.y + card.height / 2 + bob;
+  const w = card.width;
+  const h = card.height;
+
+  const glow = ctx.createRadialGradient(cx, cy, 2, cx, cy, w * 1.1);
+  glow.addColorStop(0, 'rgba(255,210,63,0.55)');
+  glow.addColorStop(1, 'rgba(255,210,63,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 1.1, w * 1.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.sin(now / 500) * 0.12);
+  ctx.fillStyle = '#fdf6e3';
+  ctx.strokeStyle = '#b08d3a';
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(-w / 2, -h / 2, w, h);
+  ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.strokeStyle = 'rgba(176,141,58,0.5)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-w / 2 + 3, -h / 2 + (h / 3) * i);
+    ctx.lineTo(w / 2 - 3, -h / 2 + (h / 3) * i);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#ffd23f';
+  const spikes = 5;
+  const outerR = w * 0.28;
+  const innerR = w * 0.12;
+  ctx.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = (Math.PI * i) / spikes - Math.PI / 2;
+    const px = Math.cos(angle) * r;
+    const py = Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawMushroom(ctx, x, y, w, h) {
   ctx.fillStyle = '#e74c3c';
   ctx.beginPath();

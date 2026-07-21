@@ -797,7 +797,7 @@ function addFloorCoins(coins, addCoin, width, groundY) {
 // then a 3-coin jackpot on the last and highest one. A separate pair of
 // coins floats between two platforms further along with nothing under
 // them at all — has to be grabbed mid-jump, not landed on.
-function buildSkyStepsRoom() {
+function buildSkyStepsRoom(fact) {
   const width = BONUS_ROOM_WIDTH;
   const groundY = BONUS_ROOM_GROUND_Y;
   const platforms = [
@@ -831,7 +831,16 @@ function buildSkyStepsRoom() {
   addCoin(coins, 820, midY - 60);
   addCoin(coins, 860, midY - 60);
 
-  return { width, groundY, platforms, coins };
+  // A rare "lore card" collectible sitting right on the jackpot step — the
+  // hardest spot in the room to reach, so finding one feels like a real
+  // discovery. Only placed when the world actually has a fact to show (see
+  // buildBonusRoom below); custom/teacher worlds without funFacts just get
+  // an empty array here, same room otherwise.
+  const loreCards = fact
+    ? [{ id: 'lore-0', x: stepX - 155 + stepW / 2 - 12, y: stepY + 8 - 46, width: 24, height: 24, collected: false, fact }]
+    : [];
+
+  return { width, groundY, platforms, coins, loreCards };
 }
 
 // "Zigzag Gauntlet" — a chain of small platforms alternating high/low
@@ -839,7 +848,7 @@ function buildSkyStepsRoom() {
 // with coins floating in the gaps between them that can only be grabbed
 // mid-air. Ends on an isolated island reachable only by the single longest
 // jump in the room, holding the jackpot.
-function buildZigzagRoom() {
+function buildZigzagRoom(fact) {
   const width = BONUS_ROOM_WIDTH;
   const groundY = BONUS_ROOM_GROUND_Y;
   const platforms = [
@@ -875,15 +884,25 @@ function buildZigzagRoom() {
   addCoin(coins, islandX + 50, islandY - 34);
   addCoin(coins, islandX + 80, islandY - 34);
 
-  return { width, groundY, platforms, coins };
+  // The lore card rides along on the same hardest-to-reach island as the
+  // zigzag room's jackpot (see buildSkyStepsRoom above for why).
+  const loreCards = fact
+    ? [{ id: 'lore-0', x: islandX + 50 - 12, y: islandY - 68, width: 24, height: 24, collected: false, fact }]
+    : [];
+
+  return { width, groundY, platforms, coins, loreCards };
 }
 
 const ROOM_VARIANTS = [buildSkyStepsRoom, buildZigzagRoom];
 
 // `variant` picks which hand-built layout to use — GameCanvas passes a
 // different one per pipe (see level.js's bonusPipes below) so a level's
-// two pipes never lead to the same room.
-export function buildBonusRoom(variant = 0) {
+// two pipes never lead to the same room. `fact` is an optional string from
+// the world's funFacts pool (see worlds.js); when present each room hides
+// exactly one lore-card collectible showing it, at its single
+// hardest-to-reach spot. Worlds without funFacts (custom/teacher decks)
+// just get the plain coin room, same as before this feature existed.
+export function buildBonusRoom(variant = 0, fact = null) {
   const build = ROOM_VARIANTS[variant % ROOM_VARIANTS.length];
-  return build();
+  return build(fact);
 }
