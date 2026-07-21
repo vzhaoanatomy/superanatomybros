@@ -1,7 +1,7 @@
 export const CHARACTERS = [
   {
     id: 'doc',
-    name: 'Marrow',
+    name: 'Dr. Marrow',
     ability: 'coinCombo',
     abilityName: 'Coin Combo',
     abilityDescription: 'Every 5th coin collected is worth 2x points.',
@@ -17,7 +17,7 @@ export const CHARACTERS = [
   },
   {
     id: 'vee',
-    name: 'Liggy',
+    name: 'Nurse Liggy',
     ability: 'superJump',
     abilityName: 'Super Jump',
     abilityDescription: 'Jumps 20% higher than the others.',
@@ -32,7 +32,7 @@ export const CHARACTERS = [
   },
   {
     id: 'bloom',
-    name: 'Princess Plasma',
+    name: 'Chief Madam Plasma',
     ability: 'glide',
     abilityName: 'Glide',
     abilityDescription: 'Hold jump in mid-air to float down slowly.',
@@ -47,7 +47,7 @@ export const CHARACTERS = [
   },
   {
     id: 'rex',
-    name: 'Bowtox',
+    name: 'Dr. Bowtox',
     ability: 'groundPound',
     abilityName: 'Ground Pound',
     abilityDescription: 'Press Down in mid-air to slam and wipe out nearby enemies.',

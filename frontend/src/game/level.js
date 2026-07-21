@@ -482,7 +482,10 @@ export function buildLevel({ world, durationMinutes, seed }) {
 
   const solidSegments = groundSegments.filter(([x1, x2]) => x2 - x1 > 160);
   const enemyCount = Math.max(2, Math.round(width / 700 + difficulty * 0.8));
-  const baseSpeed = 1.8 + (difficulty - 1) * 0.3;
+  // Slower than the original 1.8 base — enemies now carry a hovering name
+  // label (see drawPathogenLabel in spriteRenderer.js) that needs to
+  // actually be readable while patrolling, not just glimpsed.
+  const baseSpeed = 1.0 + (difficulty - 1) * 0.16;
   // The player always spawns at x: 60 (see `spawn` below) — the first solid
   // ground segment starts at x: 0, so without this an enemy's patrol range
   // could begin just a few dozen pixels from spawn with no time to react.
@@ -517,7 +520,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
       y: GROUND_Y - 42,
       width: 42,
       height: 42,
-      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.6),
+      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed + rng() * 0.35),
       alive: true,
       pending: false,
       termId: null,
@@ -551,7 +554,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
       y: platform.y - 42,
       width: 42,
       height: 42,
-      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 1.15 + rng() * 0.6),
+      vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 1.1 + rng() * 0.35),
       alive: true,
       pending: false,
       termId: null,
@@ -587,7 +590,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
       maxX,
       width: flyerWidth,
       height: flyerHeight,
-      vx: (rng() < 0.5 ? -1 : 1) * (1.6 + rng() * 0.8),
+      vx: (rng() < 0.5 ? -1 : 1) * (0.9 + rng() * 0.5),
       bobAmplitude: 18 + rng() * 14,
       bobSpeed: 0.0016 + rng() * 0.0012,
       bobPhase: rng() * Math.PI * 2,

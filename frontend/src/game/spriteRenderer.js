@@ -1823,9 +1823,39 @@ function drawScrubDetails(ctx, x, y, w, h, skin, accent, cx, topY, size, bodyBot
   ctx.stroke();
 }
 
+// A stethoscope draped around the neck — drawn on every hero's base
+// scrubs form (not just the "big" white coat state, which no longer
+// duplicates it) so "medical professional" reads from the very first
+// frame of play, not just after a power-up.
+function drawStethoscope(ctx, x, y, w, h, neckY) {
+  ctx.strokeStyle = '#3a3a3a';
+  ctx.lineWidth = Math.max(1, w * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.4, y + h * neckY);
+  ctx.quadraticCurveTo(x + w * 0.5, y + h * (neckY + 0.1), x + w * 0.58, y + h * neckY);
+  ctx.stroke();
+  ctx.fillStyle = '#3a3a3a';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.5, y + h * (neckY + 0.1), w * 0.035, h * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// A small white patch with a red cross — the universal medic symbol —
+// added to headwear that has room for it. drawBloom keeps her crown
+// intact instead of a cross (it's her "Chief" identity marker) and relies
+// on the stethoscope + scrubs alone to read as medical.
+function drawCrossPatch(ctx, x, y, w, h, cx, cy, size) {
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x + w * (cx - size), y + h * (cy - size), w * size * 2, h * size * 2);
+  ctx.fillStyle = '#d3202f';
+  ctx.fillRect(x + w * (cx - size * 0.35), y + h * (cy - size * 0.75), w * size * 0.7, h * size * 1.5);
+  ctx.fillRect(x + w * (cx - size * 0.75), y + h * (cy - size * 0.35), w * size * 1.5, h * size * 0.7);
+}
+
 function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.08, 0.0, 0.84, 0.16, colors.brim);
   rectPct(ctx, x, y, w, h, 0.16, -0.03, 0.68, 0.16, colors.cap);
+  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.05, 0.07);
   rectPct(ctx, x, y, w, h, 0.18, 0.14, 0.64, 0.28, colors.skin);
   if (colors.mustache) {
     rectPct(ctx, x, y, w, h, 0.24, 0.34, 0.52, 0.07, colors.mustache);
@@ -1833,6 +1863,7 @@ function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.36, colors.body);
   rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.08, colors.bodyDark);
   drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.42, 0.1, 0.78);
+  drawStethoscope(ctx, x, y, w, h, 0.44);
   rectPct(ctx, x, y, w, h, 0.04, 0.46, 0.14, 0.2, colors.skin);
   rectPct(ctx, x, y, w, h, 0.82, 0.46, 0.14, 0.2, colors.skin);
   rectPct(ctx, x, y, w, h, 0.16, 0.78, 0.28, 0.22, colors.shoe);
@@ -1851,6 +1882,7 @@ function drawBloom(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.12, 0.54, 0.76, 0.3, colors.body);
   rectPct(ctx, x, y, w, h, 0.12, 0.8, 0.76, 0.06, colors.bodyDark);
   drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.36, 0.09, 0.8);
+  drawStethoscope(ctx, x, y, w, h, 0.38);
   rectPct(ctx, x, y, w, h, 0.2, 0.86, 0.2, 0.14, colors.shoe);
   rectPct(ctx, x, y, w, h, 0.6, 0.86, 0.2, 0.14, colors.shoe);
   const eyeX = facing >= 0 ? 0.56 : 0.28;
@@ -1859,12 +1891,14 @@ function drawBloom(ctx, x, y, w, h, colors, facing) {
 
 function drawRex(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.14, 0.02, 0.72, 0.2, colors.hair);
+  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.11, 0.07);
   rectPct(ctx, x, y, w, h, 0.16, -0.1, 0.12, 0.16, colors.horn);
   rectPct(ctx, x, y, w, h, 0.72, -0.1, 0.12, 0.16, colors.horn);
   rectPct(ctx, x, y, w, h, 0.2, 0.18, 0.6, 0.24, colors.skin);
   rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.4, colors.body);
   rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.09, colors.bodyDark);
   drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.4, 0.1, 0.8);
+  drawStethoscope(ctx, x, y, w, h, 0.42);
   rectPct(ctx, x, y, w, h, 0.3, 0.52, 0.16, 0.16, colors.bodyDark);
   rectPct(ctx, x, y, w, h, 0.54, 0.52, 0.16, 0.16, colors.bodyDark);
   rectPct(ctx, x, y, w, h, 0.16, 0.8, 0.28, 0.2, colors.shoe);
@@ -1878,7 +1912,9 @@ function drawRex(ctx, x, y, w, h, colors, facing) {
 // system so it fits all four hero silhouettes without each needing its
 // own big-form variant. This is what actually distinguishes the "big"
 // (mushroom-equivalent) form from the base scrubs-only look, since scale
-// alone read too subtly to tell apart at a glance during play.
+// alone read too subtly to tell apart at a glance during play. The
+// stethoscope lives on the base body now (see drawStethoscope above), so
+// it isn't redrawn here.
 function drawWhiteCoat(ctx, x, y, w, h) {
   const coat = '#f7f7f4';
   const coatShadow = '#d9d9d3';
@@ -1892,17 +1928,6 @@ function drawWhiteCoat(ctx, x, y, w, h) {
   rectPct(ctx, x, y, w, h, 0.1, 0.5, 0.03, 0.03, '#8a8a80');
   rectPct(ctx, x, y, w, h, 0.1, 0.58, 0.03, 0.03, '#8a8a80');
   rectPct(ctx, x, y, w, h, 0.08, 0.44, 0.1, 0.07, '#2255cc');
-  // Stethoscope looped around the neck, dropping to a small diaphragm.
-  ctx.strokeStyle = '#3a3a3a';
-  ctx.lineWidth = Math.max(1, w * 0.03);
-  ctx.beginPath();
-  ctx.moveTo(x + w * 0.4, y + h * 0.4);
-  ctx.quadraticCurveTo(x + w * 0.5, y + h * 0.5, x + w * 0.58, y + h * 0.4);
-  ctx.stroke();
-  ctx.fillStyle = '#3a3a3a';
-  ctx.beginPath();
-  ctx.ellipse(x + w * 0.5, y + h * 0.5, w * 0.035, h * 0.03, 0, 0, Math.PI * 2);
-  ctx.fill();
 }
 
 export function drawPlayer(ctx, player, characterId, opts = {}) {
