@@ -69,7 +69,7 @@ export default function CharacterSelect({ onSelect, onBack }) {
         ← Back
       </button>
       <div className="title-banner">
-        <h1 style={{ fontSize: 32 }}>Choose Your Character</h1>
+        <h1 style={{ fontSize: 32 }}>Choose Your Hero</h1>
       </div>
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginTop: 24 }}>
         {CHARACTERS.map((c) => (

@@ -16,7 +16,7 @@ const SECTIONS = [
         ↑ / W / Space — <strong>Jump</strong> (hold for higher)
       </>,
       <>
-        ↓ / S — <strong>Character ability</strong>
+        ↓ / S — <strong>Hero ability</strong>
       </>,
       <>
         F — <strong>Throw fireball</strong> (with Fire Flower)

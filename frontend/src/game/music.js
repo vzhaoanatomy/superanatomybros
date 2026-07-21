@@ -239,6 +239,14 @@ export function playPowerUpPopSound() {
 // on the audio clock) so start/stop are explicit and immediate — the same
 // call pattern as the one-shot SFX below, which are already known to work
 // reliably, rather than the large up-front batch playStarPowerSound uses.
+//
+// Gated on `sfxEnabled`, NOT `playing` — `playing` is the toggle for the
+// bundled/uploaded <audio> background track (off by default), while this
+// is a short synthesized oscillator loop just like the dings/pops below.
+// Gating it on `playing` meant it silently never played for anyone who
+// hadn't separately opted into background music — this was the actual bug
+// behind "the alcove music didn't change" (nothing was audible in EITHER
+// room without that toggle on).
 let bonusMusicInterval = null;
 let bonusMusicStep = 0;
 const BONUS_MUSIC_STEP_MS = 150;
@@ -246,7 +254,7 @@ const BONUS_MUSIC_BASS = ['C3', 'C3', 'G3', 'C3', 'C3', 'C3', 'A3', 'G3'];
 const BONUS_MUSIC_LEAD = ['C5', 'E5', 'G5', 'E5', 'C5', 'D5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5'];
 
 function playBonusMusicStep() {
-  if (!playing) return;
+  if (!sfxEnabled) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
   const t = ctx.currentTime;

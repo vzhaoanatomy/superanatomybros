@@ -247,7 +247,17 @@ export function buildLevel({ world, durationMinutes }) {
         platforms.push({ x: cursorX, y: cursorY, width: pw, height: PLATFORM_HEIGHT, type: 'block' });
       }
 
-      cursorX += pw * 0.3 + 60 + rng() * (JUMP_DX_CLIMB - 60);
+      // Advance past this step's own footprint first (full pw, not a
+      // fraction of it) so the next step's left edge always lands a real
+      // gap clear of this one's right edge. The old `pw * 0.3` under-counted
+      // wide steps (up to 150px) badly enough that the next step could
+      // start before this one even ended — an outright x-overlap that
+      // physically blocked jumping past the lower step to reach the one
+      // beside it. MIN_STEP_GAP (50) comfortably clears PLAYER_WIDTH (40)
+      // so the hero can actually fit through/land in the gap; the random
+      // range on top stays inside JUMP_DX_CLIMB's conservative reach.
+      const MIN_STEP_GAP = 50;
+      cursorX += pw + MIN_STEP_GAP + rng() * (JUMP_DX_CLIMB - MIN_STEP_GAP);
       // MIN_CLEARANCE (110): a step-to-step decrement below this leaves
       // less than PLAYER_HEIGHT (54px) of headroom between the platform
       // below and the one above once a 40px-thick mystery-box row tile
@@ -456,10 +466,12 @@ export function buildLevel({ world, durationMinutes }) {
     platformEnemyIndex += 1;
   }
 
-  // Flyers: hover free of any platform, patrolling horizontally while
-  // bobbing on a sine wave (see GameCanvas.jsx's flyer update loop) — the
-  // only enemy reachable purely from a well-timed jump rather than a walk-
-  // up. Spread across evenly-sized zones like the tower slots above so
+  // Flyers (King Boo): hover free of any platform, patrolling horizontally
+  // while bobbing on a sine wave (see GameCanvas.jsx's flyer update loop) —
+  // the only enemy reachable purely from a well-timed jump rather than a
+  // walk-up, and deliberately NOT quiz-gated (see resolveFlyerTouch in
+  // GameCanvas.jsx) — no termId/pending needed since it never opens a
+  // quiz. Spread across evenly-sized zones like the tower slots above so
   // they don't cluster.
   const FLYER_COUNT = Math.max(1, Math.round(1 + difficulty * 0.4));
   const flyers = [];
@@ -486,8 +498,6 @@ export function buildLevel({ world, durationMinutes }) {
       bobSpeed: 0.0016 + rng() * 0.0012,
       bobPhase: rng() * Math.PI * 2,
       alive: true,
-      pending: false,
-      termId: null,
     });
   }
 
@@ -570,20 +580,32 @@ export function buildLevel({ world, durationMinutes }) {
     pending: false,
   };
 
-  // Spikes: a stationary ground hazard earlier in the level (the piranha
+  // Spikes: stationary ground hazards earlier in the level (the piranha
   // plant already owns the end-game slot) — no HP, can't be defeated,
-  // jump over it or eat it. Placed on a wide-enough solid stretch clear of
-  // spawn and the checkpoint door so it never reads as an unfair ambush.
+  // jump over them or eat them. Placed on wide-enough solid stretches clear
+  // of spawn and the checkpoint door so they never read as an unfair
+  // ambush. Two patches (one per level half) instead of one — a single
+  // hazard sitting somewhere across a level thousands of pixels wide was
+  // easy to walk an entire playthrough without ever crossing.
   const SPIKE_HEIGHT = 26;
   const SPIKE_WIDTH = 56;
   const spikeCandidates = solidSegments.filter(
-    ([sx1, sx2]) => sx2 - sx1 > 220 && sx1 > 500 && sx2 < width * 0.55 && (sx1 < doorX - 200 || sx1 > doorX + 200)
+    ([sx1, sx2]) => sx2 - sx1 > 220 && sx1 > 500 && (sx1 < doorX - 200 || sx1 > doorX + 200)
   );
-  let spikes = null;
-  if (spikeCandidates.length) {
-    const [spx1, spx2] = spikeCandidates[Math.floor(rng() * spikeCandidates.length)];
+  const spikes = [];
+  const usedSpikeSegments = new Set();
+  const SPIKE_PATCH_COUNT = 2;
+  for (let i = 0; i < SPIKE_PATCH_COUNT; i++) {
+    // Alternate halves so two patches don't both land close together.
+    const remaining = spikeCandidates.filter((seg) => !usedSpikeSegments.has(seg));
+    const half = remaining.filter(([sx1]) => (i === 0 ? sx1 < width * 0.55 : sx1 >= width * 0.3));
+    const pool = half.length ? half : remaining;
+    if (!pool.length) break;
+    const picked = pool[Math.floor(rng() * pool.length)];
+    usedSpikeSegments.add(picked);
+    const [spx1, spx2] = picked;
     const spikeX = Math.max(spx1 + 20, Math.min(spx2 - SPIKE_WIDTH - 20, spx1 + (spx2 - spx1) / 2 - SPIKE_WIDTH / 2));
-    spikes = { x: spikeX, y: GROUND_Y - SPIKE_HEIGHT, width: SPIKE_WIDTH, height: SPIKE_HEIGHT };
+    spikes.push({ x: spikeX, y: GROUND_Y - SPIKE_HEIGHT, width: SPIKE_WIDTH, height: SPIKE_HEIGHT });
   }
 
   // Piranha plant: a stationary hazard near the end of the level (before

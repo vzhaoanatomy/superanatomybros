@@ -138,8 +138,10 @@ function drawBlock(ctx, platform, palette) {
   ctx.fillStyle = gradient;
   ctx.fillRect(x, y, width, height);
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
-  ctx.lineWidth = 1;
+  // Thick, near-black mortar lines — the gradient alone read as flat at a
+  // glance; a heavier stroke is what actually sells "separate bricks."
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 2.5;
   let row = 0;
   for (let ry = y; ry < y + height; ry += BRICK_H, row++) {
     const rowH = Math.min(BRICK_H, y + height - ry);
@@ -319,7 +321,12 @@ function drawFunctionalPipe(ctx, pipe) {
 // visible warning before it drops out of solids (see GameCanvas.jsx's
 // CRUMBLE_DELAY_MS). Renders nothing at all once gone.
 const CRUMBLE_DELAY_MS = 550;
-function drawCrumblePlatform(ctx, platform, palette) {
+// Deliberately ignores the world palette — a fixed ashen grey-stone reads
+// as "this is not a normal brick platform" at a glance from anywhere in the
+// level, rather than blending in and only revealing itself once it's
+// already shaking apart underfoot.
+const CRUMBLE_BASE_COLOR = '#8c8172';
+function drawCrumblePlatform(ctx, platform) {
   if (platform.gone) return;
   const { x, y, width, height, triggered, triggerAt } = platform;
   const t = triggered ? Math.min(1, (performance.now() - triggerAt) / CRUMBLE_DELAY_MS) : 0;
@@ -328,19 +335,20 @@ function drawCrumblePlatform(ctx, platform, palette) {
 
   ctx.save();
   ctx.translate(dx, 0);
-  drawBlock(ctx, { x, y, width, height }, palette);
-  if (triggered) {
-    ctx.strokeStyle = `rgba(20,10,0,${0.4 + t * 0.4})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x + width * 0.2, y);
-    ctx.lineTo(x + width * 0.45, y + height * 0.55);
-    ctx.lineTo(x + width * 0.35, y + height);
-    ctx.moveTo(x + width * 0.7, y);
-    ctx.lineTo(x + width * 0.55, y + height * 0.5);
-    ctx.lineTo(x + width * 0.75, y + height);
-    ctx.stroke();
-  }
+  drawBlock(ctx, { x, y, width, height }, { ground: CRUMBLE_BASE_COLOR });
+
+  // Faint hairline cracks are always visible (not just once triggered) so
+  // the platform reads as fragile before the player ever steps on it.
+  ctx.strokeStyle = `rgba(20,10,0,${triggered ? 0.4 + t * 0.4 : 0.22})`;
+  ctx.lineWidth = triggered ? 2 : 1.3;
+  ctx.beginPath();
+  ctx.moveTo(x + width * 0.2, y);
+  ctx.lineTo(x + width * 0.45, y + height * 0.55);
+  ctx.lineTo(x + width * 0.35, y + height);
+  ctx.moveTo(x + width * 0.7, y);
+  ctx.lineTo(x + width * 0.55, y + height * 0.5);
+  ctx.lineTo(x + width * 0.75, y + height);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -354,7 +362,7 @@ export function drawPlatform(ctx, platform, palette) {
   } else if (platform.type === 'pipe') {
     drawFunctionalPipe(ctx, platform);
   } else if (platform.type === 'crumble') {
-    drawCrumblePlatform(ctx, platform, palette);
+    drawCrumblePlatform(ctx, platform);
   } else {
     drawBlock(ctx, platform, palette);
   }
@@ -975,39 +983,108 @@ export function drawClot(ctx, enemy) {
   ctx.fill();
 }
 
-// A small hovering enemy — flaps membranous wings and bobs on a sine wave
-// (see the flyer update loop in GameCanvas.jsx) instead of patrolling the
-// ground, so reaching it takes a well-timed jump rather than a walk-up.
-// One universal look across all worlds, unlike the per-world ground
-// enemies above.
-function drawFlyer(ctx, enemy) {
+// The flying enemy — a King Boo-style ghost: pale bulbous body with a
+// scalloped bottom skirt, a small gold crown, mischievous slanted eyes,
+// and a long lolling tongue. Hovers/bobs on a sine wave (see the flyer
+// update loop in GameCanvas.jsx) rather than patrolling the ground, and is
+// deliberately harder to read as "quiz-able" than the other enemies — no
+// question mark, no friendly cartoon face, since resolveFlyerTouch in
+// GameCanvas.jsx skips the quiz gate entirely for this one. One universal
+// look across all worlds, unlike the per-world ground enemies above.
+function drawKingBoo(ctx, enemy) {
   const { x, y, width: w, height: h } = enemy;
-  const flap = Math.sin(performance.now() / 90) * 0.5 + 0.5;
+  const now = performance.now();
   const cx = x + w / 2;
-  const cy = y + h / 2;
-  const wingSpread = w * (0.55 + flap * 0.25);
+  const cy = y + h * 0.42;
+  const facing = enemy.vx >= 0 ? 1 : -1;
 
-  ctx.fillStyle = '#e0546b';
-  ctx.beginPath();
-  ctx.ellipse(cx - wingSpread * 0.5, cy, wingSpread * 0.4, h * 0.28, -0.4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + wingSpread * 0.5, cy, wingSpread * 0.4, h * 0.28, 0.4, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.95;
 
-  ctx.fillStyle = '#c23752';
+  // Body: rounded dome top, scalloped "skirt" bottom (3 overlapping bumps)
+  // so the silhouette reads as a ghost rather than a plain blob.
+  ctx.fillStyle = '#f5f2fb';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.36, h * 0.4, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, w * 0.5, h * 0.44, 0, Math.PI, 0, false);
   ctx.fill();
+  const skirtY = cy + h * 0.06;
+  for (let i = 0; i < 3; i++) {
+    const bx = x + w * (0.18 + i * 0.32);
+    ctx.beginPath();
+    ctx.arc(bx, skirtY, w * 0.19, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillRect(x + w * 0.02, cy - h * 0.02, w * 0.96, h * 0.14);
 
+  // Small gold crown, perched on top, slightly tilted toward travel direction.
+  ctx.save();
+  ctx.translate(cx, y + h * 0.06);
+  ctx.rotate(facing * 0.08);
+  ctx.fillStyle = '#f2c230';
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.22, h * 0.06);
+  ctx.lineTo(-w * 0.22, -h * 0.02);
+  ctx.lineTo(-w * 0.11, h * 0.05);
+  ctx.lineTo(0, -h * 0.08);
+  ctx.lineTo(w * 0.11, h * 0.05);
+  ctx.lineTo(w * 0.22, -h * 0.02);
+  ctx.lineTo(w * 0.22, h * 0.06);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Mischievous slanted eyes, pupils biased toward the direction of travel.
+  const eyeY = cy - h * 0.08;
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.ellipse(cx, cy - h * 0.05, w * 0.16, h * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - w * 0.17, eyeY, w * 0.13, h * 0.15, -facing * 0.25, 0, Math.PI * 2);
+  ctx.ellipse(cx + w * 0.17, eyeY, w * 0.13, h * 0.15, -facing * 0.25, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#1a0a0a';
+  ctx.fillStyle = '#241830';
   ctx.beginPath();
-  ctx.ellipse(cx, cy - h * 0.05, w * 0.07, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - w * 0.17 + facing * w * 0.03, eyeY, w * 0.055, h * 0.09, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + w * 0.17 + facing * w * 0.03, eyeY, w * 0.055, h * 0.09, 0, 0, Math.PI * 2);
   ctx.fill();
+  // Angled brows read as "up to something" rather than friendly.
+  ctx.strokeStyle = '#241830';
+  ctx.lineWidth = Math.max(1, w * 0.045);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.28, eyeY - h * 0.2);
+  ctx.lineTo(cx - w * 0.08, eyeY - h * 0.28);
+  ctx.moveTo(cx + w * 0.28, eyeY - h * 0.2);
+  ctx.lineTo(cx + w * 0.08, eyeY - h * 0.28);
+  ctx.stroke();
+
+  // Wide grin with two small fangs.
+  const mouthY = cy + h * 0.14;
+  ctx.fillStyle = '#241830';
+  ctx.beginPath();
+  ctx.ellipse(cx, mouthY, w * 0.16, h * 0.1, 0, 0, Math.PI, false);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.12, mouthY);
+  ctx.lineTo(cx - w * 0.08, mouthY + h * 0.06);
+  ctx.lineTo(cx - w * 0.04, mouthY);
+  ctx.closePath();
+  ctx.moveTo(cx + w * 0.12, mouthY);
+  ctx.lineTo(cx + w * 0.08, mouthY + h * 0.06);
+  ctx.lineTo(cx + w * 0.04, mouthY);
+  ctx.closePath();
+  ctx.fill();
+
+  // Long lolling tongue, swaying gently.
+  const tongueSway = Math.sin(now / 220) * w * 0.05;
+  ctx.fillStyle = '#a15fd6';
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.06, mouthY + h * 0.04);
+  ctx.quadraticCurveTo(cx + tongueSway, mouthY + h * 0.35, cx + tongueSway * 1.4, mouthY + h * 0.5);
+  ctx.quadraticCurveTo(cx + tongueSway * 0.6, mouthY + h * 0.4, cx + w * 0.06, mouthY + h * 0.04);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
 }
 
 const ENEMY_RENDERERS = {
@@ -1019,7 +1096,7 @@ const ENEMY_RENDERERS = {
   labCat: drawLabCat,
   clot: drawClot,
   dragonling: drawDragonling,
-  flyer: drawFlyer,
+  flyer: drawKingBoo,
 };
 
 const SQUISH_MS = 700;
@@ -1074,7 +1151,21 @@ export function drawSpikes(ctx, spikes) {
   const count = Math.max(2, Math.round(width / 18));
   const spikeW = width / count;
 
-  ctx.fillStyle = '#7d8290';
+  // A dull steel-grey used to blend in with the ground; a hazard needs to
+  // read as dangerous at a glance, so the tips run red-hot and the base
+  // sits on a black-and-yellow warning strip instead.
+  ctx.fillStyle = 'rgba(20,15,10,0.7)';
+  ctx.fillRect(x - 3, y + height - 4, width + 6, 6);
+  ctx.fillStyle = '#f2b632';
+  for (let i = 0; i < Math.ceil(width / 10); i++) {
+    if (i % 2 === 0) ctx.fillRect(x - 3 + i * 10, y + height - 4, 5, 6);
+  }
+
+  const grad = ctx.createLinearGradient(x, y, x, y + height);
+  grad.addColorStop(0, '#ff5a3c');
+  grad.addColorStop(0.45, '#c0392b');
+  grad.addColorStop(1, '#4a4d57');
+  ctx.fillStyle = grad;
   for (let i = 0; i < count; i++) {
     const sx = x + i * spikeW;
     ctx.beginPath();
@@ -1084,7 +1175,7 @@ export function drawSpikes(ctx, spikes) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < count; i++) {
     const sx = x + i * spikeW;

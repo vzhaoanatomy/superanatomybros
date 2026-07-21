@@ -60,8 +60,9 @@ export function updateHazards(level, player, state, loseLife) {
 
   // Spikes: stationary, no HP at all — can't be defeated by anything,
   // only avoided. Same automatic-life-loss-on-touch shape as the piranha.
-  if (level.spikes && aabbOverlap(player, level.spikes)) {
-    if (!starActive && !invulnerable) {
+  // Two patches per level (see level.js), each checked independently.
+  for (const patch of level.spikes) {
+    if (aabbOverlap(player, patch) && !starActive && !invulnerable) {
       playHurtSound();
       loseLife();
     }

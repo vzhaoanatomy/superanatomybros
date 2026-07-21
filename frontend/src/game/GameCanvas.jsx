@@ -56,6 +56,7 @@ import {
   playStarPowerSound,
   playFireballSound,
   playStompSound,
+  playHurtSound,
   playCorrectChime,
   playLevelCompleteDings,
   playMysteryBoxDing,
@@ -585,6 +586,34 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
     }
 
+    // King Boo (the flying enemy) deliberately skips the quiz-gate every
+    // other enemy gets — the harder, non-vocab-based challenge the user
+    // asked for. Only three things put it down: a plain jump-stomp (any
+    // size, not just big/pounding/star like resolveEnemyTouch requires),
+    // a fireball (handled in the fireball loop below), or a big/pounding/
+    // star touch same as any other enemy. Anything else — walking into it
+    // sideways, getting bumped from below — costs a life immediately, same
+    // as a stationary hazard, with no chance to answer out of it.
+    const FLYER_STOMP_BOUNCE = -9;
+    function resolveFlyerTouch(flyer) {
+      if (!aabbOverlap(player, flyer)) return;
+      const stomping = player.vy > 0 && player.y + player.height - flyer.y < flyer.height * 0.5;
+      if (stomping || player.pounding || performance.now() < player.starUntil) {
+        flyer.alive = false;
+        flyer.deadAt = performance.now();
+        state.score += INSTANT_KILL_SCORE;
+        playStompSound();
+        popup(flyer.x + flyer.width / 2, flyer.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+        shake(juice, 5);
+        hitPause(juice, 60);
+        burst(juice, flyer.x + flyer.width / 2, flyer.y + flyer.height / 2, '#ffd23f', 8);
+        if (stomping && !player.pounding) player.vy = FLYER_STOMP_BOUNCE;
+      } else if (performance.now() >= player.invulnerableUntil) {
+        playHurtSound();
+        loseLife();
+      }
+    }
+
     // Shared "put the player into this form" logic — ground-collected
     // power-ups and mystery-box rewards both funnel through this, so the
     // two sources can never drift out of sync with each other.
@@ -1102,9 +1131,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       // Flyers patrol left-right like ground enemies but also bob up and
-      // down on a sine wave, floating free of any platform — the same
-      // stomp/quiz/star response as any other enemy (resolveEnemyTouch),
-      // just reachable from a jump instead of a walk.
+      // down on a sine wave, floating free of any platform — see
+      // resolveFlyerTouch above for why they get their own (harder,
+      // non-quiz) resolution instead of resolveEnemyTouch.
       if (!pausedRef.current) {
         for (const flyer of level.flyers) {
           if (!flyer.alive) continue;
@@ -1114,7 +1143,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             flyer.x = Math.max(flyer.minX, Math.min(flyer.x, flyer.maxX - flyer.width));
           }
           flyer.y = flyer.baseY + Math.sin(performance.now() * flyer.bobSpeed + flyer.bobPhase) * flyer.bobAmplitude;
-          resolveEnemyTouch(flyer);
+          resolveFlyerTouch(flyer);
         }
       }
 
@@ -1141,7 +1170,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           }
           if (fireball.alive) {
             for (const flyer of level.flyers) {
-              if (!flyer.alive || flyer.pending) continue;
+              if (!flyer.alive) continue;
               if (aabbOverlap(fireball, flyer)) {
                 flyer.alive = false;
                 flyer.deadAt = performance.now();
@@ -1251,7 +1280,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         }
         if (level.boss) drawBoss(ctx, level.boss);
         if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
-        if (level.spikes) drawSpikes(ctx, level.spikes);
+        for (const patch of level.spikes) drawSpikes(ctx, patch);
         if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
         drawDoor(ctx, level.door);
         drawFlag(ctx, level.flag);
