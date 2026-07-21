@@ -19,6 +19,7 @@ import {
   drawDoor,
   drawFlag,
   drawEnemy,
+  drawPathogenLabel,
   drawPlayer,
   drawPowerUp,
   drawBoss,
@@ -132,7 +133,10 @@ const CRUMBLE_DELAY_MS = 550;
 const FIREBALL_SPEED = 10;
 const FIREBALL_COOLDOWN_MS = 350;
 const FIREBALL_MAX_TRAVEL = 650;
-const FIREBALL_SIZE = 18;
+// An actual oval/pill shape, not a square — wider than tall, matching a
+// real antibiotic capsule instead of the round fireball it replaced.
+const FIREBALL_WIDTH = 24;
+const FIREBALL_HEIGHT = 14;
 const TONGUE_COOLDOWN_MS = 500;
 const TONGUE_FLICK_MS = 220;
 const TONGUE_REACH = 70;
@@ -1054,14 +1058,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         performance.now() - lastFireballTime > FIREBALL_COOLDOWN_MS
       ) {
         lastFireballTime = performance.now();
-        const spawnX = player.facing >= 0 ? player.x + player.width : player.x - FIREBALL_SIZE;
+        const spawnX = player.facing >= 0 ? player.x + player.width : player.x - FIREBALL_WIDTH;
         state.fireballs.push({
           x: spawnX,
           y: player.y + player.height * 0.35,
           spawnX,
           vx: FIREBALL_SPEED * player.facing,
-          width: FIREBALL_SIZE,
-          height: FIREBALL_SIZE,
+          width: FIREBALL_WIDTH,
+          height: FIREBALL_HEIGHT,
           alive: true,
         });
         playFireballSound();
@@ -1375,11 +1379,16 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
         for (const enemy of level.enemies) {
           if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, enemy.type ?? world.enemyType, now);
+          if (enemy.alive) drawPathogenLabel(ctx, enemy.x, enemy.y, enemy.width, enemy.name);
         }
         for (const flyer of level.flyers) {
           if (flyer.alive || flyer.deadAt) drawEnemy(ctx, flyer, 'flyer', now);
+          if (flyer.alive) drawPathogenLabel(ctx, flyer.x, flyer.y, flyer.width, flyer.name);
         }
-        if (level.boss) drawBoss(ctx, level.boss);
+        if (level.boss) {
+          drawBoss(ctx, level.boss);
+          if (level.boss.alive) drawPathogenLabel(ctx, level.boss.x, level.boss.y - 22, level.boss.width, level.boss.name);
+        }
         if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
         for (const patch of level.spikes) drawSpikes(ctx, patch);
         if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);

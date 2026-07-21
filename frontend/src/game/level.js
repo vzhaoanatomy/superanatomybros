@@ -8,6 +8,52 @@ export const GROUND_HEIGHT = 80;
 // step can become) so step-to-step headroom is untouched.
 const PLATFORM_HEIGHT = 32;
 
+// Real pathogen names for the floating labels drawn above each virus/
+// bacteria enemy (see drawPathogenLabel in spriteRenderer.js) — ambient
+// vocabulary exposure beyond whatever's in the deck itself. Genus
+// abbreviated after the first letter, the standard scientific-writing
+// convention, both for authenticity and to keep the label short at this
+// sprite scale. BOSS_NAMES are real multi-drug-resistant organisms,
+// fitting the boss's "superbug" design.
+const BACTERIA_NAMES = [
+  'E. coli',
+  'S. aureus',
+  'C. difficile',
+  'S. pneumoniae',
+  'S. pyogenes',
+  'M. tuberculosis',
+  'H. pylori',
+  'N. meningitidis',
+  'Salmonella',
+  'L. pneumophila',
+];
+const VIRUS_NAMES = [
+  'Influenza',
+  'Rhinovirus',
+  'Hepatitis A',
+  'Hepatitis B',
+  'Norovirus',
+  'Adenovirus',
+  'Herpes simplex',
+  'Varicella-zoster',
+  'Rotavirus',
+  'HPV',
+];
+const BOSS_NAMES = ['MRSA', 'VRE', 'CRE'];
+const PATHOGEN_VARIANT_COUNT = 4;
+
+// Rolls a consistent {type, name, variant} triple for one virus/bacteria
+// enemy — shared by every spawn site below (ground, platform, flyer) so
+// the "pick a type, then a name from the matching pool, then a shape
+// variant" logic lives in exactly one place.
+function rollPathogen(rng) {
+  const type = rng() < 0.5 ? 'virus' : 'bacteria';
+  const pool = type === 'virus' ? VIRUS_NAMES : BACTERIA_NAMES;
+  const name = pool[Math.floor(rng() * pool.length)];
+  const variant = Math.floor(rng() * PATHOGEN_VARIANT_COUNT);
+  return { type, name, variant };
+}
+
 function hashSeed(str) {
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++) {
@@ -442,11 +488,11 @@ export function buildLevel({ world, durationMinutes, seed }) {
   // could begin just a few dozen pixels from spawn with no time to react.
   // 340px is roughly one second of run-speed room (5.6px/frame * 60fps).
   const SPAWN_SAFE_X = 340;
-  // A fraction of ground/platform enemies roll as a bacteria instead of the
-  // world's own themed creature — adds variety without replacing any
-  // world's identity (see drawBacteria in spriteRenderer.js; falls back to
-  // world.enemyType at render time when this is left undefined).
-  const BACTERIA_CHANCE = 0.25;
+  // Every ground/platform enemy is a pathogen now — virus or bacteria,
+  // each with several distinct shape/color variants (see drawVirus/
+  // drawBacteria in spriteRenderer.js) — rather than each world's own
+  // themed creature, which all read as interchangeable "goomba-style
+  // blobs" regardless of nominal type.
   const enemies = [];
   for (let i = 0; i < enemyCount; i++) {
     const [sx1, sx2] = solidSegments[i % solidSegments.length];
@@ -475,7 +521,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
       alive: true,
       pending: false,
       termId: null,
-      type: rng() < BACTERIA_CHANCE ? 'bacteria' : undefined,
+      ...rollPathogen(rng),
     });
   }
 
@@ -509,7 +555,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
       alive: true,
       pending: false,
       termId: null,
-      type: rng() < BACTERIA_CHANCE ? 'bacteria' : undefined,
+      ...rollPathogen(rng),
     });
     platformEnemyIndex += 1;
   }
@@ -546,6 +592,8 @@ export function buildLevel({ world, durationMinutes, seed }) {
       bobSpeed: 0.0016 + rng() * 0.0012,
       bobPhase: rng() * Math.PI * 2,
       alive: true,
+      variant: Math.floor(rng() * PATHOGEN_VARIANT_COUNT),
+      name: VIRUS_NAMES[Math.floor(rng() * VIRUS_NAMES.length)],
     });
   }
 
@@ -625,6 +673,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
     maxHp: 3,
     alive: true,
     pending: false,
+    name: BOSS_NAMES[Math.floor(rng() * BOSS_NAMES.length)],
   };
 
   // Spikes: stationary ground hazards earlier in the level (the piranha
