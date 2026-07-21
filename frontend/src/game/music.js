@@ -26,7 +26,14 @@ function transposeOctave(name, delta) {
 }
 
 let audioCtx = null;
-let playing = false;
+// Background music defaults ON — it previously defaulted off and only ever
+// started from an explicit toggle click, which meant most playthroughs had
+// no ambient track running at all. That silently broke two things that
+// looked like separate bugs: the bonus-room jingle being ducked "under"
+// nothing, and the main track never being there to audibly resume once the
+// player came back up a pipe. See unlockAudio() below for where it actually
+// starts (autoplay policy requires a real user gesture).
+let playing = true;
 
 function ensureContext() {
   if (!audioCtx) {
@@ -36,12 +43,16 @@ function ensureContext() {
   return audioCtx;
 }
 
-// Resumes the (lazily-created) AudioContext from inside a real user-gesture
-// handler — App.jsx's first-tap listener calls this once so audio doesn't
-// silently fail the first time a sound tries to play on mobile Safari/Chrome.
+// Resumes the (lazily-created) AudioContext AND kicks off background music
+// (if still on, i.e. the player hasn't toggled it off before this fires)
+// from inside a real user-gesture handler — App.jsx's first-tap listener
+// calls this once, which is the trusted event mobile browsers require to
+// allow any audio, <audio> element playback included, not just the
+// Web Audio oscillator SFX.
 export function unlockAudio() {
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
+  if (playing) startPlayback();
 }
 
 function playTone(ctx, freq, startTime, duration, type, peakGain) {

@@ -142,6 +142,33 @@ function buildGroundSegments(rng, width, difficulty) {
   return segments;
 }
 
+// Guarantees solid ground spans [x1, x2] — used to pin the checkpoint door
+// (and its respawn point) to real ground regardless of where the gap
+// generator above happened to put a pit. Without this, the door's fixed
+// width/2 position could land squarely over a gap purely by chance, and
+// dying anywhere after it would respawn the player into that same pit
+// (loseLife/lastCheckpoint in GameCanvas.jsx just drop the player at the
+// door's x — there's no ground check on the respawn side, so the ground
+// itself has to be the guarantee). Merges any segment already touching the
+// target range rather than blindly inserting, so it doesn't create a
+// separate sliver right next to real ground.
+function ensureSolidGround(segments, x1, x2) {
+  let start = x1;
+  let end = x2;
+  const kept = [];
+  for (const [s1, s2] of segments) {
+    if (s2 >= start && s1 <= end) {
+      start = Math.min(start, s1);
+      end = Math.max(end, s2);
+    } else {
+      kept.push([s1, s2]);
+    }
+  }
+  kept.push([start, end]);
+  kept.sort((a, b) => a[0] - b[0]);
+  return kept;
+}
+
 // Builds a full level for a world at a given teacher-set duration. Difficulty
 // (gap size/frequency, enemy count/speed, platform count) scales with the
 // world's index (1-7) so later worlds are visibly harder, and level size
@@ -174,7 +201,17 @@ export function buildLevel({ world, durationMinutes }) {
   const baseDurationSeconds = DURATION_SECONDS[durationMinutes] ?? DURATION_SECONDS[3];
   const durationSeconds = Math.max(baseDurationSeconds, Math.ceil(width / 40));
 
-  const groundSegments = buildGroundSegments(rng, width, difficulty);
+  // Computed early (pure function of `width`, no rng) so the checkpoint's
+  // ground can be patched solid before any platform/hazard placement below
+  // reads groundSegments — see ensureSolidGround above.
+  const DOOR_WIDTH = 24;
+  const doorX = width / 2 - DOOR_WIDTH / 2;
+  const CHECKPOINT_GROUND_MARGIN = 150;
+  const groundSegments = ensureSolidGround(
+    buildGroundSegments(rng, width, difficulty),
+    doorX - CHECKPOINT_GROUND_MARGIN,
+    doorX + DOOR_WIDTH + CHECKPOINT_GROUND_MARGIN
+  );
   const platforms = groundSegments.map(([x1, x2]) => ({
     x: x1,
     y: GROUND_Y,
@@ -501,11 +538,10 @@ export function buildLevel({ world, durationMinutes }) {
     });
   }
 
+  // DOOR_WIDTH/doorX are computed earlier now (see groundSegments above) so
+  // the checkpoint's ground can be patched solid before other placement
+  // reads it — DOOR_HEIGHT has no such dependency, so it stays here.
   const DOOR_HEIGHT = 320;
-  const DOOR_WIDTH = 24;
-  // Exact middle of the track — a real halfway checkpoint, not just some
-  // fraction of the way in.
-  const doorX = width / 2 - DOOR_WIDTH / 2;
   const door = {
     x: doorX,
     y: GROUND_Y - DOOR_HEIGHT,
