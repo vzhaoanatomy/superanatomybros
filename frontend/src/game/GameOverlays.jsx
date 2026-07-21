@@ -1,3 +1,4 @@
+import LevelIntro from '../overlays/LevelIntro';
 import CoinQuiz from '../overlays/CoinQuiz';
 import EnemyEncounter from '../overlays/EnemyEncounter';
 import DoorQuiz from '../overlays/DoorQuiz';
@@ -14,6 +15,7 @@ import LevelComplete from '../overlays/LevelComplete';
 export default function GameOverlays({ overlay, h, onQuit, world, character }) {
   return (
     <>
+      {overlay?.type === 'intro' && <LevelIntro world={world} character={character} onStart={h.closeIntro} />}
       {overlay?.type === 'coin' && <CoinQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}
       {overlay?.type === 'enemy' && <EnemyEncounter question={overlay.question} onAnswer={h.resolveQuiz} />}
       {overlay?.type === 'door' && <DoorQuiz question={overlay.question} onAnswer={h.resolveQuiz} />}

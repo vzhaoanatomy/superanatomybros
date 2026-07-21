@@ -614,6 +614,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     handlersRef.current.hasMissed = () => state.missedTermIds.size > 0;
     handlersRef.current.toggleGlossary = toggleGlossary;
     handlersRef.current.getVocab = () => vocab;
+    handlersRef.current.closeIntro = () => {
+      resume();
+      setOverlay(null);
+    };
 
     function handleKeyDown(e) {
       if (JUMP_KEYS.has(e.code) || LEFT_KEYS.has(e.code) || RIGHT_KEYS.has(e.code) || DOWN_KEYS.has(e.code)) {
@@ -1475,6 +1479,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       setViewportSize(size);
     }
     window.addEventListener('resize', handleResize);
+
+    // Show the mission-briefing overlay on a fresh level start — never on a
+    // crash-recovery resume, since a returning player already got it and
+    // just wants to keep playing where they left off.
+    if (!savedProgress) {
+      pause();
+      setOverlay({ type: 'intro' });
+    }
 
     let rafId;
     function loop() {
