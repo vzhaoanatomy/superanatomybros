@@ -26,14 +26,15 @@ function transposeOctave(name, delta) {
 }
 
 let audioCtx = null;
-// Background music defaults ON — it previously defaulted off and only ever
-// started from an explicit toggle click, which meant most playthroughs had
-// no ambient track running at all. That silently broke two things that
-// looked like separate bugs: the bonus-room jingle being ducked "under"
-// nothing, and the main track never being there to audibly resume once the
-// player came back up a pipe. See unlockAudio() below for where it actually
-// starts (autoplay policy requires a real user gesture).
-let playing = true;
+// Background music defaults off — it only ever starts from an explicit
+// toggle click. (Briefly tried defaulting this on so the main track would
+// always be there to resume after a pipe visit, but autoplaying audio by
+// default is its own bug: any tab left open anywhere — including a
+// forgotten dev/test tab — starts playing music nobody asked for. The
+// duck/unduck logic in enterBonusRoom/exitBonusRoom below was already
+// correct; with the toggle off there's simply nothing to resume, which is
+// the right behavior.)
+let playing = false;
 
 function ensureContext() {
   if (!audioCtx) {
@@ -43,16 +44,12 @@ function ensureContext() {
   return audioCtx;
 }
 
-// Resumes the (lazily-created) AudioContext AND kicks off background music
-// (if still on, i.e. the player hasn't toggled it off before this fires)
-// from inside a real user-gesture handler — App.jsx's first-tap listener
-// calls this once, which is the trusted event mobile browsers require to
-// allow any audio, <audio> element playback included, not just the
-// Web Audio oscillator SFX.
+// Resumes the (lazily-created) AudioContext from inside a real user-gesture
+// handler — App.jsx's first-tap listener calls this once so audio doesn't
+// silently fail the first time a sound tries to play on mobile Safari/Chrome.
 export function unlockAudio() {
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
-  if (playing) startPlayback();
 }
 
 function playTone(ctx, freq, startTime, duration, type, peakGain) {
