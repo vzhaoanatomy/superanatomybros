@@ -282,6 +282,38 @@ export function buildLevel({ world, durationMinutes }) {
     }
   }
 
+  // Crumbling platforms: a single-jump-height detour that gives way a beat
+  // after the player lands on it (see GameCanvas.jsx's crumble-trigger
+  // check). Always floats over solid ground it can safely dump the player
+  // back onto — reusing the same slot/groundSegments-overlap technique as
+  // the tower base above — so a mistimed crossing costs nothing worse than
+  // a missed coin, never a softlock.
+  const CRUMBLE_COUNT = 1 + Math.floor(difficulty / 3);
+  const crumbleCoinSpots = [];
+  for (let c = 0; c < CRUMBLE_COUNT; c++) {
+    const zoneWidth = width / (CRUMBLE_COUNT + 1);
+    const zoneCenter = zoneWidth * (c + 1) + rng() * 160 - 80;
+    const crumbleWidth = 70;
+    const solidRanges = groundSegments
+      .map(([gx1, gx2]) => [Math.max(gx1, zoneCenter - 200), Math.min(gx2, zoneCenter + 200)])
+      .filter(([lo, hi]) => hi - lo > crumbleWidth + 20);
+    if (!solidRanges.length) continue;
+    const [lo, hi] = solidRanges[Math.floor(rng() * solidRanges.length)];
+    const crumbleX = lo + rng() * Math.max(0, hi - lo - crumbleWidth);
+    const crumbleY = GROUND_Y - (120 + rng() * 40);
+    platforms.push({
+      x: crumbleX,
+      y: crumbleY,
+      width: crumbleWidth,
+      height: PLATFORM_HEIGHT,
+      type: 'crumble',
+      triggered: false,
+      triggerAt: null,
+      gone: false,
+    });
+    crumbleCoinSpots.push({ x: crumbleX + crumbleWidth / 2 - 10, y: crumbleY - 40 });
+  }
+
   // The tower loop and the staircase loop above each keep their own steps
   // spaced apart, but neither knows about the other (or about a neighboring
   // tower's slot) — two platforms from different generation branches can
@@ -294,7 +326,7 @@ export function buildLevel({ world, durationMinutes }) {
   const MIN_TOWER_CLEARANCE = 70;
   for (let pass = 0; pass < 6; pass++) {
     let changed = false;
-    const blocks = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile');
+    const blocks = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile' || p.type === 'crumble');
     for (const upper of blocks) {
       for (const lower of blocks) {
         if (upper === lower || upper.y >= lower.y) continue;
@@ -320,7 +352,7 @@ export function buildLevel({ world, durationMinutes }) {
   // for clearCoinOfPlatforms below, same as any other block, even though
   // they're excluded from blockPlatforms (too narrow at 40px for the
   // width>=90 patrol/power-up eligibility filter that reads from it).
-  const allBlockPlatforms = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile');
+  const allBlockPlatforms = platforms.filter((p) => p.type === 'block' || p.type === 'mysteryBox' || p.type === 'tile' || p.type === 'crumble');
   const blockPlatforms = allBlockPlatforms.filter((p) => p.width >= 90);
 
   // Coins are spaced out for runner-style pacing (not a quiz every second) —
@@ -337,6 +369,7 @@ export function buildLevel({ world, durationMinutes }) {
     coinSpots.push({ x: cx, y: cy });
   }
   coinSpots.push(...bonusCoinSpots.map((c) => ({ x: c.x, y: clearCoinOfPlatforms(c.x, c.y, allBlockPlatforms) })));
+  coinSpots.push(...crumbleCoinSpots.map((c) => ({ x: c.x, y: clearCoinOfPlatforms(c.x, c.y, allBlockPlatforms) })));
 
   const coins = coinSpots.map(({ x, y }, i) => ({
     id: `coin-${i}`,
@@ -423,6 +456,41 @@ export function buildLevel({ world, durationMinutes }) {
     platformEnemyIndex += 1;
   }
 
+  // Flyers: hover free of any platform, patrolling horizontally while
+  // bobbing on a sine wave (see GameCanvas.jsx's flyer update loop) — the
+  // only enemy reachable purely from a well-timed jump rather than a walk-
+  // up. Spread across evenly-sized zones like the tower slots above so
+  // they don't cluster.
+  const FLYER_COUNT = Math.max(1, Math.round(1 + difficulty * 0.4));
+  const flyers = [];
+  for (let i = 0; i < FLYER_COUNT; i++) {
+    const zoneWidth = width / (FLYER_COUNT + 1);
+    const zoneCenter = zoneWidth * (i + 1) + rng() * 200 - 100;
+    const rangeW = 160 + rng() * 100;
+    const minX = Math.max(300, zoneCenter - rangeW / 2);
+    const maxX = Math.min(width - 300, zoneCenter + rangeW / 2);
+    if (maxX - minX < 80) continue;
+    const flyerWidth = 38;
+    const flyerHeight = 30;
+    flyers.push({
+      id: `flyer-${i}`,
+      x: minX + rng() * Math.max(1, maxX - minX - flyerWidth),
+      baseY: 160 + rng() * 140,
+      y: 0,
+      minX,
+      maxX,
+      width: flyerWidth,
+      height: flyerHeight,
+      vx: (rng() < 0.5 ? -1 : 1) * (1.6 + rng() * 0.8),
+      bobAmplitude: 18 + rng() * 14,
+      bobSpeed: 0.0016 + rng() * 0.0012,
+      bobPhase: rng() * Math.PI * 2,
+      alive: true,
+      pending: false,
+      termId: null,
+    });
+  }
+
   const DOOR_HEIGHT = 320;
   const DOOR_WIDTH = 24;
   // Exact middle of the track — a real halfway checkpoint, not just some
@@ -502,6 +570,22 @@ export function buildLevel({ world, durationMinutes }) {
     pending: false,
   };
 
+  // Spikes: a stationary ground hazard earlier in the level (the piranha
+  // plant already owns the end-game slot) — no HP, can't be defeated,
+  // jump over it or eat it. Placed on a wide-enough solid stretch clear of
+  // spawn and the checkpoint door so it never reads as an unfair ambush.
+  const SPIKE_HEIGHT = 26;
+  const SPIKE_WIDTH = 56;
+  const spikeCandidates = solidSegments.filter(
+    ([sx1, sx2]) => sx2 - sx1 > 220 && sx1 > 500 && sx2 < width * 0.55 && (sx1 < doorX - 200 || sx1 > doorX + 200)
+  );
+  let spikes = null;
+  if (spikeCandidates.length) {
+    const [spx1, spx2] = spikeCandidates[Math.floor(rng() * spikeCandidates.length)];
+    const spikeX = Math.max(spx1 + 20, Math.min(spx2 - SPIKE_WIDTH - 20, spx1 + (spx2 - spx1) / 2 - SPIKE_WIDTH / 2));
+    spikes = { x: spikeX, y: GROUND_Y - SPIKE_HEIGHT, width: SPIKE_WIDTH, height: SPIKE_HEIGHT };
+  }
+
   // Piranha plant: a stationary hazard near the end of the level (before
   // the boss/flag, not blocking the path — it's a threat you have to
   // navigate around or burn a fireball on, not a gate). Only fire defeats
@@ -559,6 +643,8 @@ export function buildLevel({ world, durationMinutes }) {
     flag,
     piranha,
     koopa,
+    spikes,
+    flyers,
   };
 }
 

@@ -235,23 +235,37 @@ export function playPowerUpPopSound() {
 
 // A fast, driving 8-bit loop for the pipe bonus room — deliberately more
 // urgent/upbeat than the calm main-level track, since the room is a timed
-// dash. Entirely pre-scheduled for the room's fixed duration on the audio
-// clock (same trick as playStarPowerSound below), so it can't be cut short
-// by rAF/setTimeout throttling in a backgrounded tab, and needs no manual
-// stop call — it just runs out exactly when the room's own timer does.
-export function playBonusRoomMusic(durationMs) {
+// dash. Ticks one step at a time on a real setInterval (not pre-scheduled
+// on the audio clock) so start/stop are explicit and immediate — the same
+// call pattern as the one-shot SFX below, which are already known to work
+// reliably, rather than the large up-front batch playStarPowerSound uses.
+let bonusMusicInterval = null;
+let bonusMusicStep = 0;
+const BONUS_MUSIC_STEP_MS = 150;
+const BONUS_MUSIC_BASS = ['C3', 'C3', 'G3', 'C3', 'C3', 'C3', 'A3', 'G3'];
+const BONUS_MUSIC_LEAD = ['C5', 'E5', 'G5', 'E5', 'C5', 'D5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5'];
+
+function playBonusMusicStep() {
   if (!playing) return;
   const ctx = ensureContext();
   if (ctx.state === 'suspended') ctx.resume();
-  const t0 = ctx.currentTime;
-  const stepDur = 0.15;
-  const totalSteps = Math.ceil(durationMs / 1000 / stepDur);
-  const bassPattern = ['C3', 'C3', 'G3', 'C3', 'C3', 'C3', 'A3', 'G3'];
-  const leadPattern = ['C5', 'E5', 'G5', 'E5', 'C5', 'D5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5'];
-  for (let i = 0; i < totalSteps; i++) {
-    const start = t0 + i * stepDur;
-    playTone(ctx, noteFreq(bassPattern[i % bassPattern.length]), start, stepDur * 0.85, 'square', 0.13);
-    playTone(ctx, noteFreq(leadPattern[i % leadPattern.length]), start, stepDur * 0.5, 'triangle', 0.1);
+  const t = ctx.currentTime;
+  playTone(ctx, noteFreq(BONUS_MUSIC_BASS[bonusMusicStep % BONUS_MUSIC_BASS.length]), t, 0.13, 'square', 0.22);
+  playTone(ctx, noteFreq(BONUS_MUSIC_LEAD[bonusMusicStep % BONUS_MUSIC_LEAD.length]), t, 0.09, 'triangle', 0.18);
+  bonusMusicStep += 1;
+}
+
+export function startBonusRoomMusic() {
+  stopBonusRoomMusic();
+  bonusMusicStep = 0;
+  playBonusMusicStep();
+  bonusMusicInterval = setInterval(playBonusMusicStep, BONUS_MUSIC_STEP_MS);
+}
+
+export function stopBonusRoomMusic() {
+  if (bonusMusicInterval) {
+    clearInterval(bonusMusicInterval);
+    bonusMusicInterval = null;
   }
 }
 

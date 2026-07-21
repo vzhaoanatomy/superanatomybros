@@ -25,6 +25,7 @@ import {
   drawDinoMount,
   drawFireball,
   drawPiranhaPlant,
+  drawSpikes,
   drawKoopa,
   drawShell,
   drawTongueFlick,
@@ -59,7 +60,8 @@ import {
   playLevelCompleteDings,
   playMysteryBoxDing,
   playPowerUpPopSound,
-  playBonusRoomMusic,
+  startBonusRoomMusic,
+  stopBonusRoomMusic,
   duckBackgroundMusic,
   unduckBackgroundMusic,
   setCustomTrack,
@@ -116,9 +118,16 @@ const PIPE_QUESTIONS = 2;
 const BONUS_ROOM_SECONDS = 10;
 const BONUS_COIN_VALUE = 10;
 // How far the player visibly sinks into (or rises out of) the pipe during
-// the entry/exit cutscene — see beginPipeEntry/exitBonusRoom.
-const PIPE_TRANSITION_MS = 350;
-const PIPE_SINK_DEPTH = 46;
+// the entry/exit cutscene — see beginPipeEntry/exitBonusRoom. Sink depth is
+// deliberately more than PLAYER_HEIGHT so they're fully hidden behind the
+// pipe (see the clip in draw()) by the end of the animation, not just
+// partway down — otherwise the player never actually disappears.
+const PIPE_TRANSITION_MS = 500;
+const PIPE_SINK_DEPTH = 62;
+// How long a crumbling platform holds after the player lands on it before
+// it gives way — long enough to grab the coin above it and step off, short
+// enough to feel like a real hazard rather than an ordinary platform.
+const CRUMBLE_DELAY_MS = 550;
 const FIREBALL_SPEED = 10;
 const FIREBALL_COOLDOWN_MS = 350;
 const FIREBALL_MAX_TRAVEL = 650;
@@ -538,6 +547,44 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
     }
 
+    // Shared "player touched a live, non-pending quiz-gated enemy" response
+    // — used by both the ground-enemy loop and the flyer loop (see
+    // updatePhysics), so a stomp/quiz/star kill behaves identically
+    // whether the enemy patrols the ground or bobs through the air.
+    function resolveEnemyTouch(enemy) {
+      if (enemy.pending || !aabbOverlap(player, enemy)) return;
+      const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
+      if (player.pounding || bigStomping || performance.now() < player.starUntil) {
+        enemy.alive = false;
+        enemy.deadAt = performance.now();
+        state.score += INSTANT_KILL_SCORE;
+        playStompSound();
+        popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+        shake(juice, 5);
+        hitPause(juice, 60);
+        burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ffd23f', 8);
+      } else if (performance.now() >= player.invulnerableUntil) {
+        enemy.pending = true;
+        const question = buildQuestion(vocab, enemy.termId);
+        openQuiz('enemy', question, (isCorrect) => {
+          enemy.pending = false;
+          if (isCorrect) {
+            enemy.alive = false;
+            enemy.deadAt = performance.now();
+            state.score += 50;
+            playStompSound();
+            popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
+            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 10);
+            recordCorrect(enemy.termId);
+          } else {
+            recordWrong(enemy.termId);
+            loseLife();
+            popup(player.x + player.width / 2, player.y, '-1 Life', '#ff6b6b');
+          }
+        });
+      }
+    }
+
     // Shared "put the player into this form" logic — ground-collected
     // power-ups and mystery-box rewards both funnel through this, so the
     // two sources can never drift out of sync with each other.
@@ -677,7 +724,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           } else {
             pipe.used = true;
             pipe.pending = false;
-            beginPipeEntry(pipe.roomVariant);
+            beginPipeEntry(pipe.roomVariant, pipe.y);
           }
         } else {
           recordWrong(termId);
@@ -705,7 +752,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     // instant teleport. Runs through the normal physics loop (not paused),
     // it just locks out input for its short duration (see the early-return
     // in updatePhysics).
-    function beginPipeEntry(roomVariant) {
+    function beginPipeEntry(roomVariant, pipeTopY) {
       const returnSpot = { x: player.x, y: player.y };
       player.vx = 0;
       player.vy = 0;
@@ -713,6 +760,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         phase: 'down',
         startedAt: performance.now(),
         startY: player.y,
+        pipeTopY,
         onComplete: () => enterBonusRoom(returnSpot, roomVariant),
       };
     }
@@ -730,11 +778,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.onGround = false;
       playSuccessFanfare();
       // The room's own fast, rhythmic track takes over from the calm main
-      // background music for exactly the room's duration (see
-      // playBonusRoomMusic) — ducked, not stopped, so the main track picks
-      // back up right where it left off on exit.
+      // background music for exactly as long as the room is active — ducked,
+      // not stopped, so the main track picks back up right where it left
+      // off on exit (see exitBonusRoom).
       duckBackgroundMusic();
-      playBonusRoomMusic(BONUS_ROOM_SECONDS * 1000);
+      startBonusRoomMusic();
     }
 
     function exitBonusRoom() {
@@ -745,11 +793,18 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.vx = 0;
       player.vy = 0;
       player.invulnerableUntil = performance.now() + INVULN_MS;
+      stopBonusRoomMusic();
       unduckBackgroundMusic();
       if (room.collected > 0) {
         popup(player.x + player.width / 2, room.returnSpot.y - 10, `🪙 x${room.collected}`, '#ffd23f');
       }
-      state.pipeTransition = { phase: 'up', startedAt: performance.now(), startY: player.y, onComplete: () => {} };
+      state.pipeTransition = {
+        phase: 'up',
+        startedAt: performance.now(),
+        startY: player.y,
+        pipeTopY: room.returnSpot.y + player.height,
+        onComplete: () => {},
+      };
     }
 
     // Drives the sink/rise cutscene — player.y is the only thing that
@@ -957,7 +1012,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       const doorSolid = !level.door.passed ? [level.door] : [];
       const bossSolid = level.boss && level.boss.alive ? [level.boss] : [];
-      const solids = [...level.platforms, ...doorSolid, ...bossSolid];
+      const standingPlatforms = level.platforms.filter((p) => p.type !== 'crumble' || !p.gone);
+      const solids = [...standingPlatforms, ...doorSolid, ...bossSolid];
 
       player.x += player.vx;
       player.x = Math.max(0, Math.min(player.x, level.width - player.width));
@@ -1003,6 +1059,27 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       resolveVertical(player, solids);
 
+      // Crumbling platforms: start the countdown the instant the player's
+      // feet land on one, then drop it from solids (see `standingPlatforms`
+      // above) once CRUMBLE_DELAY_MS elapses — a beat of warning (rendered
+      // as a shake, see drawCrumblePlatform) before it gives way.
+      if (player.onGround) {
+        for (const p of level.platforms) {
+          if (p.type !== 'crumble' || p.gone || p.triggered) continue;
+          const onTop = Math.abs(player.y + player.height - p.y) < 2;
+          const withinX = player.x + player.width > p.x && player.x < p.x + p.width;
+          if (onTop && withinX) {
+            p.triggered = true;
+            p.triggerAt = performance.now();
+          }
+        }
+      }
+      for (const p of level.platforms) {
+        if (p.type === 'crumble' && p.triggered && !p.gone && performance.now() - p.triggerAt > CRUMBLE_DELAY_MS) {
+          p.gone = true;
+        }
+      }
+
       if (player.pounding && player.onGround) {
         player.pounding = false;
         groundPoundImpact();
@@ -1020,43 +1097,24 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             enemy.vx *= -1;
             enemy.x = Math.max(enemy.minX, Math.min(enemy.x, enemy.maxX - enemy.width));
           }
+          resolveEnemyTouch(enemy);
+        }
+      }
 
-          if (enemy.pending || !aabbOverlap(player, enemy)) continue;
-
-          // Big (mushroom) adds a stomp-from-above instant kill, same as
-          // pound/star — touching it from the side while big still opens
-          // the quiz (loseLife's shield order pops "big" first on a wrong
-          // answer, same as any other hit).
-          const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
-          if (player.pounding || bigStomping || performance.now() < player.starUntil) {
-            enemy.alive = false;
-            enemy.deadAt = performance.now();
-            state.score += INSTANT_KILL_SCORE;
-            playStompSound();
-            popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
-            shake(juice, 5);
-            hitPause(juice, 60);
-            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ffd23f', 8);
-          } else if (performance.now() >= player.invulnerableUntil) {
-            enemy.pending = true;
-            const question = buildQuestion(vocab, enemy.termId);
-            openQuiz('enemy', question, (isCorrect) => {
-              enemy.pending = false;
-              if (isCorrect) {
-                enemy.alive = false;
-                enemy.deadAt = performance.now();
-                state.score += 50;
-                playStompSound();
-                popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
-                burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 10);
-                recordCorrect(enemy.termId);
-              } else {
-                recordWrong(enemy.termId);
-                loseLife();
-                popup(player.x + player.width / 2, player.y, '-1 Life', '#ff6b6b');
-              }
-            });
+      // Flyers patrol left-right like ground enemies but also bob up and
+      // down on a sine wave, floating free of any platform — the same
+      // stomp/quiz/star response as any other enemy (resolveEnemyTouch),
+      // just reachable from a jump instead of a walk.
+      if (!pausedRef.current) {
+        for (const flyer of level.flyers) {
+          if (!flyer.alive) continue;
+          flyer.x += flyer.vx;
+          if (flyer.x < flyer.minX || flyer.x + flyer.width > flyer.maxX) {
+            flyer.vx *= -1;
+            flyer.x = Math.max(flyer.minX, Math.min(flyer.x, flyer.maxX - flyer.width));
           }
+          flyer.y = flyer.baseY + Math.sin(performance.now() * flyer.bobSpeed + flyer.bobPhase) * flyer.bobAmplitude;
+          resolveEnemyTouch(flyer);
         }
       }
 
@@ -1079,6 +1137,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               popup(enemy.x + enemy.width / 2, enemy.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
               burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ff8a5c', 8);
               break;
+            }
+          }
+          if (fireball.alive) {
+            for (const flyer of level.flyers) {
+              if (!flyer.alive || flyer.pending) continue;
+              if (aabbOverlap(fireball, flyer)) {
+                flyer.alive = false;
+                flyer.deadAt = performance.now();
+                fireball.alive = false;
+                state.score += INSTANT_KILL_SCORE;
+                playStompSound();
+                popup(flyer.x + flyer.width / 2, flyer.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+                burst(juice, flyer.x + flyer.width / 2, flyer.y + flyer.height / 2, '#ff8a5c', 8);
+                break;
+              }
             }
           }
           if (fireball.alive) fireballHitsHazard(fireball, level, state);
@@ -1173,8 +1246,12 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         for (const enemy of level.enemies) {
           if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, world.enemyType, now);
         }
+        for (const flyer of level.flyers) {
+          if (flyer.alive || flyer.deadAt) drawEnemy(ctx, flyer, 'flyer', now);
+        }
         if (level.boss) drawBoss(ctx, level.boss);
         if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
+        if (level.spikes) drawSpikes(ctx, level.spikes);
         if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
         drawDoor(ctx, level.door);
         drawFlag(ctx, level.flag);
@@ -1189,9 +1266,23 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       const flashing = now < player.invulnerableUntil && Math.floor(now / 100) % 2 === 0;
       const invincible = now < player.starUntil;
+      // Mid pipe-transition, clip the player (and mount/tongue) to
+      // everything above the pipe's opening — as player.y crosses that
+      // line, they visibly disappear feet-first sinking in, or reappear
+      // rising out, instead of just standing lower/higher.
+      const pipeClipY = state.pipeTransition ? state.pipeTransition.pipeTopY : null;
+      if (pipeClipY != null) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-100000, -100000, 200000, pipeClipY + 100000);
+        ctx.clip();
+      }
       if (player.mounted && !inBonusRoom) drawDinoMount(ctx, player);
       drawPlayer(ctx, player, characterId, { flashing, invincible, big: player.big });
       if (player.mounted && !inBonusRoom) drawTongueFlick(ctx, player);
+      if (pipeClipY != null) {
+        ctx.restore();
+      }
 
       for (const p of state.scorePopups) drawScorePopup(ctx, p, now);
       if (state.scorePopups.length) {

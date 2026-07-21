@@ -31,6 +31,7 @@ export function createTermQueue(vocab) {
     refill();
     for (const coin of level.coins) coin.termId = next();
     for (const enemy of level.enemies) enemy.termId = next();
+    for (const flyer of level.flyers) flyer.termId = next();
     level.door.termId = next();
   }
 

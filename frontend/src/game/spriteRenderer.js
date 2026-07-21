@@ -217,12 +217,21 @@ function drawMysteryBox(ctx, box) {
   ctx.fillRect(x + width - 6, drawY + height - 6, rivet, rivet);
 
   // The "?" fills almost the whole box now instead of reading as a small
-  // label inside it — the box's whole job is "notice me."
+  // label inside it — the box's whole job is "notice me." textBaseline
+  // 'middle' centers on the font's em-box, not the glyph's actual ink —
+  // at this size that reads visibly high (the "?" curl outweighs its
+  // dot). Centering on the glyph's own measured bounding box instead
+  // keeps it dead-center in the box regardless of font quirks.
   ctx.fillStyle = '#1a1200';
-  ctx.font = `bold ${Math.round(height * 0.9)}px ui-monospace, Consolas, monospace`;
+  ctx.font = `bold ${Math.round(height * 0.82)}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('?', x + width / 2, drawY + height / 2 + 1);
+  ctx.textBaseline = 'alphabetic';
+  const centerX = x + width / 2;
+  const centerY = drawY + height / 2;
+  const metrics = ctx.measureText('?');
+  const ascent = metrics.actualBoundingBoxAscent ?? height * 0.32;
+  const descent = metrics.actualBoundingBoxDescent ?? height * 0.05;
+  ctx.fillText('?', centerX, centerY + (ascent - descent) / 2);
   ctx.restore();
 }
 
@@ -305,6 +314,36 @@ function drawFunctionalPipe(ctx, pipe) {
   }
 }
 
+// Same beveled brick face as drawBlock, but once triggered it shakes harder
+// the closer it gets to giving way and cracks with dark fissure lines —
+// visible warning before it drops out of solids (see GameCanvas.jsx's
+// CRUMBLE_DELAY_MS). Renders nothing at all once gone.
+const CRUMBLE_DELAY_MS = 550;
+function drawCrumblePlatform(ctx, platform, palette) {
+  if (platform.gone) return;
+  const { x, y, width, height, triggered, triggerAt } = platform;
+  const t = triggered ? Math.min(1, (performance.now() - triggerAt) / CRUMBLE_DELAY_MS) : 0;
+  const shake = triggered ? (1 - Math.cos(performance.now() / 30)) * 2 * t : 0;
+  const dx = triggered ? shake * (Math.random() - 0.5) : 0;
+
+  ctx.save();
+  ctx.translate(dx, 0);
+  drawBlock(ctx, { x, y, width, height }, palette);
+  if (triggered) {
+    ctx.strokeStyle = `rgba(20,10,0,${0.4 + t * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + width * 0.2, y);
+    ctx.lineTo(x + width * 0.45, y + height * 0.55);
+    ctx.lineTo(x + width * 0.35, y + height);
+    ctx.moveTo(x + width * 0.7, y);
+    ctx.lineTo(x + width * 0.55, y + height * 0.5);
+    ctx.lineTo(x + width * 0.75, y + height);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawPlatform(ctx, platform, palette) {
   if (platform.type === 'ground') {
     drawGroundStrip(ctx, platform, palette);
@@ -314,6 +353,8 @@ export function drawPlatform(ctx, platform, palette) {
     drawBlockTile(ctx, platform, palette);
   } else if (platform.type === 'pipe') {
     drawFunctionalPipe(ctx, platform);
+  } else if (platform.type === 'crumble') {
+    drawCrumblePlatform(ctx, platform, palette);
   } else {
     drawBlock(ctx, platform, palette);
   }
@@ -934,6 +975,41 @@ export function drawClot(ctx, enemy) {
   ctx.fill();
 }
 
+// A small hovering enemy — flaps membranous wings and bobs on a sine wave
+// (see the flyer update loop in GameCanvas.jsx) instead of patrolling the
+// ground, so reaching it takes a well-timed jump rather than a walk-up.
+// One universal look across all worlds, unlike the per-world ground
+// enemies above.
+function drawFlyer(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  const flap = Math.sin(performance.now() / 90) * 0.5 + 0.5;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const wingSpread = w * (0.55 + flap * 0.25);
+
+  ctx.fillStyle = '#e0546b';
+  ctx.beginPath();
+  ctx.ellipse(cx - wingSpread * 0.5, cy, wingSpread * 0.4, h * 0.28, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + wingSpread * 0.5, cy, wingSpread * 0.4, h * 0.28, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#c23752';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, w * 0.36, h * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - h * 0.05, w * 0.16, h * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a0a0a';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - h * 0.05, w * 0.07, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 const ENEMY_RENDERERS = {
   goomba: drawGoomba,
   skinBlob: drawSkinBlob,
@@ -943,6 +1019,7 @@ const ENEMY_RENDERERS = {
   labCat: drawLabCat,
   clot: drawClot,
   dragonling: drawDragonling,
+  flyer: drawFlyer,
 };
 
 const SQUISH_MS = 700;
@@ -987,6 +1064,46 @@ export function drawBoss(ctx, boss) {
   ctx.strokeStyle = '#111';
   ctx.lineWidth = 2;
   ctx.strokeRect(barX, barY, barW, 10);
+}
+
+// A stationary row of sharp spikes jutting up from the ground — no HP, no
+// animation, nothing to defeat. The only "tell" is the shape itself: jump
+// over it or eat it (see hazards.js's updateHazards).
+export function drawSpikes(ctx, spikes) {
+  const { x, y, width, height } = spikes;
+  const count = Math.max(2, Math.round(width / 18));
+  const spikeW = width / count;
+
+  ctx.fillStyle = '#7d8290';
+  for (let i = 0; i < count; i++) {
+    const sx = x + i * spikeW;
+    ctx.beginPath();
+    ctx.moveTo(sx, y + height);
+    ctx.lineTo(sx + spikeW / 2, y);
+    ctx.lineTo(sx + spikeW, y + height);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < count; i++) {
+    const sx = x + i * spikeW;
+    ctx.beginPath();
+    ctx.moveTo(sx, y + height);
+    ctx.lineTo(sx + spikeW / 2, y);
+    ctx.lineTo(sx + spikeW, y + height);
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  for (let i = 0; i < count; i++) {
+    const sx = x + i * spikeW;
+    ctx.beginPath();
+    ctx.moveTo(sx + spikeW / 2, y);
+    ctx.lineTo(sx + spikeW / 2 + 2, y + height * 0.3);
+    ctx.lineTo(sx + spikeW / 2 - 2, y + height * 0.3);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
 // Stationary end-of-level hazard — a potted plant with a huge toothy head,

@@ -1,8 +1,8 @@
-// Piranha plant, koopa (patrol + shell-throwing), and koopa-shell update
-// logic — split out of GameCanvas.jsx to keep the main loop file within
-// CLAUDE.md's ~600-line budget. Pure updates over the level/player/state
-// objects GameCanvas already owns; `loseLife` is passed in since it closes
-// over player/state/respawnPlayer inside GameCanvas's own effect.
+// Piranha plant, spikes, koopa (patrol + shell-throwing), and koopa-shell
+// update logic — split out of GameCanvas.jsx to keep the main loop file
+// within CLAUDE.md's ~600-line budget. Pure updates over the level/player/
+// state objects GameCanvas already owns; `loseLife` is passed in since it
+// closes over player/state/respawnPlayer inside GameCanvas's own effect.
 import { playStompSound, playHurtSound } from './music';
 
 const SHELL_SPEED = 6;
@@ -52,6 +52,15 @@ export function updateHazards(level, player, state, loseLife) {
   // Touching it costs a life automatically — star grants full immunity,
   // power-ups still absorb the hit first via loseLife's shield order.
   if (level.piranha && level.piranha.alive && aabbOverlap(player, level.piranha)) {
+    if (!starActive && !invulnerable) {
+      playHurtSound();
+      loseLife();
+    }
+  }
+
+  // Spikes: stationary, no HP at all — can't be defeated by anything,
+  // only avoided. Same automatic-life-loss-on-touch shape as the piranha.
+  if (level.spikes && aabbOverlap(player, level.spikes)) {
     if (!starActive && !invulnerable) {
       playHurtSound();
       loseLife();
