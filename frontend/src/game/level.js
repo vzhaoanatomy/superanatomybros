@@ -174,13 +174,17 @@ function ensureSolidGround(segments, x1, x2) {
 // world's index (1-7) so later worlds are visibly harder, and level size
 // (width, coin count, enemy count) scales with duration so a 5-minute level
 // is genuinely bigger, not just a longer clock.
-export function buildLevel({ world, durationMinutes }) {
-  // Seeded with a fresh random component on every call — layout (platforms,
+export function buildLevel({ world, durationMinutes, seed }) {
+  // Defaults to a fresh random component on every call — layout (platforms,
   // enemies, power-ups, coins) is deliberately NOT the same level-to-level
   // so players can't just memorize a fixed path. hashSeed itself still gives
   // a stable, well-distributed PRNG from whatever string it's given; only
-  // the string now changes every time.
-  const rng = hashSeed(`${world.id}-${durationMinutes}-${Math.random()}`);
+  // the string normally changes every time. GameCanvas.jsx can pass an
+  // explicit `seed` instead (and persist it) to regenerate the exact same
+  // layout later — see storage.js's saveProgress/loadProgress, used to
+  // resume an in-progress level after a reload/crash without losing track
+  // of which coins/enemies/boxes were already cleared.
+  const rng = hashSeed(seed ?? `${world.id}-${durationMinutes}-${Math.random()}`);
   // A teacher's own custom deck carries an explicit `difficulty` they picked
   // in the builder (see WorldBuilderForm.jsx). Built-ins and classroom-
   // joined worlds fall back to `index` (World 1-7's built-in scaling), and
@@ -438,6 +442,11 @@ export function buildLevel({ world, durationMinutes }) {
   // could begin just a few dozen pixels from spawn with no time to react.
   // 340px is roughly one second of run-speed room (5.6px/frame * 60fps).
   const SPAWN_SAFE_X = 340;
+  // A fraction of ground/platform enemies roll as a bacteria instead of the
+  // world's own themed creature — adds variety without replacing any
+  // world's identity (see drawBacteria in spriteRenderer.js; falls back to
+  // world.enemyType at render time when this is left undefined).
+  const BACTERIA_CHANCE = 0.25;
   const enemies = [];
   for (let i = 0; i < enemyCount; i++) {
     const [sx1, sx2] = solidSegments[i % solidSegments.length];
@@ -466,6 +475,7 @@ export function buildLevel({ world, durationMinutes }) {
       alive: true,
       pending: false,
       termId: null,
+      type: rng() < BACTERIA_CHANCE ? 'bacteria' : undefined,
     });
   }
 
@@ -499,6 +509,7 @@ export function buildLevel({ world, durationMinutes }) {
       alive: true,
       pending: false,
       termId: null,
+      type: rng() < BACTERIA_CHANCE ? 'bacteria' : undefined,
     });
     platformEnemyIndex += 1;
   }

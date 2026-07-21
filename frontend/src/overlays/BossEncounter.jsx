@@ -9,7 +9,7 @@ export default function BossEncounter({ question, onAnswer }) {
     <QuizOverlay
       key={question.questionNum}
       title={`Boss Battle (${question.questionNum}/3)`}
-      statsText={`Dragon HP: ${hpBar}`}
+      statsText={`Pathogen HP: ${hpBar}`}
       prompt="Which term matches:"
       definition={question.definition}
       options={question.options}

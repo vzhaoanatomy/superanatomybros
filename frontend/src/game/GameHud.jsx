@@ -44,14 +44,14 @@ export default function GameHud({
           {character.ability === 'coinCombo' && <span className="hud-status"> · Combo {hud?.comboCount ?? 0}/5</span>}
           {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
           {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}
-          {hud?.starActive && <span className="hud-status warn"> · 🌈 STAR POWER!</span>}
+          {hud?.starActive && <span className="hud-status warn"> · ✨ IMMUNE BOOST!</span>}
           {hud?.mounted && <span className="hud-status warn"> · 🦖 Tongue Lick (↓/S)</span>}
-          {hud?.big && <span className="hud-status"> · 🍄 Big!</span>}
-          {hud?.hasFire && <span className="hud-status warn"> · 🔥 Fire Power (F)</span>}
+          {hud?.big && <span className="hud-status"> · 🥼 White Coat!</span>}
+          {hud?.hasFire && <span className="hud-status warn"> · 💊 Antibiotic Power (F)</span>}
           {hud?.bossAlive && (
             <span className="hud-status warn">
               {' '}
-              · Dragon HP {hud.bossHp}/{hud.bossMaxHp}
+              · Pathogen HP {hud.bossHp}/{hud.bossMaxHp}
             </span>
           )}
         </div>

@@ -465,6 +465,10 @@ function drawEggPowerUp(ctx, x, y, w, h) {
   });
 }
 
+// The "Antibiotic Flower" — same stem/leaves/four-petal layout as the
+// original fire flower, but the petals are red/blue antibiotic capsules
+// instead of flame-colored lobes, and a white cross sits at the center
+// instead of a plain dot, so it reads as medicine rather than fire.
 function drawFireFlowerPowerUp(ctx, x, y, w, h) {
   ctx.strokeStyle = '#3f9d5c';
   ctx.lineWidth = Math.max(1, w * 0.08);
@@ -480,22 +484,27 @@ function drawFireFlowerPowerUp(ctx, x, y, w, h) {
 
   const cx = x + w / 2;
   const cy = y + h * 0.36;
-  ctx.fillStyle = '#e74c3c';
   [0, 1, 2, 3].forEach((i) => {
     const angle = (Math.PI / 2) * i + Math.PI / 4;
+    const px = cx + Math.cos(angle) * w * 0.2;
+    const py = cy + Math.sin(angle) * h * 0.2;
+    ctx.fillStyle = i % 2 === 0 ? '#e74c3c' : '#2255cc';
     ctx.beginPath();
-    ctx.ellipse(cx + Math.cos(angle) * w * 0.2, cy + Math.sin(angle) * h * 0.2, w * 0.2, h * 0.2, angle, 0, Math.PI * 2);
+    ctx.ellipse(px, py, w * 0.2, h * 0.2, angle, 0, Math.PI * 2);
     ctx.fill();
   });
-  ctx.fillStyle = '#ffd23f';
+  ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.16, h * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, w * 0.15, h * 0.15, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#e8871e';
+  ctx.strokeStyle = '#c0392b';
+  ctx.lineWidth = Math.max(1, w * 0.05);
   ctx.beginPath();
-  ctx.ellipse(cx - w * 0.05, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
-  ctx.ellipse(cx + w * 0.05, cy - h * 0.02, w * 0.04, h * 0.04, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(cx - w * 0.07, cy);
+  ctx.lineTo(cx + w * 0.07, cy);
+  ctx.moveTo(cx, cy - h * 0.07);
+  ctx.lineTo(cx, cy + h * 0.07);
+  ctx.stroke();
 }
 
 const POWER_UP_RENDERERS = {
@@ -511,26 +520,43 @@ export function drawPowerUp(ctx, powerUp) {
   if (renderer) renderer(ctx, powerUp.x, powerUp.y, powerUp.width, powerUp.height);
 }
 
-// A small flame the player lobs after picking up a fire flower — flickers
-// via a couple of pulsing lobes so it doesn't read as a flat static circle.
+// A spinning red/blue antibiotic capsule the player lobs after picking up
+// an Antibiotic Flower — same collision box/behavior as the old fireball,
+// just reskinned as medicine instead of fire.
 export function drawFireball(ctx, fireball) {
   const { x, y, width: w, height: h } = fireball;
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const t = performance.now() / 60;
-  const flicker = 1 + Math.sin(t) * 0.12;
-  ctx.fillStyle = '#ffb347';
+  const spin = performance.now() / 90;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(spin);
+
+  const r = Math.min(w, h) / 2;
   ctx.beginPath();
-  ctx.ellipse(cx, cy, (w / 2) * flicker, (h / 2) * flicker, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2, false);
+  ctx.closePath();
   ctx.fillStyle = '#e74c3c';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, (w / 2) * 0.6, (h / 2) * 0.6, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#ffe89e';
   ctx.beginPath();
-  ctx.ellipse(cx, cy, (w / 2) * 0.28, (h / 2) * 0.28, 0, 0, Math.PI * 2);
+  ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
+  ctx.closePath();
+  ctx.fillStyle = '#2255cc';
   ctx.fill();
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = Math.max(1, w * 0.06);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.moveTo(0, -r);
+  ctx.lineTo(0, r);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.22, r * 0.12, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 // The Yoshi-style dino the player rides while the egg mount is active,
@@ -983,104 +1009,164 @@ export function drawClot(ctx, enemy) {
   ctx.fill();
 }
 
-// The flying enemy — a King Boo-style ghost: pale bulbous body with a
-// scalloped bottom skirt, a small gold crown, mischievous slanted eyes,
-// and a long lolling tongue. Hovers/bobs on a sine wave (see the flyer
+// A new shared ground enemy — a rod-shaped bacterium with trailing
+// flagella and short pili bristles, distinct from any single world's own
+// themed creature (skeleton, muscle-brawler, etc.). Shows up as an
+// occasional extra alongside a world's regular enemy rather than replacing
+// it (see level.js's per-enemy `type` roll) — one universal look
+// everywhere, same pattern as the flyer below.
+export function drawBacteria(ctx, enemy) {
+  const { x, y, width: w, height: h } = enemy;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const now = performance.now();
+  const wobble = Math.sin(now / 180) * 0.06;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(wobble);
+
+  ctx.strokeStyle = '#7a9c3a';
+  ctx.lineWidth = Math.max(1, w * 0.045);
+  ctx.lineCap = 'round';
+  const tailT = now / 140;
+  for (const dy of [-0.16, 0.16]) {
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.46, h * dy);
+    ctx.quadraticCurveTo(-w * 0.72, h * dy + Math.sin(tailT) * 4, -w * 0.92, h * dy - Math.sin(tailT) * 4);
+    ctx.stroke();
+  }
+
+  const bodyGrad = ctx.createLinearGradient(0, -h * 0.32, 0, h * 0.32);
+  bodyGrad.addColorStop(0, '#a8c95a');
+  bodyGrad.addColorStop(0.5, '#8bb23f');
+  bodyGrad.addColorStop(1, '#6c9330');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.46, h * 0.32, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4c6e1e';
+  ctx.lineWidth = Math.max(1, w * 0.035);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#6c9330';
+  ctx.lineWidth = Math.max(1, w * 0.025);
+  for (let i = 0; i < 8; i++) {
+    const angle = (Math.PI * 2 * i) / 8;
+    const px = Math.cos(angle) * w * 0.44;
+    const py = Math.sin(angle) * h * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + Math.cos(angle) * w * 0.12, py + Math.sin(angle) * h * 0.12);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#1f2e0d';
+  ctx.beginPath();
+  ctx.ellipse(-w * 0.14, -h * 0.04, w * 0.06, h * 0.08, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.14, -h * 0.04, w * 0.06, h * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1f2e0d';
+  ctx.lineWidth = Math.max(1, w * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.16, h * 0.14);
+  for (let i = 0; i <= 4; i++) {
+    ctx.lineTo(-w * 0.16 + (w * 0.32 * i) / 4, h * 0.14 + (i % 2 === 0 ? 0 : h * 0.06));
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// The flying enemy — a mutating virus: spiky protein capsid, angry
+// slanted eyes, jagged teeth. Hovers/bobs on a sine wave (see the flyer
 // update loop in GameCanvas.jsx) rather than patrolling the ground, and is
 // deliberately harder to read as "quiz-able" than the other enemies — no
 // question mark, no friendly cartoon face, since resolveFlyerTouch in
-// GameCanvas.jsx skips the quiz gate entirely for this one. One universal
-// look across all worlds, unlike the per-world ground enemies above.
-function drawKingBoo(ctx, enemy) {
+// GameCanvas.jsx skips the quiz gate entirely for this one. Fits that
+// mechanic thematically too: a virus can't be reasoned with via a vocab
+// question, only physically eliminated. One universal look across all
+// worlds, unlike the per-world ground enemies above.
+function drawVirus(ctx, enemy) {
   const { x, y, width: w, height: h } = enemy;
   const now = performance.now();
   const cx = x + w / 2;
-  const cy = y + h * 0.42;
+  const cy = y + h / 2;
   const facing = enemy.vx >= 0 ? 1 : -1;
+  const pulse = Math.sin(now / 240) * 0.04;
 
   ctx.save();
-  ctx.globalAlpha = 0.95;
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.sin(now / 500) * 0.08);
+  ctx.scale(1 + pulse, 1 - pulse);
 
-  // Body: rounded dome top, scalloped "skirt" bottom (3 overlapping bumps)
-  // so the silhouette reads as a ghost rather than a plain blob.
-  ctx.fillStyle = '#f5f2fb';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, w * 0.5, h * 0.44, 0, Math.PI, 0, false);
-  ctx.fill();
-  const skirtY = cy + h * 0.06;
-  for (let i = 0; i < 3; i++) {
-    const bx = x + w * (0.18 + i * 0.32);
+  // Spike proteins — round-tipped clubs radiating from the capsid, the
+  // classic coronavirus silhouette so it reads instantly as "virus."
+  const spikeCount = 12;
+  ctx.fillStyle = '#c2477a';
+  for (let i = 0; i < spikeCount; i++) {
+    const angle = (Math.PI * 2 * i) / spikeCount + now / 3000;
+    const baseX = Math.cos(angle) * w * 0.32;
+    const baseY = Math.sin(angle) * h * 0.36;
+    const tipX = Math.cos(angle) * w * 0.56;
+    const tipY = Math.sin(angle) * h * 0.62;
+    ctx.lineWidth = Math.max(1, w * 0.045);
+    ctx.strokeStyle = '#c2477a';
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(bx, skirtY, w * 0.19, 0, Math.PI * 2);
+    ctx.moveTo(baseX, baseY);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(tipX, tipY, w * 0.07, h * 0.07, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillRect(x + w * 0.02, cy - h * 0.02, w * 0.96, h * 0.14);
 
-  // Small gold crown, perched on top, slightly tilted toward travel direction.
-  ctx.save();
-  ctx.translate(cx, y + h * 0.06);
-  ctx.rotate(facing * 0.08);
-  ctx.fillStyle = '#f2c230';
+  // Round capsid body with a radial gradient for volume.
+  const bodyGrad = ctx.createRadialGradient(-w * 0.12, -h * 0.14, w * 0.05, 0, 0, w * 0.4);
+  bodyGrad.addColorStop(0, '#f08fb0');
+  bodyGrad.addColorStop(0.55, '#e0568f');
+  bodyGrad.addColorStop(1, '#b03566');
+  ctx.fillStyle = bodyGrad;
   ctx.beginPath();
-  ctx.moveTo(-w * 0.22, h * 0.06);
-  ctx.lineTo(-w * 0.22, -h * 0.02);
-  ctx.lineTo(-w * 0.11, h * 0.05);
-  ctx.lineTo(0, -h * 0.08);
-  ctx.lineTo(w * 0.11, h * 0.05);
-  ctx.lineTo(w * 0.22, -h * 0.02);
-  ctx.lineTo(w * 0.22, h * 0.06);
-  ctx.closePath();
+  ctx.ellipse(0, 0, w * 0.4, h * 0.44, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
-
-  // Mischievous slanted eyes, pupils biased toward the direction of travel.
-  const eyeY = cy - h * 0.08;
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.ellipse(cx - w * 0.17, eyeY, w * 0.13, h * 0.15, -facing * 0.25, 0, Math.PI * 2);
-  ctx.ellipse(cx + w * 0.17, eyeY, w * 0.13, h * 0.15, -facing * 0.25, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#241830';
-  ctx.beginPath();
-  ctx.ellipse(cx - w * 0.17 + facing * w * 0.03, eyeY, w * 0.055, h * 0.09, 0, 0, Math.PI * 2);
-  ctx.ellipse(cx + w * 0.17 + facing * w * 0.03, eyeY, w * 0.055, h * 0.09, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Angled brows read as "up to something" rather than friendly.
-  ctx.strokeStyle = '#241830';
-  ctx.lineWidth = Math.max(1, w * 0.045);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cx - w * 0.28, eyeY - h * 0.2);
-  ctx.lineTo(cx - w * 0.08, eyeY - h * 0.28);
-  ctx.moveTo(cx + w * 0.28, eyeY - h * 0.2);
-  ctx.lineTo(cx + w * 0.08, eyeY - h * 0.28);
+  ctx.strokeStyle = '#7a2247';
+  ctx.lineWidth = Math.max(1, w * 0.03);
   ctx.stroke();
 
-  // Wide grin with two small fangs.
-  const mouthY = cy + h * 0.14;
-  ctx.fillStyle = '#241830';
-  ctx.beginPath();
-  ctx.ellipse(cx, mouthY, w * 0.16, h * 0.1, 0, 0, Math.PI, false);
-  ctx.fill();
+  // Angry slanted eyes, pupils biased toward the direction of travel.
+  const eyeY = -h * 0.06;
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.moveTo(cx - w * 0.12, mouthY);
-  ctx.lineTo(cx - w * 0.08, mouthY + h * 0.06);
-  ctx.lineTo(cx - w * 0.04, mouthY);
-  ctx.closePath();
-  ctx.moveTo(cx + w * 0.12, mouthY);
-  ctx.lineTo(cx + w * 0.08, mouthY + h * 0.06);
-  ctx.lineTo(cx + w * 0.04, mouthY);
-  ctx.closePath();
+  ctx.ellipse(-w * 0.15, eyeY, w * 0.1, h * 0.11, -facing * 0.25, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.15, eyeY, w * 0.1, h * 0.11, -facing * 0.25, 0, Math.PI * 2);
   ctx.fill();
-
-  // Long lolling tongue, swaying gently.
-  const tongueSway = Math.sin(now / 220) * w * 0.05;
-  ctx.fillStyle = '#a15fd6';
+  ctx.fillStyle = '#2a0a18';
   ctx.beginPath();
-  ctx.moveTo(cx - w * 0.06, mouthY + h * 0.04);
-  ctx.quadraticCurveTo(cx + tongueSway, mouthY + h * 0.35, cx + tongueSway * 1.4, mouthY + h * 0.5);
-  ctx.quadraticCurveTo(cx + tongueSway * 0.6, mouthY + h * 0.4, cx + w * 0.06, mouthY + h * 0.04);
+  ctx.ellipse(-w * 0.15 + facing * w * 0.03, eyeY, w * 0.045, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.15 + facing * w * 0.03, eyeY, w * 0.045, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2a0a18';
+  ctx.lineWidth = Math.max(1, w * 0.04);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.25, eyeY - h * 0.18);
+  ctx.lineTo(-w * 0.06, eyeY - h * 0.24);
+  ctx.moveTo(w * 0.25, eyeY - h * 0.18);
+  ctx.lineTo(w * 0.06, eyeY - h * 0.24);
+  ctx.stroke();
+
+  // Jagged mouth.
+  const mouthY = h * 0.14;
+  ctx.fillStyle = '#2a0a18';
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.18, mouthY);
+  for (let i = 0; i <= 4; i++) {
+    ctx.lineTo(-w * 0.18 + (w * 0.36 * i) / 4, mouthY + (i % 2 === 0 ? 0 : h * 0.08));
+  }
+  ctx.lineTo(w * 0.18, mouthY + h * 0.06);
+  ctx.lineTo(-w * 0.18, mouthY + h * 0.06);
   ctx.closePath();
   ctx.fill();
 
@@ -1096,7 +1182,8 @@ const ENEMY_RENDERERS = {
   labCat: drawLabCat,
   clot: drawClot,
   dragonling: drawDragonling,
-  flyer: drawKingBoo,
+  flyer: drawVirus,
+  bacteria: drawBacteria,
 };
 
 const SQUISH_MS = 700;
@@ -1125,10 +1212,93 @@ export function drawEnemy(ctx, enemy, enemyType, now = performance.now()) {
   ctx.restore();
 }
 
-// World 7 final boss — a scaled-up dragonling with an HP bar hovering above.
+// The end-of-level boss — a towering drug-resistant "superbug," reusing
+// the same bacterium visual language as drawBacteria above (rod body,
+// trailing flagella) but oriented vertically to fill the boss's tall
+// bounding box, with a spiked resistance shell and glowing eyes so it
+// reads as clearly more dangerous than a regular enemy.
+function drawPathogenBoss(ctx, boss) {
+  const { x, y, width: w, height: h } = boss;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const now = performance.now();
+  const wobble = Math.sin(now / 260) * 0.04;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(wobble);
+
+  ctx.strokeStyle = '#8a3fa0';
+  ctx.lineWidth = Math.max(2, w * 0.035);
+  ctx.lineCap = 'round';
+  const tailT = now / 160;
+  for (const dx of [-0.22, 0.22]) {
+    ctx.beginPath();
+    ctx.moveTo(w * dx, -h * 0.42);
+    ctx.quadraticCurveTo(w * dx + Math.sin(tailT) * 8, -h * 0.58, w * dx - Math.sin(tailT) * 6, -h * 0.7);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w * dx, h * 0.42);
+    ctx.quadraticCurveTo(w * dx - Math.sin(tailT) * 8, h * 0.58, w * dx + Math.sin(tailT) * 6, h * 0.7);
+    ctx.stroke();
+  }
+
+  const bodyGrad = ctx.createLinearGradient(-w * 0.4, 0, w * 0.4, 0);
+  bodyGrad.addColorStop(0, '#6b2a80');
+  bodyGrad.addColorStop(0.5, '#9645b5');
+  bodyGrad.addColorStop(1, '#6b2a80');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w * 0.36, h * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#3d1750';
+  ctx.lineWidth = Math.max(2, w * 0.03);
+  ctx.stroke();
+
+  ctx.fillStyle = '#c760e0';
+  const spikeCount = 14;
+  for (let i = 0; i < spikeCount; i++) {
+    const angle = (Math.PI * 2 * i) / spikeCount;
+    const bx = Math.cos(angle) * w * 0.34;
+    const by = Math.sin(angle) * h * 0.4;
+    const tipX = Math.cos(angle) * w * 0.5;
+    const tipY = Math.sin(angle) * h * 0.55;
+    const perpX = -Math.sin(angle) * w * 0.05;
+    const perpY = Math.cos(angle) * h * 0.05;
+    ctx.beginPath();
+    ctx.moveTo(bx - perpX, by - perpY);
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(bx + perpX, by + perpY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#ff3b3b';
+  ctx.beginPath();
+  ctx.ellipse(-w * 0.12, -h * 0.06, w * 0.07, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(w * 0.12, -h * 0.06, w * 0.07, h * 0.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#1a0520';
+  ctx.lineWidth = Math.max(1, w * 0.02);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#1a0520';
+  ctx.lineWidth = Math.max(2, w * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.18, h * 0.14);
+  for (let i = 0; i <= 5; i++) {
+    ctx.lineTo(-w * 0.18 + (w * 0.36 * i) / 5, h * 0.14 + (i % 2 === 0 ? 0 : h * 0.05));
+  }
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// The end-of-level boss encounter — a giant pathogen with an HP bar
+// hovering above (see drawPathogenBoss above).
 export function drawBoss(ctx, boss) {
   if (!boss.alive) return;
-  drawDragonling(ctx, boss);
+  drawPathogenBoss(ctx, boss);
 
   const barW = boss.width;
   const barX = boss.x;
@@ -1400,6 +1570,21 @@ function rectPct(ctx, x, y, w, h, px, py, pw, ph, color) {
   ctx.fillRect(x + px * w, y + py * h, pw * w, ph * h);
 }
 
+// A V-neck notch cut into a torso block plus a small breast pocket — the
+// shared visual shorthand for "this is a scrub top," reused (at slightly
+// different placement) across all four heroes below so the base/small
+// form always reads as medical scrubs, not a generic shirt.
+function drawScrubDetails(ctx, x, y, w, h, skin, accent, cx, topY, size) {
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.moveTo(x + w * (cx - size), y + h * topY);
+  ctx.lineTo(x + w * cx, y + h * (topY + size * 1.4));
+  ctx.lineTo(x + w * (cx + size), y + h * topY);
+  ctx.closePath();
+  ctx.fill();
+  rectPct(ctx, x, y, w, h, cx + size * 1.3, topY + size * 1.6, size * 0.9, size * 0.7, accent);
+}
+
 function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.08, 0.0, 0.84, 0.16, colors.brim);
   rectPct(ctx, x, y, w, h, 0.16, -0.03, 0.68, 0.16, colors.cap);
@@ -1409,6 +1594,7 @@ function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
   }
   rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.36, colors.body);
   rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.08, colors.bodyDark);
+  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.42, 0.08);
   rectPct(ctx, x, y, w, h, 0.04, 0.46, 0.14, 0.2, colors.skin);
   rectPct(ctx, x, y, w, h, 0.82, 0.46, 0.14, 0.2, colors.skin);
   rectPct(ctx, x, y, w, h, 0.16, 0.78, 0.28, 0.22, colors.shoe);
@@ -1426,6 +1612,7 @@ function drawBloom(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.26, 0.36, 0.48, 0.2, colors.body);
   rectPct(ctx, x, y, w, h, 0.12, 0.54, 0.76, 0.3, colors.body);
   rectPct(ctx, x, y, w, h, 0.12, 0.8, 0.76, 0.06, colors.bodyDark);
+  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.36, 0.07);
   rectPct(ctx, x, y, w, h, 0.2, 0.86, 0.2, 0.14, colors.shoe);
   rectPct(ctx, x, y, w, h, 0.6, 0.86, 0.2, 0.14, colors.shoe);
   const eyeX = facing >= 0 ? 0.56 : 0.28;
@@ -1439,12 +1626,45 @@ function drawRex(ctx, x, y, w, h, colors, facing) {
   rectPct(ctx, x, y, w, h, 0.2, 0.18, 0.6, 0.24, colors.skin);
   rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.4, colors.body);
   rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.09, colors.bodyDark);
+  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.4, 0.08);
   rectPct(ctx, x, y, w, h, 0.3, 0.52, 0.16, 0.16, colors.bodyDark);
   rectPct(ctx, x, y, w, h, 0.54, 0.52, 0.16, 0.16, colors.bodyDark);
   rectPct(ctx, x, y, w, h, 0.16, 0.8, 0.28, 0.2, colors.shoe);
   rectPct(ctx, x, y, w, h, 0.56, 0.8, 0.28, 0.2, colors.shoe);
   const eyeX = facing >= 0 ? 0.58 : 0.24;
   rectPct(ctx, x, y, w, h, eyeX, 0.26, 0.1, 0.08, '#1a1a1a');
+}
+
+// A white coat worn open over scrubs — drawn as an overlay after the
+// character's own body shape, using the same percentage-of-bounding-box
+// system so it fits all four hero silhouettes without each needing its
+// own big-form variant. This is what actually distinguishes the "big"
+// (mushroom-equivalent) form from the base scrubs-only look, since scale
+// alone read too subtly to tell apart at a glance during play.
+function drawWhiteCoat(ctx, x, y, w, h) {
+  const coat = '#f7f7f4';
+  const coatShadow = '#d9d9d3';
+  const collar = '#ececE7';
+  rectPct(ctx, x, y, w, h, 0.04, 0.38, 0.22, 0.44, coat);
+  rectPct(ctx, x, y, w, h, 0.74, 0.38, 0.22, 0.44, coat);
+  rectPct(ctx, x, y, w, h, 0.04, 0.74, 0.22, 0.08, coatShadow);
+  rectPct(ctx, x, y, w, h, 0.74, 0.74, 0.22, 0.08, coatShadow);
+  rectPct(ctx, x, y, w, h, 0.28, 0.36, 0.18, 0.1, collar);
+  rectPct(ctx, x, y, w, h, 0.54, 0.36, 0.18, 0.1, collar);
+  rectPct(ctx, x, y, w, h, 0.1, 0.5, 0.03, 0.03, '#8a8a80');
+  rectPct(ctx, x, y, w, h, 0.1, 0.58, 0.03, 0.03, '#8a8a80');
+  rectPct(ctx, x, y, w, h, 0.08, 0.44, 0.1, 0.07, '#2255cc');
+  // Stethoscope looped around the neck, dropping to a small diaphragm.
+  ctx.strokeStyle = '#3a3a3a';
+  ctx.lineWidth = Math.max(1, w * 0.03);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.4, y + h * 0.4);
+  ctx.quadraticCurveTo(x + w * 0.5, y + h * 0.5, x + w * 0.58, y + h * 0.4);
+  ctx.stroke();
+  ctx.fillStyle = '#3a3a3a';
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.5, y + h * 0.5, w * 0.035, h * 0.03, 0, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function drawPlayer(ctx, player, characterId, opts = {}) {
@@ -1470,24 +1690,24 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
     ctx.globalAlpha = 0.55;
   }
 
+  // Star power reads as an "immune boost" — a warm gold-white pulsing
+  // aura and a gentle brightness lift, instead of the old rainbow
+  // hue-cycle (which read as a generic arcade power-up, not medical).
   if (opts.invincible) {
     ctx.save();
-    const t = performance.now() / 6;
-    ctx.filter = `hue-rotate(${t % 360}deg) saturate(2.4) brightness(1.15)`;
-
-    const glowHue = t % 360;
-    ctx.save();
-    ctx.filter = 'none';
+    const t = performance.now() / 500;
+    const pulse = (Math.sin(t) + 1) / 2;
     const cx = x + w / 2;
     const cy = y + h / 2;
-    const glow = ctx.createRadialGradient(cx, cy, w * 0.2, cx, cy, w * 1.1);
-    glow.addColorStop(0, `hsla(${glowHue}, 100%, 65%, 0.55)`);
-    glow.addColorStop(1, 'hsla(0, 100%, 65%, 0)');
+    const glow = ctx.createRadialGradient(cx, cy, w * 0.2, cx, cy, w * 1.15);
+    glow.addColorStop(0, `rgba(255, 244, 200, ${0.35 + pulse * 0.25})`);
+    glow.addColorStop(0.6, 'rgba(255, 220, 130, 0.25)');
+    glow.addColorStop(1, 'rgba(255, 220, 130, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, w * 1.1, h * 1.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, w * 1.15, h * 1.15, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
+    ctx.filter = `brightness(${1.08 + pulse * 0.1}) saturate(1.05)`;
   }
 
   if (character.id === 'doc' || character.id === 'vee') {
@@ -1496,6 +1716,10 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
     drawBloom(ctx, x, y, w, h, character.colors, facing);
   } else if (character.id === 'rex') {
     drawRex(ctx, x, y, w, h, character.colors, facing);
+  }
+
+  if (opts.big) {
+    drawWhiteCoat(ctx, x, y, w, h);
   }
 
   if (opts.invincible) {

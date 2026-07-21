@@ -19,7 +19,7 @@ const SECTIONS = [
         ↓ / S — <strong>Hero ability</strong>
       </>,
       <>
-        F — <strong>Throw fireball</strong> (with Fire Flower)
+        F — <strong>Throw antibiotic capsule</strong> (with Antibiotic Flower)
       </>,
       <>
         G — <strong>Term Glossary</strong> (pause to look up any term)
@@ -80,17 +80,17 @@ const SECTIONS = [
     title: 'Power-Ups',
     items: [
       <>
-        🍄 <strong>Mushroom</strong> — +1 life, bigger size
+        🥼 <strong>Mushroom</strong> — +1 life, white coat form
       </>,
       <>
-        ⭐ <strong>Star</strong> — ~8s rainbow invincibility
+        ⭐ <strong>Star</strong> — ~8s immune boost invincibility
       </>,
       <>
         🥚 <strong>Egg</strong> — ride a dino, 1.5x speed. Press ↓/S to{' '}
         <strong>tongue-lick</strong> an enemy into a permanent egg!
       </>,
       <>
-        🌺 <strong>Fire Flower</strong> — press F for fireballs
+        💊 <strong>Antibiotic Flower</strong> — press F for capsules
       </>,
     ],
   },
