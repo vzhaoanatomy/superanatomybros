@@ -1853,16 +1853,24 @@ function drawCrossPatch(ctx, x, y, w, h, cx, cy, size) {
 }
 
 function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
-  rectPct(ctx, x, y, w, h, 0.08, 0.0, 0.84, 0.16, colors.brim);
-  rectPct(ctx, x, y, w, h, 0.16, -0.03, 0.68, 0.16, colors.cap);
-  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.05, 0.07);
+  // A big white medic cap — colors.cap/brim are white for every hero that
+  // uses this body shape now, and the cross patch is roughly double its
+  // original size so it's unmistakable even at this sprite's small scale.
+  rectPct(ctx, x, y, w, h, 0.02, -0.03, 0.96, 0.2, colors.brim);
+  rectPct(ctx, x, y, w, h, 0.08, -0.09, 0.84, 0.22, colors.cap);
+  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.0, 0.14);
   rectPct(ctx, x, y, w, h, 0.18, 0.14, 0.64, 0.28, colors.skin);
   if (colors.mustache) {
     rectPct(ctx, x, y, w, h, 0.24, 0.34, 0.52, 0.07, colors.mustache);
   }
-  rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.36, colors.body);
-  rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.08, colors.bodyDark);
-  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.42, 0.1, 0.78);
+  // Shirt (upper torso) and pants (lower torso) as two distinct blocks —
+  // each hero's own shirt color over a shared-shape pants color, instead
+  // of one single-color body block.
+  rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.2, colors.shirt);
+  rectPct(ctx, x, y, w, h, 0.14, 0.42, 0.72, 0.05, colors.shirtDark);
+  rectPct(ctx, x, y, w, h, 0.14, 0.62, 0.72, 0.16, colors.pants);
+  rectPct(ctx, x, y, w, h, 0.14, 0.62, 0.72, 0.04, colors.pantsDark);
+  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.shirtDark, 0.5, 0.42, 0.1, 0.6);
   drawStethoscope(ctx, x, y, w, h, 0.44);
   rectPct(ctx, x, y, w, h, 0.04, 0.46, 0.14, 0.2, colors.skin);
   rectPct(ctx, x, y, w, h, 0.82, 0.46, 0.14, 0.2, colors.skin);
@@ -1873,7 +1881,17 @@ function drawPlumberBody(ctx, x, y, w, h, colors, facing) {
 }
 
 function drawBloom(ctx, x, y, w, h, colors, facing) {
+  // Long hair flowing past the shoulders on both sides, drawn before the
+  // white cap band so the cap still reads as sitting on top of it.
+  rectPct(ctx, x, y, w, h, 0.02, 0.26, 0.16, 0.4, colors.hair);
+  rectPct(ctx, x, y, w, h, 0.82, 0.26, 0.16, 0.4, colors.hair);
   rectPct(ctx, x, y, w, h, 0.1, 0.1, 0.8, 0.24, colors.hair);
+  // A big white medic cap band across the top of her hair, same treatment
+  // as the other three heroes — the gold crown still perches above/through
+  // it, keeping her "Chief" identity while adding the same unmistakable
+  // medical marker everyone else has.
+  rectPct(ctx, x, y, w, h, 0.06, 0.0, 0.88, 0.2, '#fbfbf8');
+  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.07, 0.13);
   rectPct(ctx, x, y, w, h, 0.22, 0.16, 0.56, 0.22, colors.skin);
   rectPct(ctx, x, y, w, h, 0.3, -0.06, 0.1, 0.12, colors.crown);
   rectPct(ctx, x, y, w, h, 0.45, -0.1, 0.1, 0.16, colors.crown);
@@ -1890,21 +1908,57 @@ function drawBloom(ctx, x, y, w, h, colors, facing) {
 }
 
 function drawRex(ctx, x, y, w, h, colors, facing) {
-  rectPct(ctx, x, y, w, h, 0.14, 0.02, 0.72, 0.2, colors.hair);
-  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.11, 0.07);
-  rectPct(ctx, x, y, w, h, 0.16, -0.1, 0.12, 0.16, colors.horn);
-  rectPct(ctx, x, y, w, h, 0.72, -0.1, 0.12, 0.16, colors.horn);
+  // Wild grey hair drawn wide first so it pokes out from under the white
+  // cap at the edges — evil-scientist "hair escaping the surgical cap"
+  // rather than the old neatly-contained look.
+  rectPct(ctx, x, y, w, h, 0.08, -0.02, 0.84, 0.24, colors.hair);
+  rectPct(ctx, x, y, w, h, 0.14, -0.06, 0.72, 0.2, '#fbfbf8');
+  drawCrossPatch(ctx, x, y, w, h, 0.5, 0.02, 0.13);
+  rectPct(ctx, x, y, w, h, 0.16, -0.14, 0.12, 0.16, colors.horn);
+  rectPct(ctx, x, y, w, h, 0.72, -0.14, 0.12, 0.16, colors.horn);
   rectPct(ctx, x, y, w, h, 0.2, 0.18, 0.6, 0.24, colors.skin);
-  rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.4, colors.body);
-  rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.09, colors.bodyDark);
-  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.bodyDark, 0.5, 0.4, 0.1, 0.8);
+  // Turtle shell peeking up behind the shoulders/neck — the "half turtle"
+  // half of "half man, half turtle." Drawn before the shirt so the shirt
+  // collar overlaps its lower edge naturally.
+  const shellGrad = ctx.createLinearGradient(0, y + h * 0.3, 0, y + h * 0.46);
+  shellGrad.addColorStop(0, colors.shell);
+  shellGrad.addColorStop(1, colors.shellDark);
+  ctx.fillStyle = shellGrad;
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.5, y + h * 0.42, w * 0.44, h * 0.16, 0, Math.PI, 0, false);
+  ctx.fill();
+  ctx.strokeStyle = colors.shellDark;
+  ctx.lineWidth = Math.max(1, w * 0.02);
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.28, y + h * 0.34);
+  ctx.lineTo(x + w * 0.28, y + h * 0.43);
+  ctx.moveTo(x + w * 0.5, y + h * 0.28);
+  ctx.lineTo(x + w * 0.5, y + h * 0.43);
+  ctx.moveTo(x + w * 0.72, y + h * 0.34);
+  ctx.lineTo(x + w * 0.72, y + h * 0.43);
+  ctx.stroke();
+  rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.2, colors.shirt);
+  rectPct(ctx, x, y, w, h, 0.1, 0.4, 0.8, 0.05, colors.shirtDark);
+  rectPct(ctx, x, y, w, h, 0.1, 0.6, 0.8, 0.2, colors.pants);
+  rectPct(ctx, x, y, w, h, 0.1, 0.6, 0.8, 0.05, colors.pantsDark);
+  drawScrubDetails(ctx, x, y, w, h, colors.skin, colors.shirtDark, 0.5, 0.4, 0.1, 0.58);
   drawStethoscope(ctx, x, y, w, h, 0.42);
-  rectPct(ctx, x, y, w, h, 0.3, 0.52, 0.16, 0.16, colors.bodyDark);
-  rectPct(ctx, x, y, w, h, 0.54, 0.52, 0.16, 0.16, colors.bodyDark);
   rectPct(ctx, x, y, w, h, 0.16, 0.8, 0.28, 0.2, colors.shoe);
   rectPct(ctx, x, y, w, h, 0.56, 0.8, 0.28, 0.2, colors.shoe);
   const eyeX = facing >= 0 ? 0.58 : 0.24;
   rectPct(ctx, x, y, w, h, eyeX, 0.26, 0.1, 0.08, '#1a1a1a');
+  // Round mad-scientist spectacles over the eyes.
+  const lensY = y + h * 0.29;
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = Math.max(1, w * 0.025);
+  ctx.beginPath();
+  ctx.ellipse(x + w * 0.36, lensY, w * 0.09, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + w * 0.64, lensY, w * 0.09, h * 0.07, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.45, lensY);
+  ctx.lineTo(x + w * 0.55, lensY);
+  ctx.stroke();
 }
 
 // A white coat worn open over scrubs — drawn as an overlay after the
@@ -1981,7 +2035,12 @@ export function drawPlayer(ctx, player, characterId, opts = {}) {
     drawRex(ctx, x, y, w, h, character.colors, facing);
   }
 
-  if (opts.big) {
+  // Dr. Marrow and Chief Madam Plasma always wear the white coat/gown —
+  // not just in the "big" mushroom state like Nurse Liggy and Dr. Bowtox,
+  // whose scrubs/lab coat stay their own base look. It's what "always in
+  // a white gown" actually means visually: their doctor identity doesn't
+  // wait for a power-up.
+  if (opts.big || character.id === 'doc' || character.id === 'bloom') {
     drawWhiteCoat(ctx, x, y, w, h);
   }
 
