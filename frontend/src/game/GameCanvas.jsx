@@ -916,7 +916,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     function enterBonusRoom(returnSpot, roomVariant) {
       const facts = world.funFacts;
-      const fact = facts && facts.length ? facts[Math.floor(Math.random() * facts.length)] : null;
+      // Built-in worlds have a couple of hand-written facts; custom/teacher
+      // decks don't, so fall back to turning one of the deck's own vocab
+      // terms into the "fact" — every deck has vocab, so every deck gets a
+      // lore card this way, not just the 7 built-ins.
+      let fact = null;
+      if (facts && facts.length) {
+        fact = facts[Math.floor(Math.random() * facts.length)];
+      } else if (vocab.length) {
+        const randomTerm = vocab[Math.floor(Math.random() * vocab.length)];
+        fact = `${randomTerm.term} — ${randomTerm.definition}`;
+      }
       const room = buildBonusRoom(roomVariant, fact);
       state.bonusRoom = { ...room, timeLeft: BONUS_ROOM_SECONDS, collected: 0, returnSpot };
       // Spawns a little above the floor so gravity carries them the rest of

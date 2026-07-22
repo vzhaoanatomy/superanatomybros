@@ -897,11 +897,12 @@ const ROOM_VARIANTS = [buildSkyStepsRoom, buildZigzagRoom];
 
 // `variant` picks which hand-built layout to use — GameCanvas passes a
 // different one per pipe (see level.js's bonusPipes below) so a level's
-// two pipes never lead to the same room. `fact` is an optional string from
-// the world's funFacts pool (see worlds.js); when present each room hides
-// exactly one lore-card collectible showing it, at its single
-// hardest-to-reach spot. Worlds without funFacts (custom/teacher decks)
-// just get the plain coin room, same as before this feature existed.
+// two pipes never lead to the same room. `fact` is an optional string —
+// built-in worlds pass one of their hand-written funFacts (see worlds.js),
+// custom/teacher decks pass a term+definition pulled from their own vocab
+// instead (see enterBonusRoom in GameCanvas.jsx) — either way, when a fact
+// is present the room hides exactly one lore-card collectible showing it,
+// at its single hardest-to-reach spot.
 export function buildBonusRoom(variant = 0, fact = null) {
   const build = ROOM_VARIANTS[variant % ROOM_VARIANTS.length];
   return build(fact);
