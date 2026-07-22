@@ -5,13 +5,6 @@ const JOINED_WORLDS_KEY = 'anatomia_joined_worlds_v1';
 const SETTINGS_KEY = 'anatomia_settings_v1';
 const LOCAL_LEADERBOARD_KEY = 'anatomia_local_leaderboard_v1';
 const NICKNAME_KEY = 'anatomia_nickname_v1';
-const PROGRESS_KEY_PREFIX = 'anatomia_progress_v1_';
-// A real classroom interruption (bell, fire drill, a Chromebook that slept)
-// is minutes long, not hours — anything older than this is almost
-// certainly a forgotten session rather than something worth resuming into,
-// so it's ignored rather than silently dropping a student back into a
-// level they've long since moved on from.
-const PROGRESS_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 
 const LOCAL_LEADERBOARD_MAX = 20;
 
@@ -113,33 +106,4 @@ export function setNickname(name) {
     // ignore
   }
   return trimmed;
-}
-
-// Mid-level crash recovery: GameCanvas.jsx periodically saves enough state
-// to regenerate the exact same level (via the persisted RNG seed — see
-// level.js's buildLevel) and restore progress within it, so a reload
-// (sleeping Chromebook, accidental tab close, browser crash) doesn't force
-// a full restart. Keyed by world+character since switching either starts
-// a genuinely different run.
-function progressKey(worldId, characterId) {
-  return `${PROGRESS_KEY_PREFIX}${worldId}_${characterId}`;
-}
-
-export function saveProgress(worldId, characterId, data) {
-  writeJSON(progressKey(worldId, characterId), { ...data, savedAt: Date.now() });
-}
-
-export function loadProgress(worldId, characterId) {
-  const data = readJSON(progressKey(worldId, characterId), null);
-  if (!data || typeof data.savedAt !== 'number') return null;
-  if (Date.now() - data.savedAt > PROGRESS_MAX_AGE_MS) return null;
-  return data;
-}
-
-export function clearProgress(worldId, characterId) {
-  try {
-    localStorage.removeItem(progressKey(worldId, characterId));
-  } catch {
-    // ignore
-  }
 }

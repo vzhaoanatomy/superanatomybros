@@ -72,7 +72,7 @@ import {
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
-import { recordLocalScore, getNickname, saveProgress, loadProgress, clearProgress } from '../storage';
+import { recordLocalScore, getNickname } from '../storage';
 import { API_BASE } from '../api';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
@@ -240,14 +240,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     const durationMinutes = world.defaultDurationMinutes;
-    // Crash recovery: a save persists the exact RNG seed used to generate
-    // this level (see level.js's buildLevel), so regenerating with that
-    // same seed reproduces an identical layout to reapply saved progress
-    // onto — a fresh mount with no save just rolls a new random seed like
-    // before, so this is invisible outside of an actual reload/resume.
-    const savedProgress = loadProgress(worldId, characterId);
-    let levelSeed = savedProgress?.seed ?? `${world.id}-${durationMinutes}-${Math.random()}`;
-    const level = buildLevel({ world, durationMinutes, seed: levelSeed });
+    // No explicit seed — buildLevel rolls its own fresh random one, so
+    // entering a level (including re-entering one you've already played)
+    // always starts it over from scratch, never resumes mid-progress from
+    // a previous attempt.
+    const level = buildLevel({ world, durationMinutes });
     const durationSeconds = level.durationSeconds;
     const vocab = world.vocab;
     if (world.musicUrl) {
@@ -311,88 +308,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       bonusRoom: null,
       pipeTransition: null,
     };
-
-    // Reapply saved progress onto the freshly (identically) regenerated
-    // level — same seed means same array order, so restoring by index is
-    // safe. Transient mid-transition state (bonus room, pipe sink/rise,
-    // crumbling-platform triggers) isn't persisted; see saveProgressNow
-    // below for why that's an acceptable simplification, not an oversight.
-    if (savedProgress) {
-      state.score = savedProgress.score;
-      state.lives = savedProgress.lives;
-      state.missedTermIds = new Set(savedProgress.missedTermIds);
-      state.correctTermIds = new Set(savedProgress.correctTermIds);
-      state.correctCount = savedProgress.correctCount;
-      state.wrongCount = savedProgress.wrongCount;
-      state.timeRemaining = savedProgress.timeRemaining;
-      level.door.passed = savedProgress.doorPassed;
-      lastCheckpoint = savedProgress.checkpoint;
-      player.x = lastCheckpoint.x;
-      player.y = lastCheckpoint.y;
-      // A short grace period, same as any other respawn — resuming
-      // shouldn't be able to land the player directly on a hazard that
-      // instantly costs a life before they've even gotten their bearings.
-      player.invulnerableUntil = performance.now() + INVULN_MS;
-      savedProgress.coinsCollected?.forEach((c, i) => {
-        if (level.coins[i]) level.coins[i].collected = c;
-      });
-      savedProgress.enemiesAlive?.forEach((a, i) => {
-        if (level.enemies[i]) level.enemies[i].alive = a;
-      });
-      savedProgress.flyersAlive?.forEach((a, i) => {
-        if (level.flyers[i]) level.flyers[i].alive = a;
-      });
-      savedProgress.boxesUsed?.forEach((u, i) => {
-        if (level.mysteryBoxes[i]) level.mysteryBoxes[i].used = u;
-      });
-      savedProgress.pipesUsed?.forEach((u, i) => {
-        if (level.bonusPipes[i]) level.bonusPipes[i].used = u;
-      });
-      if (level.koopa && savedProgress.koopaAlive != null) level.koopa.alive = savedProgress.koopaAlive;
-      if (level.piranha && savedProgress.piranhaAlive != null) level.piranha.alive = savedProgress.piranhaAlive;
-      if (level.boss) {
-        if (savedProgress.bossAlive != null) level.boss.alive = savedProgress.bossAlive;
-        if (savedProgress.bossHp != null) level.boss.hp = savedProgress.bossHp;
-      }
-      popup(player.x + player.width / 2, player.y - 20, 'Welcome back!', '#7de37b');
-    }
-
-    // Throttled autosave — checkpoint/coin/enemy/etc. mutations happen in
-    // many different places across this file, so rather than hook every
-    // single one, this just snapshots current progress on a timer from
-    // inside the physics loop. Skipped mid-bonus-room or mid-pipe-transition
-    // (state.bonusRoom/pipeTransition) so a resume never has to reconstruct
-    // that transient state — it just resumes from the last good moment on
-    // the main level, a beat before the pipe was entered.
-    let lastProgressSaveAt = 0;
-    const PROGRESS_SAVE_INTERVAL_MS = 3000;
-    function saveProgressNow(force = false) {
-      const now = performance.now();
-      if (!force && now - lastProgressSaveAt < PROGRESS_SAVE_INTERVAL_MS) return;
-      if (state.bonusRoom || state.pipeTransition || state.levelComplete) return;
-      lastProgressSaveAt = now;
-      saveProgress(worldId, characterId, {
-        seed: levelSeed,
-        score: state.score,
-        lives: state.lives,
-        missedTermIds: [...state.missedTermIds],
-        correctTermIds: [...state.correctTermIds],
-        correctCount: state.correctCount,
-        wrongCount: state.wrongCount,
-        timeRemaining: state.timeRemaining,
-        doorPassed: level.door.passed,
-        checkpoint: lastCheckpoint,
-        coinsCollected: level.coins.map((c) => c.collected),
-        enemiesAlive: level.enemies.map((e) => e.alive),
-        flyersAlive: level.flyers.map((f) => f.alive),
-        boxesUsed: level.mysteryBoxes.map((b) => b.used),
-        pipesUsed: level.bonusPipes.map((p) => p.used),
-        koopaAlive: level.koopa ? level.koopa.alive : null,
-        piranhaAlive: level.piranha ? level.piranha.alive : null,
-        bossAlive: level.boss ? level.boss.alive : null,
-        bossHp: level.boss ? level.boss.hp : null,
-      });
-    }
 
     let lastFrameTime = performance.now();
     let lastHudPush = 0;
@@ -531,16 +446,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // reassignment) so every closure that already reads `level.xxx`
       // picks up the new layout transparently. Width and durationSeconds
       // are deterministic (not rng-driven), so they stay consistent with
-      // state.durationSeconds captured at mount. `levelSeed` is reassigned
-      // (not const) so saveProgressNow's next autosave persists THIS new
-      // layout's seed, not the one from mount — otherwise a resume after
-      // Play Again would rebuild the wrong layout and misapply saved
-      // per-index coin/enemy flags onto it. Any old save is cleared
-      // outright too, since a restart's progress shouldn't resurrect a
-      // previous attempt's checkpoint/score.
-      levelSeed = `${world.id}-${durationMinutes}-${Math.random()}`;
-      clearProgress(worldId, characterId);
-      Object.assign(level, buildLevel({ world, durationMinutes, seed: levelSeed }));
+      // state.durationSeconds captured at mount. No explicit seed — same
+      // as the initial mount, buildLevel rolls its own fresh random one.
+      Object.assign(level, buildLevel({ world, durationMinutes }));
       if (level.koopa) {
         level.koopa.nextThrowAt = scheduleKoopaThrow();
       }
@@ -586,8 +494,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     handlersRef.current.resolveQuiz = (isCorrect) => handlersRef.current._pendingResolve?.(isCorrect);
     handlersRef.current.finishEndOfLevel = (results) => {
-      // A finished level has nothing left to resume into.
-      clearProgress(worldId, characterId);
       for (const r of results) {
         if (r.correct) recordCorrect(r.termId);
         else recordWrong(r.termId);
@@ -1063,8 +969,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         updateBonusRoomPhysics(dt);
         return;
       }
-
-      saveProgressNow();
 
       state.timeRemaining -= dt;
       if (state.timeRemaining <= 0) {
@@ -1558,15 +1462,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   const h = handlersRef.current;
   const fraction = hud ? hud.timeRemaining / hud.durationSeconds : 1;
   const timeClass = fraction < 0.2 ? 'hud-timer critical' : fraction < 0.5 ? 'hud-timer warn' : 'hud-timer';
-  // A deliberate Quit clears the mid-level save rather than leaving it to
-  // resume later — shared classroom devices mean the next student to pick
-  // this same world+character combo shouldn't silently inherit someone
-  // else's score/lives/position. Crash/reload recovery (the actual point
-  // of the save) never goes through this path.
-  function handleQuit() {
-    clearProgress(worldId, characterId);
-    onQuit();
-  }
 
   return (
     <div className="game-page">
@@ -1580,7 +1475,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           musicOn={musicOn}
           onToggleMusic={() => setMusicOn(toggleMusic())}
           onToggleGlossary={h.toggleGlossary}
-          onQuit={handleQuit}
+          onQuit={onQuit}
         />
         <div className="game-viewport" style={{ width: viewportSize.w, height: viewportSize.h }}>
           <canvas
@@ -1589,7 +1484,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           />
 
           <TouchControls keysRef={keysRef} />
-          <GameOverlays overlay={overlay} h={h} onQuit={handleQuit} world={world} character={character} />
+          <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} character={character} />
           {termFlash && (
             <div
               key={termFlash.id}

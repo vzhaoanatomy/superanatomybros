@@ -223,13 +223,11 @@ function ensureSolidGround(segments, x1, x2) {
 export function buildLevel({ world, durationMinutes, seed }) {
   // Defaults to a fresh random component on every call — layout (platforms,
   // enemies, power-ups, coins) is deliberately NOT the same level-to-level
-  // so players can't just memorize a fixed path. hashSeed itself still gives
-  // a stable, well-distributed PRNG from whatever string it's given; only
-  // the string normally changes every time. GameCanvas.jsx can pass an
-  // explicit `seed` instead (and persist it) to regenerate the exact same
-  // layout later — see storage.js's saveProgress/loadProgress, used to
-  // resume an in-progress level after a reload/crash without losing track
-  // of which coins/enemies/boxes were already cleared.
+  // so players can't just memorize a fixed path, and every level entry (or
+  // restart) starts completely fresh. hashSeed itself still gives a stable,
+  // well-distributed PRNG from whatever string it's given; only the string
+  // normally changes every time. An explicit `seed` can still be passed to
+  // reproduce a specific layout deterministically (e.g. tests).
   const rng = hashSeed(seed ?? `${world.id}-${durationMinutes}-${Math.random()}`);
   // A teacher's own custom deck carries an explicit `difficulty` they picked
   // in the builder (see WorldBuilderForm.jsx). Built-ins and classroom-
