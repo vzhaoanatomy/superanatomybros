@@ -9,5 +9,12 @@ export const GRAVITY = 0.62;
 export const JUMP_CUTOFF_VELOCITY = -4; // releasing jump early clamps vy to this if still rising faster
 export const MAX_FALL_SPEED = 18;
 
+// Feel/forgiveness windows — not part of the core tuning above, safe to
+// adjust independently. See GameCanvas.jsx's coyote-time/jump-buffer/
+// corner-correction logic.
+export const COYOTE_TIME_MS = 90; // grace window to still jump after walking off a ledge
+export const JUMP_BUFFER_MS = 120; // queue a jump pressed slightly before landing
+export const CORNER_CORRECTION_PX = 6; // max sideways nudge to forgive a grazed ledge corner
+
 export const PLAYER_WIDTH = 40;
 export const PLAYER_HEIGHT = 54;

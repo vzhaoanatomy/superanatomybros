@@ -7,6 +7,9 @@ import {
   MAX_FALL_SPEED,
   PLAYER_WIDTH,
   PLAYER_HEIGHT,
+  COYOTE_TIME_MS,
+  JUMP_BUFFER_MS,
+  CORNER_CORRECTION_PX,
 } from './constants';
 import { buildLevel, buildBonusRoom, GROUND_HEIGHT } from './level';
 import { getCharacter } from './characters';
@@ -173,6 +176,18 @@ function resolveVertical(player, solids) {
       player.vy = 0;
       player.onGround = true;
     } else if (player.vy < 0) {
+      // Corner correction: if only a few px of the player's side pokes into
+      // the platform's underside corner, nudge sideways and let the jump
+      // continue instead of hard-stopping it — this is what lets a jump
+      // right next to a ledge slip past instead of getting pixel-caught.
+      // Player width equals TILE (level.js), so grazed corners are common.
+      const overlapLeft = player.x + player.width - p.x;
+      const overlapRight = p.x + p.width - player.x;
+      const shallowest = Math.min(overlapLeft, overlapRight);
+      if (shallowest <= CORNER_CORRECTION_PX) {
+        player.x += overlapLeft < overlapRight ? -shallowest : shallowest;
+        continue;
+      }
       player.y = p.y + p.height;
       player.vy = 0;
     }
@@ -274,6 +289,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       vx: 0,
       vy: 0,
       onGround: false,
+      lastGroundedAt: 0,
+      canCoyoteJump: true,
       facing: 1,
       invulnerableUntil: 0,
       pounding: false,
@@ -318,6 +335,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     let lastHudPush = 0;
     let lastFireballTime = 0;
     let lastTongueTime = 0;
+    let jumpBufferedUntil = 0;
     let glossaryOpen = false;
 
     // Toggled by the G key or the HUD button — a plain pause/resume like
@@ -411,7 +429,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.vx = 0;
       player.vy = 0;
       player.pounding = false;
+      player.canCoyoteJump = true;
       player.invulnerableUntil = performance.now() + INVULN_MS;
+      jumpBufferedUntil = 0;
     }
 
     function loseLife() {
@@ -560,6 +580,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
       if (DOWN_KEYS.has(e.code) && !keysRef.current.has(e.code)) {
         pipeEnterRequested = true;
+      }
+      if (JUMP_KEYS.has(e.code) && !keysRef.current.has(e.code)) {
+        jumpBufferedUntil = performance.now() + JUMP_BUFFER_MS;
       }
       keysRef.current.add(e.code);
     }
@@ -1075,9 +1098,20 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       const jumpVelocity = character.ability === 'superJump' ? JUMP_VELOCITY * SUPER_JUMP_MULTIPLIER : JUMP_VELOCITY;
 
-      if (jumpHeld && player.onGround && !player.pounding) {
+      // Coyote time: a jump still lands within COYOTE_TIME_MS of walking off
+      // a ledge, consumed once per ledge departure so holding jump doesn't
+      // re-trigger on every edge. Jump buffer: a jump pressed slightly
+      // before landing (jumpBufferedUntil, set in handleKeyDown) fires the
+      // instant the ground is touched instead of being dropped.
+      const now = performance.now();
+      const withinCoyoteWindow =
+        !player.onGround && player.canCoyoteJump && now - player.lastGroundedAt <= COYOTE_TIME_MS;
+      const jumpBuffered = now <= jumpBufferedUntil;
+      if ((jumpHeld || jumpBuffered) && (player.onGround || withinCoyoteWindow) && !player.pounding) {
         player.vy = jumpVelocity;
         player.onGround = false;
+        player.canCoyoteJump = false;
+        jumpBufferedUntil = 0;
       }
       if (!jumpHeld && player.vy < JUMP_CUTOFF_VELOCITY) {
         player.vy = JUMP_CUTOFF_VELOCITY;
@@ -1152,6 +1186,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // above) once CRUMBLE_DELAY_MS elapses — a beat of warning (rendered
       // as a shake, see drawCrumblePlatform) before it gives way.
       if (player.onGround) {
+        player.lastGroundedAt = now;
+        player.canCoyoteJump = true;
         for (const p of level.platforms) {
           if (p.type !== 'crumble' || p.gone || p.triggered) continue;
           const onTop = Math.abs(player.y + player.height - p.y) < 2;
