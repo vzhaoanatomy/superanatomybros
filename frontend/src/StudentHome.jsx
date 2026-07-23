@@ -56,6 +56,17 @@ const inputStyle = {
   fontFamily: 'inherit',
 };
 
+// One of a student's own joined decks, deterministically featured for the
+// whole day — same pick for everyone on the same day (day-of-year modulo
+// deck count), no randomness/storage needed. Only meaningful once a
+// student has joined more than one class; with just one deck there's no
+// real "which one today" choice to nudge them toward.
+function pickCaseOfTheDay(joined) {
+  if (joined.length < 2) return null;
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  return joined[dayOfYear % joined.length];
+}
+
 // The student-only entry point (served at /play) — a code-entry screen plus
 // whatever's already in this device's library (storage.loadJoinedWorlds()),
 // never the teacher's full authoring menu. A world played once stays in the
@@ -70,6 +81,7 @@ export default function StudentHome({ onSelectWorld }) {
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
   const [nickname, setNicknameState] = useState(getNickname());
+  const caseOfTheDay = pickCaseOfTheDay(joined);
 
   useEffect(() => {
     const settings = loadSettings();
@@ -123,6 +135,37 @@ export default function StudentHome({ onSelectWorld }) {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: '1 1 480px', minWidth: 320 }}>
+          {caseOfTheDay && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 14,
+                flexWrap: 'wrap',
+                background: 'linear-gradient(135deg, #3a2a0e, #1a1200)',
+                border: '2px solid #c9932a',
+                borderRadius: 10,
+                padding: '12px 16px',
+                textAlign: 'left',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, color: '#ffd85a' }}>
+                  🎯 Case of the Day
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 'bold', color: '#fff' }}>{caseOfTheDay.name}</div>
+                <div style={{ fontSize: 12.5, color: '#c9b98a' }}>{caseOfTheDay.subtitle}</div>
+              </div>
+              <button
+                type="button"
+                style={{ ...panelButtonStyle, width: 'auto', background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
+                onClick={() => onSelectWorld(caseOfTheDay.id)}
+              >
+                Play Now ▶
+              </button>
+            </div>
+          )}
           <p style={sectionHeaderStyle}>📚 Your Classes</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
             {joined.map((world) => (
