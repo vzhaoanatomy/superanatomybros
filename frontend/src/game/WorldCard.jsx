@@ -14,7 +14,12 @@ export default function WorldCard({ world, onSelect }) {
   // Joined classroom worlds (student library) never carry a numeric index —
   // that numbering only exists for the teacher's own built-in/custom list —
   // so this falls back to a stable pick rather than NaN.
-  const heroId = CHARACTERS[Math.max(0, (world.index ?? 1) - 1) % CHARACTERS.length].id;
+  // Custom/teacher-made decks stick to just Dr. Marrow and Nurse Liggy
+  // (alternating) rather than cycling through all 4 — Chief Madam Plasma
+  // and Dr. Bowtox stay reserved for the built-in 7.
+  const heroId = world.custom
+    ? CHARACTERS[(world.index ?? 1) % 2].id
+    : CHARACTERS[Math.max(0, (world.index ?? 1) - 1) % CHARACTERS.length].id;
   const bestScore = getBestLocalScore(world.id);
 
   useEffect(() => {
