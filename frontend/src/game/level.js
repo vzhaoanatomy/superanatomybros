@@ -494,11 +494,25 @@ export function buildLevel({ world, durationMinutes, seed }) {
   // drawBacteria in spriteRenderer.js) — rather than each world's own
   // themed creature, which all read as interchangeable "goomba-style
   // blobs" regardless of nominal type.
+  // Once enemyCount exceeds the number of ground segments, indices wrap
+  // and reuse the same segment more than once. Each segment gets divided
+  // into this many non-overlapping slices so repeat visits patrol distinct
+  // stretches instead of every enemy on that segment sharing the identical
+  // patrol box — previously that stacked multiple enemies on top of each
+  // other patrolling the exact same few hundred px, so killing one still
+  // left an overlapping twin walking around, reading as "it didn't die."
+  const repeatsPerSegment = Math.max(1, Math.ceil(enemyCount / solidSegments.length));
+  const segmentUseCount = new Array(solidSegments.length).fill(0);
   const enemies = [];
   for (let i = 0; i < enemyCount; i++) {
-    const [sx1, sx2] = solidSegments[i % solidSegments.length];
-    const segWidth = sx2 - sx1;
-    const patrolMargin = Math.min(60, segWidth * 0.2);
+    const segIdx = i % solidSegments.length;
+    const [segX1, segX2] = solidSegments[segIdx];
+    const slice = segmentUseCount[segIdx];
+    segmentUseCount[segIdx] += 1;
+    const sliceWidth = (segX2 - segX1) / repeatsPerSegment;
+    const sx1 = segX1 + slice * sliceWidth;
+    const sx2 = sx1 + sliceWidth;
+    const patrolMargin = Math.min(60, sliceWidth * 0.2);
     const minX = sx1 + patrolMargin;
     const maxX = Math.max(minX + 80, sx2 - patrolMargin);
     // A segment whose whole viable range sits inside the safe zone (only
