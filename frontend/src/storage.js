@@ -5,6 +5,7 @@ const JOINED_WORLDS_KEY = 'anatomia_joined_worlds_v1';
 const SETTINGS_KEY = 'anatomia_settings_v1';
 const LOCAL_LEADERBOARD_KEY = 'anatomia_local_leaderboard_v1';
 const NICKNAME_KEY = 'anatomia_nickname_v1';
+const TEACHER_ONBOARDING_KEY = 'anatomia_teacher_onboarding_dismissed_v1';
 
 const LOCAL_LEADERBOARD_MAX = 20;
 
@@ -106,4 +107,23 @@ export function setNickname(name) {
     // ignore
   }
   return trimmed;
+}
+
+// The "Quick Start" banner at the top of Teacher Mode — dismissed once,
+// stays dismissed on this device, rather than nagging a teacher who
+// already knows the ropes every time they come back.
+export function isTeacherOnboardingDismissed() {
+  try {
+    return localStorage.getItem(TEACHER_ONBOARDING_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function dismissTeacherOnboarding() {
+  try {
+    localStorage.setItem(TEACHER_ONBOARDING_KEY, '1');
+  } catch {
+    // ignore
+  }
 }

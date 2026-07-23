@@ -1,14 +1,21 @@
 import { useRef, useState } from 'react';
 import { getGroupedWorlds, WORLDS } from '../game/worlds';
-import { loadCustomWorldData, saveCustomWorldData } from '../storage';
+import {
+  loadCustomWorldData,
+  saveCustomWorldData,
+  isTeacherOnboardingDismissed,
+  dismissTeacherOnboarding,
+} from '../storage';
 import { publishWorld, updateWorld, uploadWorldMusic } from '../api';
 import WorldBuilderForm from './WorldBuilderForm';
 import MissedTermsPanel from './MissedTermsPanel';
 import StudentAttemptsPanel from './StudentAttemptsPanel';
+import QuickStartBanner from './QuickStartBanner';
 import * as t from './teacherStyles';
 
 export default function TeacherMode({ onExit }) {
   const [, setVersion] = useState(0);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(isTeacherOnboardingDismissed);
   const [editing, setEditing] = useState(null); // null | 'new' | { world, isBuiltIn }
   const [publishingId, setPublishingId] = useState(null);
   const [publishError, setPublishError] = useState(null); // { id, message }
@@ -253,6 +260,15 @@ export default function TeacherMode({ onExit }) {
             ← Back to Menu
           </button>
         </div>
+
+        {!onboardingDismissed && (
+          <QuickStartBanner
+            onDismiss={() => {
+              dismissTeacherOnboarding();
+              setOnboardingDismissed(true);
+            }}
+          />
+        )}
 
         <button type="button" style={{ ...t.buttonPurple, marginBottom: 16 }} onClick={() => setEditing('new')}>
           + New Custom World
