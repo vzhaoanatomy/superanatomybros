@@ -78,7 +78,8 @@ import {
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
-import { recordLocalScore, getNickname } from '../storage';
+import { recordLocalScore, getNickname, addFieldNote } from '../storage';
+import { GENERAL_FACTS } from './facts';
 import { API_BASE } from '../api';
 import { submitScore } from '../api';
 import GameHud from './GameHud';
@@ -912,18 +913,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     }
 
     function enterBonusRoom(returnSpot, roomVariant) {
-      const facts = world.funFacts;
-      // Built-in worlds have a couple of hand-written facts; custom/teacher
-      // decks don't, so fall back to turning one of the deck's own vocab
-      // terms into the "fact" — every deck has vocab, so every deck gets a
-      // lore card this way, not just the 7 built-ins.
-      let fact = null;
-      if (facts && facts.length) {
-        fact = facts[Math.floor(Math.random() * facts.length)];
-      } else if (vocab.length) {
-        const randomTerm = vocab[Math.floor(Math.random() * vocab.length)];
-        fact = `${randomTerm.term} — ${randomTerm.definition}`;
-      }
+      // Drawn from the shared general body/health pool (see facts.js) —
+      // deliberately not scoped to this deck's own system, so a skeletal
+      // level can just as easily surface a fact about the nervous system.
+      const fact = GENERAL_FACTS[Math.floor(Math.random() * GENERAL_FACTS.length)];
       const room = buildBonusRoom(roomVariant, fact);
       state.bonusRoom = { ...room, timeLeft: BONUS_ROOM_SECONDS, collected: 0, returnSpot };
       // Spawns a little above the floor so gravity carries them the rest of
@@ -1040,6 +1033,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         playMysteryBoxDing();
         popup(loreCard.x + loreCard.width / 2, loreCard.y, `+${LORE_CARD_SCORE}`, '#ffd23f');
         flashLore(loreCard.fact);
+        addFieldNote(loreCard.fact);
       }
 
       state.camera = Math.max(
@@ -1381,6 +1375,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       if (!pausedRef.current) {
+        // The level's own case file — see level.js's loreCardPlatform. Touch
+        // to collect, same as the bonus-room ones, no quiz gate.
+        for (const loreCard of level.loreCards) {
+          if (loreCard.collected) continue;
+          if (!aabbOverlap(player, loreCard)) continue;
+          loreCard.collected = true;
+          state.score += LORE_CARD_SCORE;
+          playMysteryBoxDing();
+          popup(loreCard.x + loreCard.width / 2, loreCard.y, `+${LORE_CARD_SCORE}`, '#ffd23f');
+          flashLore(loreCard.fact);
+          addFieldNote(loreCard.fact);
+        }
+      }
+
+      if (!pausedRef.current) {
         for (const p of level.powerUps) {
           if (p.collected) continue;
           if (!aabbOverlap(player, p)) continue;
@@ -1431,6 +1440,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       if (!inBonusRoom) {
+        for (const loreCard of level.loreCards) drawLoreCard(ctx, loreCard);
         for (const powerUp of level.powerUps) drawPowerUp(ctx, powerUp);
         for (const enemy of level.enemies) {
           if (enemy.alive || enemy.deadAt) drawEnemy(ctx, enemy, enemy.type ?? world.enemyType, now);

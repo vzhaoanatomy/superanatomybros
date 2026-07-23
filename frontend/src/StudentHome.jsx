@@ -5,6 +5,7 @@ import WorldCard from './game/WorldCard';
 import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
+import FieldNotes from './overlays/FieldNotes';
 
 const sectionHeaderStyle = {
   width: '100%',
@@ -65,6 +66,7 @@ export default function StudentHome({ onSelectWorld }) {
   const [showJoin, setShowJoin] = useState(joined.length === 0);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showFieldNotes, setShowFieldNotes] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
   const [nickname, setNicknameState] = useState(getNickname());
@@ -159,6 +161,13 @@ export default function StudentHome({ onSelectWorld }) {
           <button type="button" style={panelButtonStyle} onClick={() => setShowHowToPlay(true)}>
             ❓ How to Play
           </button>
+          <button
+            type="button"
+            style={{ ...panelButtonStyle, background: '#3a2f5c', border: '2px solid #5a2ba0' }}
+            onClick={() => setShowFieldNotes(true)}
+          >
+            📓 Field Notes
+          </button>
           <div style={{ textAlign: 'left', marginTop: 8 }}>
             <label style={{ display: 'block', fontSize: 12, textTransform: 'uppercase', color: '#9fb0d0', marginBottom: 6 }}>
               Nickname (shown on classroom leaderboards)
@@ -185,6 +194,7 @@ export default function StudentHome({ onSelectWorld }) {
       </div>
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} />}
       {showLeaderboard && <LocalLeaderboard onClose={() => setShowLeaderboard(false)} />}
+      {showFieldNotes && <FieldNotes onClose={() => setShowFieldNotes(false)} />}
     </div>
   );
 }

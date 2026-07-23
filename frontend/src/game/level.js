@@ -1,4 +1,5 @@
 import { WIDTH_BY_DURATION, DURATION_SECONDS } from './worlds';
+import { GENERAL_FACTS } from './facts';
 
 export const GROUND_Y = 460;
 export const GROUND_HEIGHT = 80;
@@ -760,6 +761,32 @@ export function buildLevel({ world, durationMinutes, seed }) {
     nextThrowAt: 0,
   };
 
+  // A third case file lives in the main level itself, not a bonus room —
+  // on the highest reachable platform in the back half, so finding it takes
+  // real exploration instead of just walking the ground path. The other
+  // two come from the bonus-room alcoves (see GameCanvas.jsx's
+  // enterBonusRoom) — together a level always has exactly 3 to find, all
+  // drawn from the same general body/health pool (see facts.js) regardless
+  // of which system this particular level covers.
+  const loreCardCandidates = blockPlatforms.filter((p) => p.x > width * 0.5);
+  const loreCardPlatform = (loreCardCandidates.length ? loreCardCandidates : blockPlatforms).reduce(
+    (highest, p) => (!highest || p.y < highest.y ? p : highest),
+    null
+  );
+  const loreCards = loreCardPlatform
+    ? [
+        {
+          id: 'lore-main-0',
+          x: loreCardPlatform.x + loreCardPlatform.width / 2 - 12,
+          y: loreCardPlatform.y - 34,
+          width: 24,
+          height: 24,
+          collected: false,
+          fact: GENERAL_FACTS[Math.floor(rng() * GENERAL_FACTS.length)],
+        },
+      ]
+    : [];
+
   return {
     width,
     durationSeconds,
@@ -778,6 +805,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
     koopa,
     spikes,
     flyers,
+    loreCards,
   };
 }
 
@@ -845,9 +873,10 @@ function buildSkyStepsRoom(fact) {
 
   // A rare "lore card" collectible sitting right on the jackpot step — the
   // hardest spot in the room to reach, so finding one feels like a real
-  // discovery. Only placed when the world actually has a fact to show (see
-  // buildBonusRoom below); custom/teacher worlds without funFacts just get
-  // an empty array here, same room otherwise.
+  // discovery. `fact` is always populated by the caller (see
+  // GameCanvas.jsx's enterBonusRoom, which draws from the shared
+  // GENERAL_FACTS pool), but this still degrades to no card at all if it
+  // ever isn't.
   const loreCards = fact
     ? [{ id: 'lore-0', x: stepX - 155 + stepW / 2 - 12, y: stepY + 8 - 46, width: 24, height: 24, collected: false, fact }]
     : [];
@@ -909,12 +938,10 @@ const ROOM_VARIANTS = [buildSkyStepsRoom, buildZigzagRoom];
 
 // `variant` picks which hand-built layout to use — GameCanvas passes a
 // different one per pipe (see level.js's bonusPipes below) so a level's
-// two pipes never lead to the same room. `fact` is an optional string —
-// built-in worlds pass one of their hand-written funFacts (see worlds.js),
-// custom/teacher decks pass a term+definition pulled from their own vocab
-// instead (see enterBonusRoom in GameCanvas.jsx) — either way, when a fact
-// is present the room hides exactly one lore-card collectible showing it,
-// at its single hardest-to-reach spot.
+// two pipes never lead to the same room. `fact` is a string drawn from the
+// shared GENERAL_FACTS pool (see enterBonusRoom in GameCanvas.jsx) — the
+// room hides exactly one lore-card collectible showing it, at its single
+// hardest-to-reach spot.
 export function buildBonusRoom(variant = 0, fact = null) {
   const build = ROOM_VARIANTS[variant % ROOM_VARIANTS.length];
   return build(fact);

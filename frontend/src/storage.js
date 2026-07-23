@@ -6,6 +6,7 @@ const SETTINGS_KEY = 'anatomia_settings_v1';
 const LOCAL_LEADERBOARD_KEY = 'anatomia_local_leaderboard_v1';
 const NICKNAME_KEY = 'anatomia_nickname_v1';
 const TEACHER_ONBOARDING_KEY = 'anatomia_teacher_onboarding_dismissed_v1';
+const FIELD_NOTES_KEY = 'anatomia_field_notes_v1';
 
 const LOCAL_LEADERBOARD_MAX = 20;
 
@@ -126,4 +127,25 @@ export function dismissTeacherOnboarding() {
   } catch {
     // ignore
   }
+}
+
+// Every unique fact a student has ever collected from a case-file pickup
+// (bonus-room alcove or the main level's own highest-platform card) — see
+// GENERAL_FACTS in game/facts.js. Deduped by exact string match so
+// replaying a level and re-finding the same fact doesn't inflate the
+// journal; the FieldNotes viewer shows collected vs. total pool size.
+export function getFieldNotes() {
+  const data = readJSON(FIELD_NOTES_KEY, []);
+  return Array.isArray(data) ? data : [];
+}
+
+// Returns the updated list so callers (e.g. a "new fact!" flash) can tell
+// whether this was actually a new addition without a second read.
+export function addFieldNote(fact) {
+  if (!fact) return getFieldNotes();
+  const list = getFieldNotes();
+  if (list.includes(fact)) return list;
+  const updated = [...list, fact];
+  writeJSON(FIELD_NOTES_KEY, updated);
+  return updated;
 }

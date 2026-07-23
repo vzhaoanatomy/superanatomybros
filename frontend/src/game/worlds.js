@@ -13,10 +13,6 @@ export const WORLDS = [
     enemyType: 'goomba',
     defaultDurationMinutes: 3,
     palette: { sky: '#68b5f8', hills: '#3ccc67', ground: '#bb7029', platform: '#bb7029', accent: '#ffd85a' },
-    funFacts: [
-      "Anatomical position — standing, facing forward, palms out — is the fixed reference point every 'anterior/posterior/medial' direction is described from.",
-      "Doctors and EMTs use the same anterior/posterior/medial/lateral vocabulary worldwide specifically so a description of an injury can't be misread across languages.",
-    ],
     vocab: [
       { id: 'anterior', term: 'Anterior', definition: 'Toward the front of the body.' },
       { id: 'posterior', term: 'Posterior', definition: 'Toward the back of the body.' },
@@ -38,10 +34,6 @@ export const WORLDS = [
     enemyType: 'skinBlob',
     defaultDurationMinutes: 3,
     palette: { sky: '#ffcbd7', hills: '#f491a4', ground: '#d88696', platform: '#d88696', accent: '#ff4c89' },
-    funFacts: [
-      'Skin is the largest organ in the body — an average adult carries about 8 pounds and 22 square feet of it.',
-      'The epidermis fully replaces itself roughly every 27 days; most household dust is actually shed skin cells.',
-    ],
     vocab: [
       { id: 'epidermis', term: 'Epidermis', definition: 'The outer, protective layer of the skin.' },
       { id: 'dermis', term: 'Dermis', definition: 'The layer of skin beneath the epidermis containing vessels and nerves.' },
@@ -61,10 +53,6 @@ export const WORLDS = [
     enemyType: 'skeleton',
     defaultDurationMinutes: 3,
     palette: { sky: '#d4dbea', hills: '#a6afc2', ground: '#a19b86', platform: '#a19b86', accent: '#6750b2' },
-    funFacts: [
-      'Babies are born with about 300 bones; many fuse together as they grow, leaving adults with 206.',
-      'The femur is the longest AND strongest bone in the body — it can withstand more pressure per square inch than concrete.',
-    ],
     vocab: [
       { id: 'cranium', term: 'Cranium', definition: 'The part of the skull that encloses the brain.' },
       { id: 'vertebra', term: 'Vertebra', definition: 'One of the bones that make up the spinal column.' },
@@ -84,10 +72,6 @@ export const WORLDS = [
     enemyType: 'muscleBrawler',
     defaultDurationMinutes: 3,
     palette: { sky: '#ffac92', hills: '#f47555', ground: '#d94224', platform: '#d94224', accent: '#ffffff' },
-    funFacts: [
-      'The heart is the one muscle you can never voluntarily stop flexing — cardiac muscle contracts on its own, roughly 100,000 times a day.',
-      'The strongest muscle for its size is the masseter, in your jaw — it can close your teeth with over 150 lbs of force.',
-    ],
     vocab: [
       { id: 'tendon', term: 'Tendon', definition: 'Connective tissue that attaches muscle to bone.' },
       { id: 'ligament', term: 'Ligament', definition: 'Connective tissue that attaches bone to bone.' },
@@ -107,10 +91,6 @@ export const WORLDS = [
     enemyType: 'neuron',
     defaultDurationMinutes: 3,
     palette: { sky: '#d1c2ff', hills: '#a997f4', ground: '#7766df', platform: '#7766df', accent: '#03d9ff' },
-    funFacts: [
-      'A single neuron can fire signals up to 268 miles per hour, and the nervous system carries millions of them at once.',
-      'The longest axon in your body runs from the base of your spine to your big toe — over 3 feet in a tall adult.',
-    ],
     vocab: [
       { id: 'neuron', term: 'Neuron', definition: 'A nerve cell that transmits electrical and chemical signals.' },
       { id: 'synapse', term: 'Synapse', definition: 'The junction where a signal passes from one neuron to another.' },
@@ -130,10 +110,6 @@ export const WORLDS = [
     enemyType: 'clot',
     defaultDurationMinutes: 3,
     palette: { sky: '#f95d76', hills: '#db3553', ground: '#8f2237', platform: '#8f2237', accent: '#ffd85a' },
-    funFacts: [
-      "Laid end to end, an adult's blood vessels — arteries, veins, and capillaries — would stretch about 60,000 miles, roughly 2.5 times around the Earth.",
-      'The heart pumps around 2,000 gallons of blood a day without you ever thinking about it.',
-    ],
     vocab: [
       { id: 'aorta', term: 'Aorta', definition: 'The largest artery, carrying oxygen-rich blood away from the heart.' },
       { id: 'atrium', term: 'Atrium', definition: 'An upper chamber of the heart that receives incoming blood.' },
@@ -153,10 +129,6 @@ export const WORLDS = [
     enemyType: 'labCat',
     defaultDurationMinutes: 3,
     palette: { sky: '#bcf9de', hills: '#88e9ab', ground: '#40b572', platform: '#40b572', accent: '#1f9f5f' },
-    funFacts: [
-      "A cat's whiskers are roughly as wide as its body — they use them to judge whether a gap is safe to fit through.",
-      'Cat dissection is still used in some A&P courses because feline anatomy closely mirrors human anatomy in organ placement and structure.',
-    ],
     vocab: [
       { id: 'whiskers', term: 'Vibrissae', definition: "The technical term for a cat's whiskers, used for sensing surroundings." },
       { id: 'claw', term: 'Retractable Claw', definition: 'A claw that can be pulled back into a protective sheath.' },
