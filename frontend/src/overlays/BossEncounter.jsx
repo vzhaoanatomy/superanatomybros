@@ -11,9 +11,7 @@ export default function BossEncounter({ question, onAnswer }) {
       title={`Boss Battle (${question.questionNum}/3)`}
       statsText={`Pathogen HP: ${hpBar}`}
       prompt="Which term matches:"
-      definition={question.definition}
-      options={question.options}
-      correctId={question.termId}
+      question={question}
       onAnswer={onAnswer}
     />
   );

@@ -30,6 +30,16 @@ const DIFFICULTY_OPTIONS = [
   { label: 'Hard', value: 6 },
 ];
 
+// Quick Match is the original 4-choice format; Scenario asks the player to
+// type the term instead of picking it — harder, and reads as a genuine
+// recall check rather than recognition. Applies to every quiz in the level
+// (coins, enemies, doors, boss, bonus pipes, end-of-level review) — see
+// vocab.js's buildQuestion and GameCanvas.jsx's questionStyle.
+const QUESTION_STYLE_OPTIONS = [
+  { label: 'Quick Match', value: 'quick', hint: 'Pick the term from 4 choices' },
+  { label: 'Scenario', value: 'scenario', hint: 'Type the term from memory' },
+];
+
 export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCancel }) {
   const [name, setName] = useState(initialWorld?.name ?? '');
   const [subtitle, setSubtitle] = useState(initialWorld?.subtitle ?? '');
@@ -37,6 +47,7 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
   const [enemyType, setEnemyType] = useState(initialWorld?.enemyType ?? ENEMY_TYPE_OPTIONS[0].type);
   const [paletteKey, setPaletteKey] = useState(PALETTE_PRESETS[0].key);
   const [difficulty, setDifficulty] = useState(initialWorld?.difficulty ?? 4);
+  const [questionStyle, setQuestionStyle] = useState(initialWorld?.questionStyle ?? 'quick');
   const [vocabText, setVocabText] = useState(vocabToText(initialWorld?.vocab));
   const [preview, setPreview] = useState(() => {
     if (!initialWorld?.vocab?.length) return null;
@@ -57,6 +68,7 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         name: name.trim() || initialWorld.name,
         subtitle: subtitle.trim() || initialWorld.subtitle,
         defaultDurationMinutes: Number(durationMinutes),
+        questionStyle,
         vocab: parsed.terms,
       });
     } else {
@@ -68,6 +80,7 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         palette,
         defaultDurationMinutes: Number(durationMinutes),
         difficulty,
+        questionStyle,
         vocab: parsed.terms,
         classroomCode: initialWorld?.classroomCode,
       });
@@ -93,6 +106,32 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         <option value={3}>3 minutes</option>
         <option value={5}>5 minutes</option>
       </select>
+
+      <label style={t.label}>Question style</label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {QUESTION_STYLE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setQuestionStyle(opt.value)}
+            title={opt.hint}
+            style={{
+              ...t.button,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              textAlign: 'left',
+              gap: 2,
+              background: questionStyle === opt.value ? '#7d3fd6' : t.button.background,
+              border: questionStyle === opt.value ? '2px solid #5a2ba0' : t.button.border,
+            }}
+          >
+            <span>{opt.label}</span>
+            <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>{opt.hint}</span>
+          </button>
+        ))}
+      </div>
 
       {!isBuiltIn && (
         <>

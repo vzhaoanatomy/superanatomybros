@@ -6,9 +6,7 @@ export default function DoorQuiz({ question, onAnswer }) {
       title="Checkpoint Door"
       statsText="Correct: Unlock · Wrong: Stay Blocked"
       prompt="Which term matches:"
-      definition={question.definition}
-      options={question.options}
-      correctId={question.termId}
+      question={question}
       onAnswer={onAnswer}
     />
   );

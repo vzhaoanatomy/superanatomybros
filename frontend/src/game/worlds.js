@@ -189,6 +189,7 @@ export function getAllWorlds() {
       name: override.name ?? world.name,
       subtitle: override.subtitle ?? world.subtitle,
       defaultDurationMinutes: override.defaultDurationMinutes ?? world.defaultDurationMinutes,
+      questionStyle: override.questionStyle ?? world.questionStyle,
       vocab: override.vocab ?? world.vocab,
       updatedAt: override.updatedAt,
       customized: true,

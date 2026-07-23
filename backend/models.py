@@ -23,6 +23,9 @@ class WorldPayload(BaseModel):
     enemyType: str
     palette: Palette
     defaultDurationMinutes: int
+    # "quick" (4-choice) or "scenario" (typed free-response) — see the
+    # frontend's WorldBuilderForm.jsx / vocab.js buildQuestion.
+    questionStyle: str = "quick"
     vocab: list[VocabTerm]
 
 

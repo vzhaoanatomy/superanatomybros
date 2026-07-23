@@ -13,21 +13,33 @@ export function findTerm(vocab, termId) {
   return vocab.find((v) => v.id === termId);
 }
 
-// Builds a single definition-prompt question: the target term's definition
-// plus 4 shuffled term options (1 correct + 3 distractors). Distractors are
-// picked by closest term-length to the correct answer (not pure random) so
-// the right option can't be spotted just by "which one looks different" —
-// the pool is shuffled first so length ties don't resolve the same way
-// every time.
-export function buildQuestion(vocab, termId) {
+// Builds a single definition-prompt question. `style` is a per-world Teacher
+// Mode setting (see worlds.js) — 'quick' (default) returns 4 shuffled term
+// options (1 correct + 3 distractors, picked by closest term-length to the
+// correct answer so the right option can't be spotted just by "which one
+// looks different"); 'scenario' skips the options entirely since that style
+// is answered by typing the term instead of picking a button (see
+// QuizOverlay.jsx). Both shapes carry `term` directly so callers never have
+// to branch to find the correct answer.
+export function buildQuestion(vocab, termId, style = 'quick') {
   const target = findTerm(vocab, termId);
+  if (style === 'scenario') {
+    return {
+      style: 'scenario',
+      termId,
+      term: target.term,
+      definition: target.definition,
+    };
+  }
   const candidates = shuffle(vocab.filter((v) => v.id !== termId));
   const distractors = candidates
     .sort((a, b) => Math.abs(a.term.length - target.term.length) - Math.abs(b.term.length - target.term.length))
     .slice(0, 3);
   const options = shuffle([target, ...distractors]);
   return {
+    style: 'quick',
     termId,
+    term: target.term,
     definition: target.definition,
     options: options.map((o) => ({ id: o.id, term: o.term })),
   };
@@ -35,7 +47,7 @@ export function buildQuestion(vocab, termId) {
 
 // Builds the 5-question end-of-level set: the run's missed terms first, then
 // random fill from the rest of the vocab (or all random if nothing was missed).
-export function buildEndOfLevelQuestions(vocab, missedTermIds) {
+export function buildEndOfLevelQuestions(vocab, missedTermIds, style = 'quick') {
   const count = Math.min(5, vocab.length);
   const chosen = [];
 
@@ -50,5 +62,5 @@ export function buildEndOfLevelQuestions(vocab, missedTermIds) {
     chosen.push(id);
   }
 
-  return chosen.map((id) => buildQuestion(vocab, id));
+  return chosen.map((id) => buildQuestion(vocab, id, style));
 }

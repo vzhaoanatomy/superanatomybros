@@ -27,6 +27,7 @@ function toWorldPayload(world) {
     enemyType: world.enemyType,
     palette: world.palette,
     defaultDurationMinutes: world.defaultDurationMinutes,
+    questionStyle: world.questionStyle ?? 'quick',
     vocab: world.vocab,
   };
 }

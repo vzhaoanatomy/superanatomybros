@@ -26,9 +26,7 @@ export default function EndOfLevelQuiz({ questions, onFinish }) {
       title={`End-of-Level Quiz (${index + 1}/${questions.length})`}
       statsText="Missed terms first"
       prompt="Which term matches:"
-      definition={question.definition}
-      options={question.options}
-      correctId={question.termId}
+      question={question}
       onAnswer={handleAnswer}
     />
   );

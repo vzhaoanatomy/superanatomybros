@@ -11,9 +11,7 @@ export default function PipeQuiz({ question, onAnswer }) {
       title={`Pipe Bonus (${question.questionNum}/${question.totalQuestions})`}
       statsText="Answer right to unlock the bonus room"
       prompt="Which term matches:"
-      definition={question.definition}
-      options={question.options}
-      correctId={question.termId}
+      question={question}
       onAnswer={onAnswer}
     />
   );

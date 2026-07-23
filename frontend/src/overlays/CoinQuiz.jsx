@@ -6,9 +6,7 @@ export default function CoinQuiz({ question, onAnswer }) {
       title="Coin Question"
       statsText="Correct: +15 · Wrong: -10"
       prompt="Which term matches:"
-      definition={question.definition}
-      options={question.options}
-      correctId={question.termId}
+      question={question}
       onAnswer={onAnswer}
     />
   );

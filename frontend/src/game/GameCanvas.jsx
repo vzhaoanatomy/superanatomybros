@@ -247,6 +247,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     const level = buildLevel({ world, durationMinutes });
     const durationSeconds = level.durationSeconds;
     const vocab = world.vocab;
+    // A teacher's per-deck Question Style setting (see WorldBuilderForm.jsx)
+    // — 'scenario' means every quiz in this level is typed-answer instead of
+    // 4-choice. Defaults to 'quick' for every deck that predates the setting.
+    const questionStyle = world.questionStyle === 'scenario' ? 'scenario' : 'quick';
     if (world.musicUrl) {
       setCustomTrack(`${API_BASE}${world.musicUrl}`);
     }
@@ -592,7 +596,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#ffd23f', 8);
       } else if (performance.now() >= player.invulnerableUntil) {
         enemy.pending = true;
-        const question = buildQuestion(vocab, enemy.termId);
+        const question = buildQuestion(vocab, enemy.termId, questionStyle);
         openQuiz('enemy', question, (isCorrect) => {
           enemy.pending = false;
           if (isCorrect) {
@@ -724,8 +728,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         if (!handlersRef.current._pendingResolve) {
           resume();
           setOverlay(null);
-          const correctOption = question.options.find((o) => o.id === question.termId);
-          flashTerm(correctOption?.term, question.definition, isCorrect);
+          flashTerm(question.term, question.definition, isCorrect);
         }
       };
       setOverlay({ type, question });
@@ -734,7 +737,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     function openBossQuestion(questionNum) {
       const boss = level.boss;
       const termId = nextTermId();
-      const question = buildQuestion(vocab, termId);
+      const question = buildQuestion(vocab, termId, questionStyle);
       openQuiz(
         'boss',
         { ...question, questionNum, hp: boss.hp, maxHp: boss.maxHp },
@@ -770,7 +773,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     // and try again, same "wrong stays blocked" shape as the checkpoint door.
     function openPipeQuestion(pipe, questionNum) {
       const termId = nextTermId();
-      const question = buildQuestion(vocab, termId);
+      const question = buildQuestion(vocab, termId, questionStyle);
       openQuiz('pipe', { ...question, questionNum, totalQuestions: PIPE_QUESTIONS }, (isCorrect) => {
         if (isCorrect) {
           recordCorrect(termId);
@@ -1098,7 +1101,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (!level.door.passed && !level.door.pending && aabbOverlap(player, level.door)) {
         const pushBack = player.vx > 0 ? level.door.x - player.width : level.door.x + level.door.width;
         level.door.pending = true;
-        const question = buildQuestion(vocab, level.door.termId);
+        const question = buildQuestion(vocab, level.door.termId, questionStyle);
         openQuiz('door', question, (isCorrect) => {
           level.door.pending = false;
           if (isCorrect) {
@@ -1249,7 +1252,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (!aabbOverlap(player, coin)) continue;
 
           coin.pending = true;
-          const question = buildQuestion(vocab, coin.termId);
+          const question = buildQuestion(vocab, coin.termId, questionStyle);
           openQuiz('coin', question, (isCorrect) => {
             coin.pending = false;
             if (isCorrect) {
@@ -1286,7 +1289,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         state.score += bonus;
         state.lastTimeBonus = bonus;
         playSuccessFanfare();
-        const questions = buildEndOfLevelQuestions(vocab, [...state.missedTermIds]);
+        const questions = buildEndOfLevelQuestions(vocab, [...state.missedTermIds], questionStyle);
         pause();
         setOverlay({ type: 'endOfLevel', questions });
       }
