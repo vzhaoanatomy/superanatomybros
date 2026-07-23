@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { parseVocabPaste } from '../game/vocabParser';
-import { ENEMY_TYPE_OPTIONS, PALETTE_PRESETS } from '../game/worlds';
+import { PALETTE_PRESETS } from '../game/worlds';
 import * as t from './teacherStyles';
 
 function vocabToText(vocab) {
@@ -30,21 +30,20 @@ const DIFFICULTY_OPTIONS = [
   { label: 'Hard', value: 6 },
 ];
 
-// Quick Match is the original 4-choice format; Scenario asks the player to
-// type the term instead of picking it — harder, and reads as a genuine
-// recall check rather than recognition. Applies to every quiz in the level
-// (coins, enemies, doors, boss, bonus pipes, end-of-level review) — see
-// vocab.js's buildQuestion and GameCanvas.jsx's questionStyle.
+// Both styles are still 4-choice — Scenario just frames the definition as a
+// longer "case note" prompt instead of the flat "which term matches," for
+// teachers who want something less skimmable. Applies to every quiz in the
+// level (coins, enemies, doors, boss, bonus pipes, end-of-level review) —
+// see vocab.js's buildQuestion and GameCanvas.jsx's questionStyle.
 const QUESTION_STYLE_OPTIONS = [
-  { label: 'Quick Match', value: 'quick', hint: 'Pick the term from 4 choices' },
-  { label: 'Scenario', value: 'scenario', hint: 'Type the term from memory' },
+  { label: 'Quick Match', value: 'quick', hint: 'Short prompt, 4 choices' },
+  { label: 'Scenario', value: 'scenario', hint: 'Longer case-note prompt, 4 choices' },
 ];
 
 export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCancel }) {
   const [name, setName] = useState(initialWorld?.name ?? '');
   const [subtitle, setSubtitle] = useState(initialWorld?.subtitle ?? '');
   const [durationMinutes, setDurationMinutes] = useState(initialWorld?.defaultDurationMinutes ?? 3);
-  const [enemyType, setEnemyType] = useState(initialWorld?.enemyType ?? ENEMY_TYPE_OPTIONS[0].type);
   const [paletteKey, setPaletteKey] = useState(PALETTE_PRESETS[0].key);
   const [difficulty, setDifficulty] = useState(initialWorld?.difficulty ?? 4);
   const [questionStyle, setQuestionStyle] = useState(initialWorld?.questionStyle ?? 'quick');
@@ -53,9 +52,30 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
     if (!initialWorld?.vocab?.length) return null;
     return { terms: initialWorld.vocab, skipped: 0 };
   });
+  const [fileError, setFileError] = useState(null);
+  const fileInputRef = useRef(null);
 
   function handleParse() {
     setPreview(parseVocabPaste(vocabText));
+  }
+
+  // Same "Term - Definition" / CSV parser as the paste box — a spreadsheet
+  // exported to .csv, or a plain .txt list, both come out as text either
+  // way, so this just reads the file and feeds it through the identical
+  // pipeline rather than needing a separate format.
+  function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setFileError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      setVocabText(text);
+      setPreview(parseVocabPaste(text));
+    };
+    reader.onerror = () => setFileError('Could not read that file.');
+    reader.readAsText(file);
   }
 
   function handleSave() {
@@ -76,7 +96,11 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         id: initialWorld?.id ?? `custom-${slugifyName(name || 'world')}-${Math.random().toString(36).slice(2, 6)}`,
         name: name.trim() || 'Untitled World',
         subtitle: subtitle.trim(),
-        enemyType,
+        // Every ground enemy is auto-assigned a virus/bacteria sprite at
+        // level-generation time regardless of this field (see level.js's
+        // rollPathogen) — it only still exists because the backend's
+        // WorldPayload schema requires it. Not teacher-facing anymore.
+        enemyType: initialWorld?.enemyType ?? 'goomba',
         palette,
         defaultDurationMinutes: Number(durationMinutes),
         difficulty,
@@ -135,15 +159,6 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
 
       {!isBuiltIn && (
         <>
-          <label style={t.label}>Enemy sprite</label>
-          <select style={t.input} value={enemyType} onChange={(e) => setEnemyType(e.target.value)}>
-            {ENEMY_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.type} value={opt.type}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
           <label style={t.label}>Theme</label>
           <select style={t.input} value={paletteKey} onChange={(e) => setPaletteKey(e.target.value)}>
             {PALETTE_PRESETS.map((p) => (
@@ -184,10 +199,21 @@ export default function WorldBuilderForm({ initialWorld, isBuiltIn, onSave, onCa
         }}
         placeholder={'Mitosis - Cell division producing two identical daughter cells\nMeiosis: Cell division producing gametes'}
       />
-      <div style={{ marginTop: 10, display: 'flex', gap: 10 }}>
+      <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" style={t.button} onClick={handleParse}>
           Parse Vocab
         </button>
+        <button type="button" style={t.button} onClick={() => fileInputRef.current?.click()}>
+          📁 Upload .csv / .txt
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.txt,text/csv,text/plain"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        {fileError && <span style={{ fontSize: 13, color: '#ff8a5c' }}>{fileError}</span>}
         {preview && (
           <span style={{ fontSize: 13, color: preview.skipped ? '#f1c40f' : '#7fdba0', alignSelf: 'center' }}>
             {preview.terms.length} term{preview.terms.length === 1 ? '' : 's'} parsed

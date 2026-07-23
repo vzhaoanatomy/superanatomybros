@@ -230,16 +230,4 @@ export function getWorld(id) {
 export const DURATION_SECONDS = { 2: 120, 3: 180, 5: 300 };
 export const WIDTH_BY_DURATION = { 2: 4800, 3: 7400, 5: 12000 };
 
-// Teacher Mode's builder offers these as pick-a-theme presets for brand-new
-// custom worlds (built-in edits keep the built-in's own theme/enemy).
-export const ENEMY_TYPE_OPTIONS = [
-  { type: 'goomba', label: 'Goomba-style blob' },
-  { type: 'skinBlob', label: 'Skin-disease blob' },
-  { type: 'skeleton', label: 'Skeleton' },
-  { type: 'muscleBrawler', label: 'Muscle-brawler' },
-  { type: 'neuron', label: 'Neuron' },
-  { type: 'clot', label: 'Blood clot' },
-  { type: 'labCat', label: 'Lab cat' },
-];
-
 export const PALETTE_PRESETS = WORLDS.map((w) => ({ key: w.id, label: w.name, palette: w.palette }));

@@ -248,8 +248,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     const durationSeconds = level.durationSeconds;
     const vocab = world.vocab;
     // A teacher's per-deck Question Style setting (see WorldBuilderForm.jsx)
-    // — 'scenario' means every quiz in this level is typed-answer instead of
-    // 4-choice. Defaults to 'quick' for every deck that predates the setting.
+    // — 'scenario' means every quiz in this level frames its definition as a
+    // longer case-note prompt (see QuizOverlay.jsx), still 4-choice. Defaults
+    // to 'quick' for every deck that predates the setting.
     const questionStyle = world.questionStyle === 'scenario' ? 'scenario' : 'quick';
     if (world.musicUrl) {
       setCustomTrack(`${API_BASE}${world.musicUrl}`);
@@ -543,6 +544,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     };
 
     function handleKeyDown(e) {
+      // This listener is on `window`, so it fires regardless of what's
+      // focused — without this guard, typing into any text input on the
+      // page (e.g. a quiz's future free-text field, if one is ever added)
+      // would have game keys like A/D/G silently intercepted as movement/
+      // glossary-toggle instead of reaching the input.
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (JUMP_KEYS.has(e.code) || LEFT_KEYS.has(e.code) || RIGHT_KEYS.has(e.code) || DOWN_KEYS.has(e.code)) {
         e.preventDefault();
       }

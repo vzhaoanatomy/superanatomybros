@@ -3,17 +3,6 @@ import { CHARACTERS } from './characters';
 import { drawBackground, drawPlayer } from './spriteRenderer';
 import { getBestLocalScore } from '../storage';
 
-const ENEMY_LABELS = {
-  goomba: 'Goomba-style blob',
-  skinBlob: 'Skin-disease blob',
-  skeleton: 'Skeleton',
-  muscleBrawler: 'Muscle-brawler',
-  neuron: 'Neuron',
-  clot: 'Blood clot',
-  labCat: 'Lab cat',
-  dragonling: 'Dragonlings',
-};
-
 const PREVIEW_W = 190;
 const PREVIEW_H = 96;
 
@@ -73,7 +62,7 @@ export default function WorldCard({ world, onSelect }) {
         style={{ borderRadius: 6, imageRendering: 'pixelated', display: 'block' }}
       />
       <strong style={{ fontSize: 14 }}>{world.name}</strong>
-      <span style={{ fontSize: 12, color: world.palette.accent }}>{ENEMY_LABELS[world.enemyType] ?? world.enemyType}</span>
+      <span style={{ fontSize: 12, color: world.palette.accent }}>{world.subtitle || '🦠 Viruses & Bacteria'}</span>
       {bestScore != null && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Best: {bestScore}</span>}
       {world.isClassroom && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Code: {world.code}</span>}
     </button>
