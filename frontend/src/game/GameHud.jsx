@@ -31,6 +31,12 @@ export default function GameHud({
             COINS {hud?.coinsCollected ?? 0}/{hud?.totalCoins ?? 0}
           </span>
           <span>SCORE {String(hud?.score ?? 0).padStart(6, '0')}</span>
+          {hud?.paceDelta != null && (
+            <span className={hud.paceDelta >= 0 ? 'hud-pace ahead' : 'hud-pace behind'}>
+              {hud.paceDelta >= 0 ? '▲' : '▼'} {hud.paceDelta >= 0 ? '+' : ''}
+              {hud.paceDelta} vs best
+            </span>
+          )}
         </div>
       </div>
       <div className="hud-progress-track">

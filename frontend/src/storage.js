@@ -7,6 +7,7 @@ const LOCAL_LEADERBOARD_KEY = 'anatomia_local_leaderboard_v1';
 const NICKNAME_KEY = 'anatomia_nickname_v1';
 const TEACHER_ONBOARDING_KEY = 'anatomia_teacher_onboarding_dismissed_v1';
 const FIELD_NOTES_KEY = 'anatomia_field_notes_v1';
+const BEST_RUN_TRACE_KEY = 'anatomia_best_run_trace_v1';
 
 const LOCAL_LEADERBOARD_MAX = 20;
 
@@ -148,4 +149,25 @@ export function addFieldNote(fact) {
   const updated = [...list, fact];
   writeJSON(FIELD_NOTES_KEY, updated);
   return updated;
+}
+
+// One "score at elapsed seconds" trace per world, kept only for that
+// world's single highest-scoring run — the "beat your last run" HUD
+// indicator (GameCanvas.jsx) compares the current run's live score against
+// this trace at the same elapsed time, so a student always sees whether
+// they're pacing ahead of or behind their own best.
+export function getBestRunTrace(worldId) {
+  const data = readJSON(BEST_RUN_TRACE_KEY, {});
+  return data[worldId] ?? null;
+}
+
+// Only overwrites the stored trace if this run's final score actually beat
+// the previous best — a slower/lower-scoring run shouldn't replace a
+// student's real personal best just because they played again.
+export function saveBestRunTrace(worldId, finalScore, trace) {
+  const data = readJSON(BEST_RUN_TRACE_KEY, {});
+  const existing = data[worldId];
+  if (existing && existing.finalScore >= finalScore) return;
+  data[worldId] = { finalScore, trace };
+  writeJSON(BEST_RUN_TRACE_KEY, data);
 }

@@ -78,7 +78,7 @@ import {
 } from './music';
 import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
-import { recordLocalScore, getNickname, addFieldNote } from '../storage';
+import { recordLocalScore, getNickname, addFieldNote, getBestRunTrace, saveBestRunTrace } from '../storage';
 import { GENERAL_FACTS } from './facts';
 import { API_BASE } from '../api';
 import { submitScore } from '../api';
@@ -107,6 +107,10 @@ const GROUND_POUND_RADIUS = 90;
 // jump that's 20% *higher* (not 20% faster launch), scale velocity by sqrt(1.2).
 const SUPER_JUMP_MULTIPLIER = Math.sqrt(1.2);
 const HUD_PUSH_INTERVAL_MS = 100;
+// Coarser than the HUD push — a snapshot every 2s of elapsed level time is
+// plenty of resolution for a pace comparison and keeps a stored trace small
+// (a 3-minute level is ~90 points, not ~1800).
+const RUN_TRACE_INTERVAL_MS = 2000;
 const TERM_FLASH_MS = 2000;
 // Long enough to survive being covered by a quiz overlay right after — the
 // dismiss timer runs on real wall-clock time regardless of the game's own
@@ -168,6 +172,21 @@ function aabbOverlap(a, b) {
     a.y < b.y + b.height &&
     a.y + a.height > b.y
   );
+}
+
+// The best run's score at (or just before) a given elapsed time — the
+// "beat your last run" HUD indicator compares this against the current
+// run's live score at the same point. `trace` is sorted by construction
+// (pushed in increasing elapsed order), so the last point not past
+// `elapsed` is the right one to compare against.
+function scoreAtElapsed(trace, elapsed) {
+  if (!trace || !trace.length) return null;
+  let best = null;
+  for (const point of trace) {
+    if (point.t > elapsed) break;
+    best = point;
+  }
+  return best ? best.score : null;
 }
 
 function resolveHorizontal(player, solids) {
@@ -291,6 +310,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       level.koopa.nextThrowAt = scheduleKoopaThrow();
     }
 
+    // This world's single highest-scoring run, if any — loaded once per
+    // mount (a fresh Play Again reuses it; it's only ever replaced at
+    // finishEndOfLevel, and only if the new run actually beat it). Powers
+    // the "beat your last run" HUD pace readout (see RUN_TRACE_INTERVAL_MS
+    // below and GameHud.jsx).
+    const bestRunTrace = getBestRunTrace(world.id);
+
     // Every coin/enemy/door/boss-question draws its term from this shuffled
     // no-repeat queue, rebuilt fresh on mount and on every Play Again so
     // replays don't show the same order twice.
@@ -339,6 +365,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       answerStreak: 0,
       bestStreakThisRun: 0,
       wasPerfect: false,
+      runTrace: [],
       durationSeconds,
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
@@ -353,6 +380,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
     let lastFrameTime = performance.now();
     let lastHudPush = 0;
+    let lastTracePush = 0;
     let lastFireballTime = 0;
     let lastTongueTime = 0;
     let jumpBufferedUntil = 0;
@@ -546,6 +574,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.answerStreak = 0;
       state.bestStreakThisRun = 0;
       state.wasPerfect = false;
+      state.runTrace = [];
       state.timeRemaining = state.durationSeconds;
       state.lastTimeBonus = 0;
       juice.particles = [];
@@ -570,6 +599,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (state.wasPerfect) {
         state.score += PERFECT_LEVEL_BONUS;
       }
+      // Only actually overwrites the stored trace if this run's final
+      // score beat the previous one (see saveBestRunTrace) — a slower
+      // replay doesn't erase a student's real best.
+      saveBestRunTrace(world.id, state.score, state.runTrace);
       recordLocalScore({
         worldId: world.id,
         worldName: world.name,
@@ -1507,6 +1540,18 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         drawBonusHud(ctx, canvasWidth, state.bonusRoom);
       }
 
+      // Elapsed level time only advances while actually playing the main
+      // level (state.timeRemaining is untouched during a bonus room), so
+      // this stays a fair "same point in the level" comparison without any
+      // extra bonus-room/pipe-transition gating.
+      const elapsed = state.durationSeconds - state.timeRemaining;
+      if (!inBonusRoom && !state.pipeTransition && now - lastTracePush > RUN_TRACE_INTERVAL_MS) {
+        lastTracePush = now;
+        state.runTrace.push({ t: Math.round(elapsed), score: state.score });
+      }
+      const bestPaceScore = bestRunTrace ? scoreAtElapsed(bestRunTrace.trace, elapsed) : null;
+      const paceDelta = bestPaceScore == null ? null : state.score - bestPaceScore;
+
       if (now - lastHudPush > HUD_PUSH_INTERVAL_MS) {
         lastHudPush = now;
         setHud({
@@ -1518,6 +1563,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           durationSeconds: state.durationSeconds,
           comboCount: state.coinsCollected % 5,
           answerStreak: state.answerStreak,
+          paceDelta,
           gliding: state.gliding,
           pounding: state.pounding,
           starActive: invincible,
