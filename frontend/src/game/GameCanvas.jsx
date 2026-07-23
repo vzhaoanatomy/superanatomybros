@@ -621,7 +621,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             [...state.missedTermIds],
             [...state.correctTermIds],
             state.correctCount,
-            state.wrongCount
+            state.wrongCount,
+            state.bestStreakThisRun
           ).catch(() => {});
         }
       }

@@ -42,6 +42,28 @@ export default function StudentAttemptsPanel({ code, vocab, onClose }) {
     else groups.push({ nickname: row.nickname, attempts: [row] });
   }
 
+  // "Most Improved" needs at least two attempts from the same student to
+  // mean anything — first score vs. their latest replay, not just whoever
+  // has the highest score outright (that's what the leaderboard is for).
+  let mostImproved = null;
+  for (const group of groups) {
+    if (group.attempts.length < 2) continue;
+    const delta = group.attempts[group.attempts.length - 1].score - group.attempts[0].score;
+    if (delta > 0 && (!mostImproved || delta > mostImproved.delta)) {
+      mostImproved = { nickname: group.nickname, delta };
+    }
+  }
+
+  // Biggest streak across every submitted attempt, not just each student's
+  // best-scoring one — a student can post their longest streak on a run
+  // that wasn't actually their highest score.
+  let biggestStreak = null;
+  for (const row of attempts ?? []) {
+    if (row.bestStreak > 0 && (!biggestStreak || row.bestStreak > biggestStreak.streak)) {
+      biggestStreak = { nickname: row.nickname, streak: row.bestStreak };
+    }
+  }
+
   return (
     <div style={{ ...t.panel, marginTop: 10, background: '#0e1526', maxHeight: '60vh', overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -55,6 +77,43 @@ export default function StudentAttemptsPanel({ code, vocab, onClose }) {
       {!error && attempts === null && <p style={{ color: '#9fb0d0', fontSize: 13 }}>Loading…</p>}
       {!error && attempts?.length === 0 && (
         <p style={{ color: '#9fb0d0', fontSize: 13 }}>No runs submitted yet for this code.</p>
+      )}
+
+      {(mostImproved || biggestStreak) && (
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          {mostImproved && (
+            <div
+              style={{
+                flex: '1 1 200px',
+                background: '#1a2e1a',
+                border: '1px solid #2e5c2e',
+                borderRadius: 6,
+                padding: '8px 10px',
+              }}
+            >
+              <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#7de37b' }}>📈 Most Improved</div>
+              <div style={{ fontSize: 13.5 }}>
+                <strong>{mostImproved.nickname}</strong> · +{mostImproved.delta} pts since first run
+              </div>
+            </div>
+          )}
+          {biggestStreak && (
+            <div
+              style={{
+                flex: '1 1 200px',
+                background: '#2e1f14',
+                border: '1px solid #5c3a1e',
+                borderRadius: 6,
+                padding: '8px 10px',
+              }}
+            >
+              <div style={{ fontSize: 11, textTransform: 'uppercase', color: '#ff8a5c' }}>🔥 Biggest Streak</div>
+              <div style={{ fontSize: 13.5 }}>
+                <strong>{biggestStreak.nickname}</strong> · {biggestStreak.streak} correct in a row
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {!error && groups.length > 0 && (

@@ -51,11 +51,12 @@ export function submitScore(
   missedTermIds = [],
   correctTermIds = [],
   correctCount = 0,
-  wrongCount = 0
+  wrongCount = 0,
+  bestStreak = 0
 ) {
   return request(`/api/scores/${code}`, {
     method: 'POST',
-    body: JSON.stringify({ nickname, score, missedTermIds, correctTermIds, correctCount, wrongCount }),
+    body: JSON.stringify({ nickname, score, missedTermIds, correctTermIds, correctCount, wrongCount, bestStreak }),
   });
 }
 

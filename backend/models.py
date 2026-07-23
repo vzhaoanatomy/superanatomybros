@@ -42,6 +42,10 @@ class ScoreSubmitRequest(BaseModel):
     correctTermIds: list[str] = []
     correctCount: int = 0
     wrongCount: int = 0
+    # Longest consecutive-correct run this attempt reached (see
+    # GameCanvas.jsx's answerStreak) — powers the teacher's "Biggest
+    # Streak" callout in StudentAttemptsPanel.
+    bestStreak: int = 0
 
 
 class ScoreEntry(BaseModel):
@@ -68,3 +72,4 @@ class AttemptEntry(BaseModel):
     correctTermIds: list[str]
     missedTermIds: list[str]
     submittedAt: str
+    bestStreak: int = 0

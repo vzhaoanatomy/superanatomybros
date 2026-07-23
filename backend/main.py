@@ -129,6 +129,7 @@ async def submit_score(code: str, payload: ScoreSubmitRequest):
             "correctTermIds": payload.correctTermIds,
             "missedTermIds": payload.missedTermIds,
             "submittedAt": datetime.now(timezone.utc).isoformat(),
+            "bestStreak": payload.bestStreak,
         }
     )
     return {"status": "ok"}
@@ -164,6 +165,7 @@ async def get_attempts(code: str):
             correctTermIds=doc["correctTermIds"],
             missedTermIds=doc["missedTermIds"],
             submittedAt=doc["submittedAt"],
+            bestStreak=doc.get("bestStreak", 0),
         )
         async for doc in cursor
     ]
