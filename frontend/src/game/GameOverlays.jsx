@@ -29,6 +29,7 @@ export default function GameOverlays({ overlay, h, onQuit, world, character }) {
           score={h.getScore?.() ?? 0}
           timeBonus={h.getTimeBonus?.() ?? 0}
           hasMissed={h.hasMissed?.() ?? false}
+          isPerfect={h.wasPerfectRun?.() ?? false}
           onReview={h.openReview}
           onPlayAgain={h.playAgain}
           onQuit={onQuit}

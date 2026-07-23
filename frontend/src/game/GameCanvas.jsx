@@ -57,6 +57,7 @@ import {
 import {
   toggleMusic,
   isMusicPlaying,
+  autoStartMusicOnce,
   playSuccessFanfare,
   playStarPowerSound,
   playFireballSound,
@@ -64,6 +65,8 @@ import {
   playHurtSound,
   playCorrectChime,
   playLevelCompleteDings,
+  playPerfectLevelFanfare,
+  playStreakFanfare,
   playMysteryBoxDing,
   playPowerUpPopSound,
   startBonusRoomMusic,
@@ -95,6 +98,7 @@ const COIN_WRONG_PENALTY = 10;
 // answering it (see the quiz-resolved enemy kill below at +50) — still
 // rewarding so those abilities stay fun to use, but not the best strategy.
 const INSTANT_KILL_SCORE = 10;
+const ENEMY_CORRECT_SCORE = 50;
 const GLIDE_FALL_SPEED = 1.6;
 const GROUND_POUND_SPEED = 24;
 const GROUND_POUND_RADIUS = 90;
@@ -125,6 +129,15 @@ const BONUS_ROOM_SECONDS = 10;
 const BONUS_COIN_VALUE = 10;
 const LORE_CARD_SCORE = 25;
 const LORE_FLASH_MS = 6000;
+// Once a student's consecutive-correct streak passes this many, every
+// further correct answer scores double until they miss one (see
+// recordCorrect/recordWrong below) — the 6th answer in a row is the first
+// one that counts as "above 5."
+const STREAK_BONUS_THRESHOLD = 5;
+const STREAK_FLASH_MS = 1800;
+// Awarded once, at end-of-level, if the whole run (including the
+// end-of-level review) had zero wrong answers — see finishEndOfLevel.
+const PERFECT_LEVEL_BONUS = 50;
 // How far the player visibly sinks into (or rises out of) the pipe during
 // the entry/exit cutscene — see beginPipeEntry/exitBonusRoom. Sink depth is
 // deliberately more than PLAYER_HEIGHT so they're fully hidden behind the
@@ -243,6 +256,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   const [powerUpFlash, setPowerUpFlash] = useState(null);
   // The fact revealed by a bonus-room lore card — see flashLore.
   const [loreFlash, setLoreFlash] = useState(null);
+  // Shown once, the moment an answer streak crosses STREAK_BONUS_THRESHOLD —
+  // see flashStreak.
+  const [streakFlash, setStreakFlash] = useState(null);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
@@ -319,6 +335,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       correctTermIds: new Set(),
       correctCount: 0,
       wrongCount: 0,
+      answerStreak: 0,
+      bestStreakThisRun: 0,
+      wasPerfect: false,
       durationSeconds,
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
@@ -357,11 +376,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     function recordWrong(termId) {
       state.missedTermIds.add(termId);
       state.wrongCount += 1;
+      state.answerStreak = 0;
     }
 
     function recordCorrect(termId) {
       state.correctTermIds.add(termId);
       state.correctCount += 1;
+      state.answerStreak += 1;
+      if (state.answerStreak > state.bestStreakThisRun) state.bestStreakThisRun = state.answerStreak;
+      // Fires once, right as the streak crosses the bonus threshold — every
+      // answer from here until a miss scores double (see the coin/enemy
+      // quiz-resolution sites below).
+      if (state.answerStreak === STREAK_BONUS_THRESHOLD + 1) {
+        playStreakFanfare();
+        flashStreak(state.answerStreak);
+      }
     }
 
     function popup(x, y, text, color) {
@@ -421,6 +450,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (loreFlashTimer) clearTimeout(loreFlashTimer);
       setLoreFlash({ id: performance.now(), fact });
       loreFlashTimer = setTimeout(() => setLoreFlash(null), LORE_FLASH_MS);
+    }
+
+    let streakFlashTimer = null;
+    function flashStreak(streak) {
+      if (streakFlashTimer) clearTimeout(streakFlashTimer);
+      setStreakFlash({ id: performance.now(), streak });
+      streakFlashTimer = setTimeout(() => setStreakFlash(null), STREAK_FLASH_MS);
     }
 
     function respawnPlayer() {
@@ -506,6 +542,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       state.correctTermIds = new Set();
       state.correctCount = 0;
       state.wrongCount = 0;
+      state.answerStreak = 0;
+      state.bestStreakThisRun = 0;
+      state.wasPerfect = false;
       state.timeRemaining = state.durationSeconds;
       state.lastTimeBonus = 0;
       juice.particles = [];
@@ -522,6 +561,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       for (const r of results) {
         if (r.correct) recordCorrect(r.termId);
         else recordWrong(r.termId);
+      }
+      // Perfect run: zero wrong answers across the whole level, including
+      // this end-of-level review — checked here (not earlier) since a
+      // review miss should still cost the bonus.
+      state.wasPerfect = state.wrongCount === 0;
+      if (state.wasPerfect) {
+        state.score += PERFECT_LEVEL_BONUS;
       }
       recordLocalScore({
         worldId: world.id,
@@ -545,7 +591,11 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           ).catch(() => {});
         }
       }
-      playLevelCompleteDings();
+      if (state.wasPerfect) {
+        playPerfectLevelFanfare();
+      } else {
+        playLevelCompleteDings();
+      }
       setOverlay({ type: 'complete' });
     };
     handlersRef.current.openReview = () => setOverlay({ type: 'review' });
@@ -556,9 +606,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     handlersRef.current.getScore = () => state.score;
     handlersRef.current.getTimeBonus = () => state.lastTimeBonus;
     handlersRef.current.hasMissed = () => state.missedTermIds.size > 0;
+    handlersRef.current.wasPerfectRun = () => !!state.wasPerfect;
     handlersRef.current.toggleGlossary = toggleGlossary;
     handlersRef.current.getVocab = () => vocab;
     handlersRef.current.closeIntro = () => {
+      // A real click, not page-load autoplay — see autoStartMusicOnce for
+      // why that distinction matters. Only ever takes effect once per
+      // browser session; later levels don't fight a student's own mute.
+      setMusicOn(autoStartMusicOnce());
       resume();
       setOverlay(null);
     };
@@ -633,11 +688,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           if (isCorrect) {
             enemy.alive = false;
             enemy.deadAt = performance.now();
-            state.score += 50;
-            playStompSound();
-            popup(enemy.x + enemy.width / 2, enemy.y, '+50', '#7de37b');
-            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 10);
             recordCorrect(enemy.termId);
+            const streakBonus = state.answerStreak > STREAK_BONUS_THRESHOLD;
+            const gained = ENEMY_CORRECT_SCORE * (streakBonus ? 2 : 1);
+            state.score += gained;
+            playStompSound();
+            popup(enemy.x + enemy.width / 2, enemy.y, streakBonus ? `+${gained} Streak x2!` : `+${gained}`, '#7de37b');
+            burst(juice, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, '#7de37b', 10);
           } else {
             recordWrong(enemy.termId);
             loseLife();
@@ -1302,12 +1359,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             if (isCorrect) {
               coin.collected = true;
               state.coinsCollected += 1;
-              const combo = character.ability === 'coinCombo' && state.coinsCollected % 5 === 0;
-              const gained = combo ? COIN_CORRECT_POINTS * 2 : COIN_CORRECT_POINTS;
-              state.score += gained;
-              popup(coin.x + coin.width / 2, coin.y, combo ? `+${gained} Combo!` : `+${gained}`, '#7de37b');
-              if (combo) burst(juice, coin.x + coin.width / 2, coin.y, '#ffd23f', 14);
+              // Called before scoring below so state.answerStreak already
+              // reflects this answer — the one that crosses the threshold
+              // is itself the first to earn the streak bonus.
               recordCorrect(coin.termId);
+              const combo = character.ability === 'coinCombo' && state.coinsCollected % 5 === 0;
+              const streakBonus = state.answerStreak > STREAK_BONUS_THRESHOLD;
+              const gained = COIN_CORRECT_POINTS * (combo ? 2 : 1) * (streakBonus ? 2 : 1);
+              state.score += gained;
+              const tag = combo && streakBonus ? ' Combo+Streak!' : combo ? ' Combo!' : streakBonus ? ' Streak x2!' : '';
+              popup(coin.x + coin.width / 2, coin.y, `+${gained}${tag}`, '#7de37b');
+              if (combo || streakBonus) burst(juice, coin.x + coin.width / 2, coin.y, '#ffd23f', 14);
             } else {
               recordWrong(coin.termId);
               state.score -= COIN_WRONG_PENALTY;
@@ -1445,6 +1507,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           timeRemaining: state.timeRemaining,
           durationSeconds: state.durationSeconds,
           comboCount: state.coinsCollected % 5,
+          answerStreak: state.answerStreak,
           gliding: state.gliding,
           pounding: state.pounding,
           starActive: invincible,
@@ -1499,6 +1562,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       if (termFlashTimer) clearTimeout(termFlashTimer);
       if (powerUpFlashTimer) clearTimeout(powerUpFlashTimer);
       if (loreFlashTimer) clearTimeout(loreFlashTimer);
+      if (streakFlashTimer) clearTimeout(streakFlashTimer);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', handleResize);
@@ -1534,7 +1598,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           <GameOverlays overlay={overlay} h={h} onQuit={onQuit} world={world} character={character} />
           {termFlash && (
             <div
-              key={termFlash.id}
+              key={`term-${termFlash.id}`}
               className="term-flash"
               style={{ borderColor: termFlash.correct ? '#8bd17c' : '#e97c6d' }}
             >
@@ -1545,7 +1609,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             </div>
           )}
           {powerUpFlash && (
-            <div key={powerUpFlash.id} className="power-flash">
+            <div key={`power-${powerUpFlash.id}`} className="power-flash">
               <strong>
                 {powerUpFlash.icon} {powerUpFlash.label}
               </strong>
@@ -1553,9 +1617,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
             </div>
           )}
           {loreFlash && (
-            <div key={loreFlash.id} className="lore-flash">
+            <div key={`lore-${loreFlash.id}`} className="lore-flash">
               <strong>💡 Did You Know?</strong>
               <span>{loreFlash.fact}</span>
+            </div>
+          )}
+          {streakFlash && (
+            <div key={`streak-${streakFlash.id}`} className="streak-flash">
+              <strong>🔥 Streak Bonus!</strong>
+              <span>{streakFlash.streak} in a row — correct answers now worth 2x!</span>
             </div>
           )}
         </div>

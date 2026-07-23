@@ -84,6 +84,7 @@ export default function LevelComplete({
   score,
   timeBonus,
   hasMissed,
+  isPerfect,
   onReview,
   onPlayAgain,
   onQuit,
@@ -114,6 +115,22 @@ export default function LevelComplete({
       <Fireworks />
       <div style={{ ...card, position: 'relative' }}>
         <h2 style={{ color: '#2ecc71', margin: '0 0 8px' }}>🎉 Level Complete! 🎉</h2>
+        {isPerfect && (
+          <p
+            style={{
+              fontSize: 15,
+              fontWeight: 'bold',
+              color: '#0e1526',
+              background: '#ffd23f',
+              display: 'inline-block',
+              padding: '4px 12px',
+              borderRadius: 20,
+              margin: '0 0 8px',
+            }}
+          >
+            🌟 PERFECT LEVEL! +50 Bonus
+          </p>
+        )}
         {timeBonus > 0 && (
           <p style={{ fontSize: 14, color: '#89e0ff', margin: '0 0 4px' }}>Time Bonus: +{timeBonus}</p>
         )}

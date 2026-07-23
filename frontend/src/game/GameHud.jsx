@@ -41,6 +41,13 @@ export default function GameHud({
       <div className="hud-bottom">
         <div className="hud-player">
           PLAYER: <strong>{character.name}</strong> · <span className="hud-ability">{character.abilityName}</span>
+          {(hud?.answerStreak ?? 0) >= 2 && (
+            <span className={`hud-status${hud.answerStreak > 5 ? ' warn' : ''}`}>
+              {' '}
+              · 🔥 Streak {hud.answerStreak}
+              {hud.answerStreak > 5 ? ' · 2x!' : ''}
+            </span>
+          )}
           {character.ability === 'coinCombo' && <span className="hud-status"> · Combo {hud?.comboCount ?? 0}/5</span>}
           {character.ability === 'groundPound' && hud?.pounding && <span className="hud-status warn"> · GROUND POUND!</span>}
           {character.ability === 'glide' && hud?.gliding && <span className="hud-status glide"> · Gliding...</span>}

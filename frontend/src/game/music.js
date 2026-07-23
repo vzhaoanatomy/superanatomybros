@@ -131,6 +131,22 @@ export function toggleMusic() {
   return playing;
 }
 
+// Turns music on for a student's very first level of the browser session —
+// called once from GameCanvas's "Start Rounds" handler, which is itself a
+// real click, so this doesn't run into the autoplay problem described
+// above. Every call after the first is a no-op, so a student who mutes
+// mid-session doesn't get overridden by the next level they start.
+let hasAutoStarted = false;
+export function autoStartMusicOnce() {
+  if (hasAutoStarted) return playing;
+  hasAutoStarted = true;
+  if (!playing) {
+    playing = true;
+    startPlayback();
+  }
+  return playing;
+}
+
 let sfxEnabled = true;
 
 export function isSfxEnabled() {
@@ -349,5 +365,40 @@ export function playLevelCompleteDings() {
     const start = t0 + i * 0.16;
     playTone(ctx, noteFreq(n), start, 0.3, 'sine', 0.2);
     playTone(ctx, noteFreq(n), start, 0.3, 'triangle', 0.1);
+  });
+}
+
+// A quick three-note "ding-ding-ding" — played once, the instant a
+// student's answer streak crosses the bonus threshold (see
+// STREAK_BONUS_THRESHOLD in GameCanvas.jsx), announcing that their next
+// correct answers are worth double until they miss one.
+export function playStreakFanfare() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const notes = ['E6', 'G6', 'C7'];
+  notes.forEach((n, i) => {
+    const start = t0 + i * 0.11;
+    playTone(ctx, noteFreq(n), start, 0.22, 'square', 0.18);
+    playTone(ctx, noteFreq(n), start, 0.22, 'triangle', 0.08);
+  });
+}
+
+// A bigger fanfare than the standard level-complete dings — reserved for
+// finishing a level with zero wrong answers (see PERFECT_LEVEL_BONUS in
+// GameCanvas.jsx), so a perfect run is audibly distinct from a merely
+// finished one.
+export function playPerfectLevelFanfare() {
+  if (!sfxEnabled) return;
+  const ctx = ensureContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  const t0 = ctx.currentTime;
+  const notes = ['C6', 'E6', 'G6', 'C7', 'G6', 'C7'];
+  notes.forEach((n, i) => {
+    const start = t0 + i * 0.13;
+    const dur = i === notes.length - 1 ? 0.5 : 0.2;
+    playTone(ctx, noteFreq(n), start, dur, 'square', 0.2);
+    playTone(ctx, noteFreq(n), start, dur, 'triangle', 0.1);
   });
 }
