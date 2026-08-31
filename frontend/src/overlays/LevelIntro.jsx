@@ -1,4 +1,5 @@
 import { backdrop } from './overlayStyles';
+import { isTouchDevice } from '../game/touch';
 
 const FONT = '"Trebuchet MS", "Segoe UI", Verdana, sans-serif';
 
@@ -67,8 +68,17 @@ export default function LevelIntro({ world, character, onStart }) {
           }}
         >
           <div style={tipStyle}>
-            <span>←/→ or A/D</span>
-            <span>move · ↑ / W / Space to jump</span>
+            {isTouchDevice() ? (
+              <>
+                <span>🏃</span>
+                <span>You run on your own — hold ⬆ to jump, hold ◀ to back up</span>
+              </>
+            ) : (
+              <>
+                <span>←/→ or A/D</span>
+                <span>move · ↑ / W / Space to jump</span>
+              </>
+            )}
           </div>
           <div style={tipStyle}>
             <span>🪙</span>

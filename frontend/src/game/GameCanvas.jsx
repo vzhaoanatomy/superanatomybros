@@ -85,6 +85,7 @@ import { submitScore } from '../api';
 import GameHud from './GameHud';
 import GameOverlays from './GameOverlays';
 import TouchControls from './TouchControls';
+import { isTouchDevice } from './touch';
 
 const JUMP_KEYS = new Set(['Space', 'ArrowUp', 'KeyW']);
 const LEFT_KEYS = new Set(['ArrowLeft', 'KeyA']);
@@ -234,19 +235,41 @@ function formatClock(seconds) {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
+// A level's platforms never generate above roughly world-y:140 (see the
+// climb-chain ceiling in level.js's buildLevel), and the ground sits at
+// GROUND_Y(460) + GROUND_HEIGHT(80) = 540 — so the whole vertical band of
+// actual level content spans about 400px, and a canvas taller than roughly
+// 560-600px just shows more blank sky above it, not more platforms. This
+// caps mobile's canvas height there so a tall phone screen doesn't waste
+// its extra height on empty sky instead of touch-control/HUD room.
+const MOBILE_MAX_CANVAS_H = 620;
+const MOBILE_MAX_CANVAS_W = 520;
+
 // Fits the viewport within both window dimensions at once — HUD panel,
 // frame borders, controls hint, and page padding all eat into vertical
 // space, so a width-only cap left the ground below the fold on shorter
-// screens. Aspect ratio (2:1) is preserved either way.
+// screens.
 function computeViewportSize() {
   if (typeof window === 'undefined') return { w: 960, h: 480 };
-  // A phone in landscape has very little height to spare (browser chrome
-  // eats a big chunk of an already-short screen) — the HUD/hint chrome
-  // this reserves space for shrinks to match at that size (see the
-  // `max-height: 500px` rules in App.css), so the reservation here has to
-  // shrink by the same amount, or the canvas stays tiny even once that
-  // chrome is already compact. `compact` is keyed on the same threshold
-  // as that CSS so the two never drift out of sync.
+  if (isTouchDevice()) {
+    // Mobile plays portrait-first, not landscape: rather than forcing the
+    // desktop 2:1 aspect ratio (which on a portrait phone produces a
+    // canvas only a few hundred px tall, cutting off most of a level's own
+    // climb-chain towers), just fill however much of the actual screen
+    // shape is available — a tall portrait phone shows far more of the
+    // level's vertical content band at once than a landscape phone's own
+    // height could ever fit, and a wide landscape shape (if the player
+    // rotates anyway) still works fine with no forced ratio either way.
+    const SIDE_MARGIN = 12;
+    const CHROME_HEIGHT = 96; // compact HUD panel + touch-control overlay room
+    const w = Math.max(240, Math.min(window.innerWidth - SIDE_MARGIN, MOBILE_MAX_CANVAS_W));
+    const h = Math.max(240, Math.min(window.innerHeight - CHROME_HEIGHT, MOBILE_MAX_CANVAS_H));
+    return { w, h };
+  }
+  // A short (but non-touch) window — e.g. a small desktop browser — gets
+  // the same compact HUD chrome as mobile (see the `max-height: 500px`
+  // rules in App.css); this reservation has to shrink by the same amount
+  // at that size or the canvas stays tiny even once that chrome does.
   const compact = window.innerHeight <= 500;
   const CHROME_HEIGHT = compact ? 86 : 230; // hud-panel + divider + controls-hint + borders + page padding
   const SIDE_MARGIN = compact ? 12 : 64;
@@ -288,45 +311,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   // Shown once, the moment an answer streak crosses STREAK_BONUS_THRESHOLD —
   // see flashStreak.
   const [streakFlash, setStreakFlash] = useState(null);
-  // True on a touch device currently held in portrait — the game world is
-  // built landscape-shaped (wide camera-scroll levels), so rather than
-  // silently cramming it into a tall, narrow canvas (unreadable HUD, tiny
-  // touch targets), a clear rotate prompt takes over instead. Deliberately
-  // its own effect, entirely separate from the game-loop-mounting one
-  // below (CLAUDE.md rule 1) — it only ever toggles a UI overlay and pauses
-  // via the same pause()/resume() every quiz overlay already uses, never
-  // re-running or touching the loop itself.
-  const [isPortraitTouch, setIsPortraitTouch] = useState(false);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const portraitQuery = window.matchMedia('(orientation: portrait)');
-    const coarseQuery = window.matchMedia('(pointer: coarse)');
-    function update() {
-      const portrait = portraitQuery.matches && (coarseQuery.matches || 'ontouchstart' in window);
-      setIsPortraitTouch(portrait);
-      if (portrait) {
-        handlersRef.current.pause?.();
-      } else if (overlay === null) {
-        // Only resume if nothing else (a quiz, the mission briefing, etc.)
-        // still legitimately wants the game paused — rotating back to
-        // landscape mid-quiz shouldn't silently resume physics behind a
-        // still-open overlay. `overlay` is a dependency below specifically
-        // so this always sees its current value, not a stale mount-time one.
-        handlersRef.current.resume?.();
-      }
-    }
-    update();
-    portraitQuery.addEventListener('change', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      portraitQuery.removeEventListener('change', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  }, [overlay]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -423,6 +410,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       pipeTransition: null,
     };
 
+    // Touch devices play as an auto-runner (see the main movement block in
+    // updatePhysics below) — the phone's narrower, portrait-shaped canvas
+    // and a thumb that's otherwise split between holding a direction and
+    // timing a jump both push toward "just handle the jump," matching how
+    // this style of mobile platformer usually plays. Desktop/keyboard is
+    // untouched — evaluated once since touch capability doesn't change
+    // mid-session.
+    const autoRun = isTouchDevice();
     let lastFrameTime = performance.now();
     let lastHudPush = 0;
     let lastTracePush = 0;
@@ -510,10 +505,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         pauseStartedAt = null;
       }
     }
-    // Exposed so the separate portrait-rotation effect above can pause/
-    // resume through this same choke point without needing its own copy.
-    handlersRef.current.pause = pause;
-    handlersRef.current.resume = resume;
 
     let termFlashTimer = null;
     function flashTerm(term, definition, correct) {
@@ -1089,7 +1080,21 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       const right = [...RIGHT_KEYS].some((k) => keys.has(k));
       const jumpHeld = [...JUMP_KEYS].some((k) => keys.has(k));
 
-      if (left && !right) {
+      // Both bonus rooms are hand-built as purely rightward platforming
+      // chains (see buildSkyStepsRoom/buildZigzagRoom in level.js) — the
+      // same auto-run treatment as the main level applies here too, and
+      // has to: TouchControls no longer renders a Right button at all
+      // (redundant under auto-run everywhere else), so without this a
+      // touch player would have no way to move right in here.
+      if (autoRun) {
+        if (left) {
+          player.vx = -RUN_SPEED;
+          player.facing = -1;
+        } else {
+          player.vx = RUN_SPEED;
+          player.facing = 1;
+        }
+      } else if (left && !right) {
         player.vx = -RUN_SPEED;
         player.facing = -1;
       } else if (right && !left) {
@@ -1236,7 +1241,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       if (!player.pounding) {
         const runSpeed = player.mounted ? RUN_SPEED * MOUNT_SPEED_MULTIPLIER : RUN_SPEED;
-        if (left && !right) {
+        if (autoRun) {
+          // Always moving forward on its own; holding Left is still there
+          // to back up (retrying a jump, backtracking for a missed coin,
+          // lining up on a bonus pipe) but is never required for normal
+          // play — Right has no effect since it's already running that way.
+          if (left) {
+            player.vx = -runSpeed;
+            player.facing = -1;
+          } else {
+            player.vx = runSpeed;
+            player.facing = 1;
+          }
+        } else if (left && !right) {
           player.vx = -runSpeed;
           player.facing = -1;
         } else if (right && !left) {
@@ -1701,13 +1718,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
   return (
     <div className="game-page">
-      {isPortraitTouch && (
-        <div className="rotate-prompt">
-          <div className="rotate-prompt-icon">📱</div>
-          <strong>Turn your phone sideways</strong>
-          <span>This game plays in landscape — rotate to keep going.</span>
-        </div>
-      )}
       <div className="game-frame" style={{ width: viewportSize.w + 8 }}>
         <GameHud
           world={world}

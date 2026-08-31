@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { isTouchDevice } from './touch';
 
 // Sized with vw-relative clamps, not a fixed px, because these only ever
 // render on touch devices (any screen size) — without this, two button
@@ -25,16 +26,15 @@ const BTN_BASE = {
   cursor: 'pointer',
 };
 
-function isTouchDevice() {
-  if (typeof window === 'undefined') return false;
-  if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
-  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-}
-
-// On-screen D-pad + action buttons for touch devices. Presses/releases write
-// the same key codes the keyboard handlers use directly into keysRef — the
+// On-screen action buttons for touch devices. Presses/releases write the
+// same key codes the keyboard handlers use directly into keysRef — the
 // physics loop already reads that Set every frame, so there's no separate
 // input path for it to know about.
+//
+// The mobile game auto-runs forward on its own (see the `autoRun` const in
+// GameCanvas.jsx's updatePhysics) — a dedicated Right button would just
+// duplicate what already happens by default, so only a Left ("back") button
+// is offered, for backtracking a missed coin or lining up on a bonus pipe.
 export default function TouchControls({ keysRef }) {
   const [visible, setVisible] = useState(false);
 
@@ -71,9 +71,6 @@ export default function TouchControls({ keysRef }) {
       <div style={{ position: 'absolute', left: 14, bottom: 14, display: 'flex', gap: 10, pointerEvents: 'auto' }}>
         <button type="button" className="touch-btn" style={BTN_BASE} {...press('ArrowLeft')}>
           ◀
-        </button>
-        <button type="button" className="touch-btn" style={BTN_BASE} {...press('ArrowRight')}>
-          ▶
         </button>
       </div>
       <div style={{ position: 'absolute', right: 14, bottom: 14, display: 'flex', alignItems: 'flex-end', gap: 10, pointerEvents: 'auto' }}>

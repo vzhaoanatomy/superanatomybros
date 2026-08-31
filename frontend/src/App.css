@@ -425,54 +425,16 @@
   transform: scale(0.92);
 }
 
-/* Shown instead of the game canvas whenever a touch device is held in
-   portrait — the game world is built landscape-shaped (wide camera-scroll
-   levels), so a portrait canvas was rendering tiny and unreadable rather
-   than actually playable. See the isPortraitTouch effect in GameCanvas.jsx. */
-.rotate-prompt {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 24px;
-  text-align: center;
-  background: #05070d;
-  color: #fff;
-  font-family: ui-monospace, Consolas, monospace;
-}
-
-.rotate-prompt strong {
-  font-size: 18px;
-}
-
-.rotate-prompt span {
-  max-width: 280px;
-  font-size: 13px;
-  color: #9fb0d0;
-}
-
-.rotate-prompt-icon {
-  font-size: 48px;
-  animation: rotate-prompt-spin 1.6s ease-in-out infinite;
-}
-
-@keyframes rotate-prompt-spin {
-  0%, 15% { transform: rotate(0deg); }
-  50%, 65% { transform: rotate(-90deg); }
-  100% { transform: rotate(-90deg); }
-}
-
-/* A phone in landscape is short on height, not width — this targets that
-   directly (rather than a width breakpoint, which a landscape phone never
-   trips) so the desktop-sized HUD/hint chrome doesn't eat most of an
-   already-short screen. Kept in lockstep with computeViewportSize's own
-   `compact` threshold in GameCanvas.jsx so the canvas sizing and the chrome
-   shrinking around it never drift out of sync. */
-@media (max-height: 500px) {
+/* Two independent triggers, matching computeViewportSize's own two
+   branches in GameCanvas.jsx: `pointer: coarse` catches every touch
+   device — including a tall portrait phone, which has height to spare but
+   still needs a compact HUD to leave real room for the canvas on a narrow
+   screen — and `max-height: 500px` separately catches a short window (a
+   landscape phone, or just a small desktop browser) regardless of touch.
+   Kept in lockstep with GameCanvas.jsx's `isTouchDevice()`/`compact` checks
+   so the canvas sizing and the chrome shrinking around it never drift out
+   of sync. */
+@media (pointer: coarse), (max-height: 500px) {
   .game-page {
     padding: 4px;
   }
