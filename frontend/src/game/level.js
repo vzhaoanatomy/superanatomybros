@@ -640,27 +640,71 @@ export function buildLevel({ world, durationMinutes, seed }) {
     if (gx1 < doorX + 260 && gx2 > doorX - 260) return false;
     return true;
   });
+  // A pipe needs a fully open column above it — the tower/staircase/
+  // crumble loops above run before this and know nothing about where a
+  // pipe will land, so a climbing step can otherwise end up floating
+  // directly over the pipe's spot with barely any clearance, physically
+  // blocking the player from ever standing on top of it to press Down and
+  // enter. Rather than disqualifying an entire (often long) ground segment
+  // over one platform touching any part of it, scan for an actual clear
+  // window to place the pipe in — checked against both every floating
+  // step/box (allBlockPlatforms) and any pipe already placed this level, so
+  // two pipes never land on top of each other either.
+  const PIPE_SCAN_STEP = 20;
+  const PIPE_CLEAR_MARGIN = 15;
+  const placedPipeRanges = [];
+  function findClearPipeX(gx1, gx2, preferredX) {
+    const lo = gx1 + 20;
+    const hi = gx2 - PIPE_WIDTH - 20;
+    if (hi < lo) return null;
+    const start = Math.min(hi, Math.max(lo, preferredX));
+    const span = hi - lo;
+    for (let offset = 0; offset <= span; offset += PIPE_SCAN_STEP) {
+      const tries = offset === 0 ? [start] : [start - offset, start + offset];
+      for (const x of tries) {
+        if (x < lo || x > hi) continue;
+        const x1 = x - PIPE_CLEAR_MARGIN;
+        const x2 = x + PIPE_WIDTH + PIPE_CLEAR_MARGIN;
+        const blocked =
+          allBlockPlatforms.some((p) => x1 < p.x + p.width && x2 > p.x) ||
+          placedPipeRanges.some((r) => x1 < r[1] && x2 > r[0]);
+        if (!blocked) return x;
+      }
+    }
+    return null;
+  }
   const bonusPipes = [];
   // Two pipes per level (when the layout has room for them) — each tagged
   // with a different roomVariant so GameCanvas.jsx's enterBonusRoom builds
   // a distinct bonus room per pipe rather than the same one twice.
-  const pipeCount = Math.min(pipeCandidates.length, 2);
-  for (let i = 0; i < pipeCount; i++) {
+  const desiredPipeCount = Math.min(pipeCandidates.length, 2);
+  for (let i = 0; i < desiredPipeCount; i++) {
     const segIndex = Math.min(
-      Math.floor(((i + 0.5) / pipeCount) * pipeCandidates.length),
+      Math.floor(((i + 0.5) / desiredPipeCount) * pipeCandidates.length),
       pipeCandidates.length - 1
     );
     const [gx1, gx2] = pipeCandidates[segIndex];
+    let pipeX = findClearPipeX(gx1, gx2, gx1 + (gx2 - gx1) / 2 - PIPE_WIDTH / 2);
+    // This slot's own segment has no open column — fall back to scanning
+    // every other candidate segment rather than just losing the pipe.
+    if (pipeX == null) {
+      for (const [ogx1, ogx2] of pipeCandidates) {
+        pipeX = findClearPipeX(ogx1, ogx2, ogx1 + (ogx2 - ogx1) / 2 - PIPE_WIDTH / 2);
+        if (pipeX != null) break;
+      }
+    }
+    if (pipeX == null) continue; // no clear spot anywhere this level — skip this pipe
+    placedPipeRanges.push([pipeX - PIPE_CLEAR_MARGIN, pipeX + PIPE_WIDTH + PIPE_CLEAR_MARGIN]);
     const pipe = {
-      id: `pipe-${i}`,
-      x: gx1 + (gx2 - gx1) / 2 - PIPE_WIDTH / 2,
+      id: `pipe-${bonusPipes.length}`,
+      x: pipeX,
       y: GROUND_Y - PIPE_HEIGHT,
       width: PIPE_WIDTH,
       height: PIPE_HEIGHT,
       type: 'pipe',
       used: false,
       pending: false,
-      roomVariant: i,
+      roomVariant: bonusPipes.length,
     };
     platforms.push(pipe);
     bonusPipes.push(pipe);
@@ -820,7 +864,14 @@ export function buildLevel({ world, durationMinutes, seed }) {
 // ROOM_VARIANTS) so the level's two pipes don't feel like the same room.
 export const BONUS_ROOM_WIDTH = 1100;
 export const BONUS_ROOM_GROUND_Y = 380;
-const BONUS_CEILING_Y = 0;
+// buildSkyStepsRoom's top step sits at y=71 (groundY - 105 - 68*3) — with
+// the ceiling previously at y=0..20, that left only 51px of clearance
+// above it, less than the player's own 54px height. The step itself was
+// geometrically impossible to stand on (the player's head would hit the
+// ceiling before their feet ever reached it), regardless of where a coin
+// or lore card was placed on it. Raised well clear of that: 71 - (-40) =
+// 111px of clearance, comfortably above 54px.
+const BONUS_CEILING_Y = -60;
 const BONUS_CEILING_HEIGHT = 20;
 
 function makeCoinFactory() {
@@ -877,8 +928,15 @@ function buildSkyStepsRoom(fact) {
   // GameCanvas.jsx's enterBonusRoom, which draws from the shared
   // GENERAL_FACTS pool), but this still degrades to no card at all if it
   // ever isn't.
+  // stepY has been decremented one extra time past the last pushed step
+  // (the loop above always runs `stepY -= 68` after every push, including
+  // the final one) — the jackpot coins above undo that with their own
+  // `+ 68` to land back on the true last step's y; this needs the same
+  // correction, or it lands a further 68px higher, clean through the
+  // room's ceiling (BONUS_CEILING_Y/HEIGHT above) and permanently
+  // unreachable.
   const loreCards = fact
-    ? [{ id: 'lore-0', x: stepX - 155 + stepW / 2 - 12, y: stepY + 8 - 46, width: 24, height: 24, collected: false, fact }]
+    ? [{ id: 'lore-0', x: stepX - 155 + stepW / 2 - 12, y: stepY + 68 + 8 - 46, width: 24, height: 24, collected: false, fact }]
     : [];
 
   return { width, groundY, platforms, coins, loreCards };

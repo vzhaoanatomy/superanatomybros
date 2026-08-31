@@ -414,3 +414,103 @@
     justify-content: flex-start;
   }
 }
+
+/* On-screen D-pad/action buttons had no visual response to a press at all —
+   on a touch screen, that reads as "did that even register?" (part of what
+   made the controls feel "wonky"). A quick scale+brighten on `:active` gives
+   an immediate tactile confirmation, matching the pointer-capture fix in
+   TouchControls.jsx that keeps a press registered while it's held. */
+.touch-btn:active {
+  background: rgba(255, 255, 255, 0.34) !important;
+  transform: scale(0.92);
+}
+
+/* Shown instead of the game canvas whenever a touch device is held in
+   portrait — the game world is built landscape-shaped (wide camera-scroll
+   levels), so a portrait canvas was rendering tiny and unreadable rather
+   than actually playable. See the isPortraitTouch effect in GameCanvas.jsx. */
+.rotate-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: #05070d;
+  color: #fff;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.rotate-prompt strong {
+  font-size: 18px;
+}
+
+.rotate-prompt span {
+  max-width: 280px;
+  font-size: 13px;
+  color: #9fb0d0;
+}
+
+.rotate-prompt-icon {
+  font-size: 48px;
+  animation: rotate-prompt-spin 1.6s ease-in-out infinite;
+}
+
+@keyframes rotate-prompt-spin {
+  0%, 15% { transform: rotate(0deg); }
+  50%, 65% { transform: rotate(-90deg); }
+  100% { transform: rotate(-90deg); }
+}
+
+/* A phone in landscape is short on height, not width — this targets that
+   directly (rather than a width breakpoint, which a landscape phone never
+   trips) so the desktop-sized HUD/hint chrome doesn't eat most of an
+   already-short screen. Kept in lockstep with computeViewportSize's own
+   `compact` threshold in GameCanvas.jsx so the canvas sizing and the chrome
+   shrinking around it never drift out of sync. */
+@media (max-height: 500px) {
+  .game-page {
+    padding: 4px;
+  }
+  .hud-panel {
+    padding: 4px 10px;
+  }
+  .hud-world-sub {
+    display: none;
+  }
+  .hud-world-name {
+    font-size: 13px;
+  }
+  .hud-hearts {
+    font-size: 15px;
+    min-width: 0;
+  }
+  .hud-stats {
+    font-size: 11px;
+    gap: 10px;
+    min-width: 0;
+  }
+  .hud-progress-track {
+    height: 6px;
+    margin-top: 4px;
+  }
+  .hud-divider {
+    margin: 4px 0;
+  }
+  .hud-player,
+  .hud-pace {
+    font-size: 11px;
+  }
+  .hud-quit,
+  .hud-music {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .controls-hint {
+    display: none;
+  }
+}

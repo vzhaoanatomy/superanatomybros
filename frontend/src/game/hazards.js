@@ -43,7 +43,7 @@ export function fireballHitsHazard(fireball, level, state) {
   return false;
 }
 
-export function updateHazards(level, player, state, loseLife) {
+export function updateHazards(level, player, state, loseLife, playerWasFalling, playerFallY) {
   const now = performance.now();
   const starActive = now < player.starUntil;
   const invulnerable = now < player.invulnerableUntil;
@@ -94,7 +94,17 @@ export function updateHazards(level, player, state, loseLife) {
     }
 
     if (aabbOverlap(player, koopa)) {
-      const stomping = player.vy > 0 && player.y + player.height - koopa.y < koopa.height * 0.5;
+      // The koopa always stands on real, solid ground — GameCanvas's own
+      // resolveVertical (which runs before this, every frame) already
+      // snapped the player down onto that same ground by the time this
+      // executes, since the koopa itself isn't a solid the player can
+      // land on. That leaves player.vy back at 0 and player.y at its
+      // final resting spot — reading as "standing next to it," never
+      // "just landed on its head," so a normal jump-stomp could never
+      // register. playerWasFalling/playerFallY are GameCanvas's
+      // pre-resolution snapshot of this same frame, taken while the
+      // player was still actually falling through the koopa's box.
+      const stomping = playerWasFalling && playerFallY + player.height - koopa.y < koopa.height * 0.5;
       if (stomping || player.pounding) {
         koopa.alive = false;
         state.score += KOOPA_SCORE;

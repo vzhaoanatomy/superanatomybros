@@ -2,6 +2,11 @@
 // of scroll position — matters most for page-level modals (Settings, How to
 // Play) on a tall/scrolled mobile page; in-game quiz overlays already sit
 // inside a viewport-sized `.game-viewport`, so this is a no-op change there.
+// `overflowY: auto` matters on a short landscape-phone viewport specifically:
+// `alignItems: center` alone clips a card taller than the viewport off both
+// the top and bottom with no way to reach whatever's cut off (e.g. the
+// mission briefing's own "Start Rounds" button) — scrolling is what turns
+// that into "requires a scroll" instead of "permanently unreachable."
 export const backdrop = {
   position: 'fixed',
   inset: 0,
@@ -10,6 +15,9 @@ export const backdrop = {
   justifyContent: 'center',
   background: 'rgba(4, 8, 20, 0.72)',
   zIndex: 10,
+  overflowY: 'auto',
+  padding: '12px 0',
+  boxSizing: 'border-box',
 };
 
 export const card = {

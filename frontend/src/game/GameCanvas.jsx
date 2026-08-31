@@ -240,9 +240,18 @@ function formatClock(seconds) {
 // screens. Aspect ratio (2:1) is preserved either way.
 function computeViewportSize() {
   if (typeof window === 'undefined') return { w: 960, h: 480 };
-  const CHROME_HEIGHT = 230; // hud-panel + divider + controls-hint + borders + page padding
-  const maxW = Math.min(window.innerWidth - 64, 1300);
-  const maxH = Math.max(300, window.innerHeight - CHROME_HEIGHT);
+  // A phone in landscape has very little height to spare (browser chrome
+  // eats a big chunk of an already-short screen) — the HUD/hint chrome
+  // this reserves space for shrinks to match at that size (see the
+  // `max-height: 500px` rules in App.css), so the reservation here has to
+  // shrink by the same amount, or the canvas stays tiny even once that
+  // chrome is already compact. `compact` is keyed on the same threshold
+  // as that CSS so the two never drift out of sync.
+  const compact = window.innerHeight <= 500;
+  const CHROME_HEIGHT = compact ? 86 : 230; // hud-panel + divider + controls-hint + borders + page padding
+  const SIDE_MARGIN = compact ? 12 : 64;
+  const maxW = Math.min(window.innerWidth - SIDE_MARGIN, 1300);
+  const maxH = Math.max(180, window.innerHeight - CHROME_HEIGHT);
   let w = maxW;
   let h = Math.round(w * 0.5);
   if (h > maxH) {
@@ -279,9 +288,45 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
   // Shown once, the moment an answer streak crosses STREAK_BONUS_THRESHOLD —
   // see flashStreak.
   const [streakFlash, setStreakFlash] = useState(null);
+  // True on a touch device currently held in portrait — the game world is
+  // built landscape-shaped (wide camera-scroll levels), so rather than
+  // silently cramming it into a tall, narrow canvas (unreadable HUD, tiny
+  // touch targets), a clear rotate prompt takes over instead. Deliberately
+  // its own effect, entirely separate from the game-loop-mounting one
+  // below (CLAUDE.md rule 1) — it only ever toggles a UI overlay and pauses
+  // via the same pause()/resume() every quiz overlay already uses, never
+  // re-running or touching the loop itself.
+  const [isPortraitTouch, setIsPortraitTouch] = useState(false);
 
   const world = getWorld(worldId);
   const character = getCharacter(characterId);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const portraitQuery = window.matchMedia('(orientation: portrait)');
+    const coarseQuery = window.matchMedia('(pointer: coarse)');
+    function update() {
+      const portrait = portraitQuery.matches && (coarseQuery.matches || 'ontouchstart' in window);
+      setIsPortraitTouch(portrait);
+      if (portrait) {
+        handlersRef.current.pause?.();
+      } else if (overlay === null) {
+        // Only resume if nothing else (a quiz, the mission briefing, etc.)
+        // still legitimately wants the game paused — rotating back to
+        // landscape mid-quiz shouldn't silently resume physics behind a
+        // still-open overlay. `overlay` is a dependency below specifically
+        // so this always sees its current value, not a stale mount-time one.
+        handlersRef.current.resume?.();
+      }
+    }
+    update();
+    portraitQuery.addEventListener('change', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      portraitQuery.removeEventListener('change', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, [overlay]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -385,6 +430,16 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     let lastTongueTime = 0;
     let jumpBufferedUntil = 0;
     let glossaryOpen = false;
+    // Captured each frame right before resolveVertical (see updatePhysics)
+    // — the player's true fall velocity and raw, not-yet-clipped y for this
+    // frame. Ground-level hazards (koopa) and enemies aren't solid, so
+    // resolveVertical always snaps the player straight down onto the real
+    // ground platform underneath/behind them; reading the live player.vy/y
+    // afterward in a stomp check sees a landed, motionless player standing
+    // at ground level, not one that just fell through the enemy's own top
+    // half. These preserve that pre-resolution snapshot for stomp checks.
+    let playerWasFalling = false;
+    let playerFallY = 0;
 
     // Toggled by the G key or the HUD button — a plain pause/resume like
     // any quiz overlay, just without a resolve callback. Won't open over an
@@ -455,6 +510,10 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         pauseStartedAt = null;
       }
     }
+    // Exposed so the separate portrait-rotation effect above can pause/
+    // resume through this same choke point without needing its own copy.
+    handlersRef.current.pause = pause;
+    handlersRef.current.resume = resume;
 
     let termFlashTimer = null;
     function flashTerm(term, definition, correct) {
@@ -705,7 +764,14 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     // whether the enemy patrols the ground or bobs through the air.
     function resolveEnemyTouch(enemy) {
       if (enemy.pending || !aabbOverlap(player, enemy)) return;
-      const bigStomping = player.big && player.vy > 0 && player.y + player.height - enemy.y < enemy.height * 0.5;
+      // Ground enemies aren't solid, so by the time this runs (after
+      // resolveVertical, see updatePhysics) a player falling onto one has
+      // already been snapped down onto the real ground platform underneath
+      // it — player.vy is back to 0 and player.y reads as "standing," never
+      // "landing on the enemy's head." playerWasFalling/playerFallY are
+      // this frame's pre-resolution snapshot, taken while the player was
+      // still genuinely falling through the enemy's own box.
+      const bigStomping = player.big && playerWasFalling && playerFallY + player.height - enemy.y < enemy.height * 0.5;
       if (player.pounding || bigStomping || performance.now() < player.starUntil) {
         enemy.alive = false;
         enemy.deadAt = performance.now();
@@ -750,7 +816,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     const FLYER_STOMP_BOUNCE = -9;
     function resolveFlyerTouch(flyer) {
       if (!aabbOverlap(player, flyer)) return;
-      const stomping = player.vy > 0 && player.y + player.height - flyer.y < flyer.height * 0.5;
+      const stomping = playerWasFalling && playerFallY + player.height - flyer.y < flyer.height * 0.5;
       if (stomping || player.pounding || performance.now() < player.starUntil) {
         flyer.alive = false;
         flyer.deadAt = performance.now();
@@ -1258,7 +1324,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // underside once it stops them, which reads as touching, not
       // overlapping, so a check placed after it would miss every bump.
       const wasMovingUp = player.vy < 0;
+      playerWasFalling = player.vy > 0;
       player.y += player.vy;
+      playerFallY = player.y;
       if (wasMovingUp && !pausedRef.current) {
         for (const box of level.mysteryBoxes) {
           if (!box.used && aabbOverlap(player, box)) triggerMysteryBox(box);
@@ -1371,7 +1439,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
 
       if (!pausedRef.current) {
-        updateHazards(level, player, state, loseLife);
+        updateHazards(level, player, state, loseLife, playerWasFalling, playerFallY);
       }
 
       if (!pausedRef.current) {
@@ -1633,6 +1701,13 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
   return (
     <div className="game-page">
+      {isPortraitTouch && (
+        <div className="rotate-prompt">
+          <div className="rotate-prompt-icon">📱</div>
+          <strong>Turn your phone sideways</strong>
+          <span>This game plays in landscape — rotate to keep going.</span>
+        </div>
+      )}
       <div className="game-frame" style={{ width: viewportSize.w + 8 }}>
         <GameHud
           world={world}
