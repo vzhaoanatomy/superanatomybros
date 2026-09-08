@@ -1,9 +1,8 @@
 import os
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from codes import unique_code
 from db import attempts_collection, scores_collection, term_stats_collection, worlds_collection
@@ -22,12 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Uploaded classroom music lives on disk, served back out at /media/<code>.mp3
-# — one fixed filename per code, so a re-upload just overwrites in place.
-UPLOAD_DIR = "uploads"
+# Uploaded classroom music is stored as bytes directly in the world's own
+# Mongo document (musicData/musicContentType below), not on local disk —
+# Render's free tier has no persistent disk, so anything written to disk
+# (the old `uploads/<code>.mp3` + StaticFiles mount this replaced) silently
+# vanishes on the very next deploy, permanently breaking every classroom's
+# uploaded music. Mongo already persists everything else about a world;
+# 8MB comfortably fits under Mongo's own 16MB document size limit.
 MAX_MUSIC_BYTES = 8 * 1024 * 1024
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 
 
 @app.get("/api/health")
@@ -47,7 +48,11 @@ async def publish_world(payload: WorldPayload):
 
 @app.get("/api/worlds/{code}")
 async def get_world(code: str):
-    doc = await worlds_collection.find_one({"code": code.upper()})
+    # Excludes musicData: every student joining a world fetches this
+    # document, and that field can be up to MAX_MUSIC_BYTES of raw audio —
+    # the frontend only ever needs musicUrl (a plain string pointing at the
+    # dedicated /music route below), never the bytes themselves here.
+    doc = await worlds_collection.find_one({"code": code.upper()}, {"musicData": 0, "musicContentType": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="World not found")
     doc.pop("_id", None)
@@ -81,13 +86,32 @@ async def upload_world_music(code: str, file: UploadFile = File(...)):
     if len(body) > MAX_MUSIC_BYTES:
         raise HTTPException(status_code=400, detail="File too large (8MB max)")
 
-    dest = os.path.join(UPLOAD_DIR, f"{code}.mp3")
-    with open(dest, "wb") as f:
-        f.write(body)
-
-    music_url = f"/media/{code}.mp3"
-    await worlds_collection.update_one({"code": code}, {"$set": {"musicUrl": music_url}})
+    # musicUrl is a stable path (no filename/extension in it) — it always
+    # points at this same API route, which looks up whatever's currently
+    # stored for this code, so a re-upload just needs the $set below and
+    # nothing else changes for anyone already holding this URL.
+    music_url = f"/api/worlds/{code}/music"
+    await worlds_collection.update_one(
+        {"code": code},
+        {"$set": {"musicUrl": music_url, "musicData": body, "musicContentType": file.content_type or "audio/mpeg"}},
+    )
     return {"musicUrl": music_url}
+
+
+@app.get("/api/worlds/{code}/music")
+async def get_world_music(code: str):
+    doc = await worlds_collection.find_one({"code": code.upper()}, {"musicData": 1, "musicContentType": 1})
+    if not doc or not doc.get("musicData"):
+        raise HTTPException(status_code=404, detail="No music uploaded for this world")
+    return Response(
+        content=bytes(doc["musicData"]),
+        media_type=doc.get("musicContentType") or "audio/mpeg",
+        # A world's music is only ever replaced by a brand-new upload, and
+        # the frontend's <audio src> naturally re-fetches whenever a level
+        # switches worlds — safe to cache for a while rather than
+        # re-downloading the same bytes on every replay of the same world.
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.post("/api/scores/{code}")
