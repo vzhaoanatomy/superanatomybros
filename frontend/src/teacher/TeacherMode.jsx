@@ -45,7 +45,22 @@ export default function TeacherMode({ onExit }) {
     setUploadingId(world.id);
     setUploadMessage(null);
     try {
-      await uploadWorldMusic(world.classroomCode, file);
+      const { musicUrl } = await uploadWorldMusic(world.classroomCode, file);
+      // The upload only updates the *published* copy in the backend — this
+      // teacher's own local copy (what "My Decks" actually plays, whether
+      // or not they ever rejoin via the classroom code themselves) never
+      // otherwise learns the new musicUrl, so a teacher testing their own
+      // deck right after uploading would still hear nothing even though a
+      // student joining fresh would already have it. Mirrors handlePublish's
+      // own pattern for keeping classroomCode in sync locally after a
+      // server-side change.
+      const store = loadCustomWorldData();
+      const idx = store.custom.findIndex((w) => w.id === world.id);
+      if (idx >= 0) {
+        store.custom[idx] = { ...store.custom[idx], musicUrl };
+        saveCustomWorldData(store);
+        refresh();
+      }
       setUploadMessage({ id: world.id, text: '🎵 Music uploaded!', isError: false });
     } catch (err) {
       setUploadMessage({ id: world.id, text: err.message, isError: true });
