@@ -1,4 +1,4 @@
-# Super Anatomy Bros — Full Spec
+# Super Anatomy Docs — Full Spec
 
 ## Content model (read first)
 Vocabulary is **teacher-supplied, not hardcoded**. The 7 built-in worlds are themed

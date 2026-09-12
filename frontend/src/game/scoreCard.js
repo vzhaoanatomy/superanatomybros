@@ -26,7 +26,7 @@ export function downloadScoreCard({ worldName, characterName, nickname, score, t
 
   ctx.fillStyle = '#ffd23f';
   ctx.font = 'bold 30px ui-monospace, Consolas, monospace';
-  ctx.fillText('SUPER ANATOMY BROS', cx, 118);
+  ctx.fillText('SUPER ANATOMY DOCS', cx, 118);
 
   ctx.fillStyle = '#fff';
   ctx.font = '18px ui-monospace, Consolas, monospace';
@@ -56,7 +56,7 @@ export function downloadScoreCard({ worldName, characterName, nickname, score, t
   ctx.fillText(new Date().toLocaleDateString(), cx, 372);
 
   const link = document.createElement('a');
-  link.download = `super-anatomy-bros-score-${Date.now()}.png`;
+  link.download = `super-anatomy-docs-score-${Date.now()}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
 }

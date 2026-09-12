@@ -1,4 +1,4 @@
-# Building Super Anatomy Bros with Claude Code
+# Building Super Anatomy Docs with Claude Code
 
 The Emergent prompt does **not** translate directly. Emergent takes one big wall of text and generates a whole app. Claude Code is an agent working in your repo — it does better with a spec file it can re-read, plus a phased build order with checkpoints where you actually play the game before moving on. Building all of this in one shot is how you get a 3,000-line mess that's choppy and hard to debug.
 
@@ -9,7 +9,7 @@ So this guide has three parts: two files you save into the repo, and a kickoff m
 ## STEP 1 — Set up the repo
 
 ```bash
-mkdir super-anatomy-bros && cd super-anatomy-bros
+mkdir super-anatomy-docs && cd super-anatomy-docs
 git init
 claude
 ```
@@ -23,7 +23,7 @@ Save the two files below into that folder before you start (or ask Claude Code t
 This is persistent context. Claude Code reads it automatically on every session, so these rules survive across days and compactions.
 
 ```markdown
-# Project: Super Anatomy Bros — Anatomy and Physiology Edition
+# Project: Super Anatomy Docs — Anatomy and Physiology Edition
 
 A Super Mario–style 2D canvas platformer for high school A&P vocab review.
 Full feature spec lives in SPEC.md — read it before starting any new feature.
@@ -63,7 +63,7 @@ Full feature spec lives in SPEC.md — read it before starting any new feature.
 ## STEP 3 — Save this as `SPEC.md` in the repo root
 
 ```markdown
-# Super Anatomy Bros — Full Spec
+# Super Anatomy Docs — Full Spec
 
 ## Content model (read first)
 Vocabulary is **teacher-supplied, not hardcoded**. The 7 built-in worlds are themed

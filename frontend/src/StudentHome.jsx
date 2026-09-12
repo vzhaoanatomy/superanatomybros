@@ -120,7 +120,7 @@ export default function StudentHome({ onSelectWorld }) {
   return (
     <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24 }}>
       <div className="title-banner">
-        <h1>Super Anatomy Bros</h1>
+        <h1>Super Anatomy Docs</h1>
       </div>
       <p className="tagline-ribbon">Enter your teacher's code to play. Highest score wins!</p>
       <div

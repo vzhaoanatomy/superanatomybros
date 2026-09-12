@@ -95,7 +95,7 @@ export default function WorldSelect({ onSelect, onOpenTeacherMode }) {
   return (
     <div style={{ textAlign: 'center', color: '#1a2a4a', padding: 24 }}>
       <div className="title-banner">
-        <h1>Super Anatomy Bros</h1>
+        <h1>Super Anatomy Docs</h1>
       </div>
       <p className="tagline-ribbon">Anatomy and Physiology Edition — customize a deck or jump into one below.</p>
       <div

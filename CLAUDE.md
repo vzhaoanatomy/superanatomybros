@@ -1,4 +1,4 @@
-# Project: Super Anatomy Bros — Anatomy and Physiology Edition
+# Project: Super Anatomy Docs — Anatomy and Physiology Edition
 
 A Super Mario–style 2D canvas platformer for high school A&P vocab review.
 Full feature spec lives in SPEC.md — read it before starting any new feature.
