@@ -9,7 +9,7 @@ const PREVIEW_H = 96;
 // Shared between the teacher's WorldSelect grid and the student's
 // StudentHome library — same canvas preview, same card chrome, so a joined
 // world looks exactly like the one the teacher published.
-export default function WorldCard({ world, onSelect }) {
+export default function WorldCard({ world, onSelect, loading = false }) {
   const canvasRef = useRef(null);
   // Joined classroom worlds (student library) never carry a numeric index —
   // that numbering only exists for the teacher's own built-in/custom list —
@@ -39,6 +39,7 @@ export default function WorldCard({ world, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(world.id)}
+      disabled={loading}
       style={{
         position: 'relative',
         display: 'flex',
@@ -51,13 +52,31 @@ export default function WorldCard({ world, onSelect }) {
         borderRadius: 10,
         boxShadow: '0 4px 0 rgba(0,0,0,0.35)',
         color: '#fff',
-        cursor: 'pointer',
+        cursor: loading ? 'default' : 'pointer',
         width: 190,
+        opacity: loading ? 0.6 : 1,
       }}
     >
       {world.custom && (
         <span style={{ position: 'absolute', top: -10, right: -6, fontSize: 20 }} title="Custom world">
           ⭐
+        </span>
+      )}
+      {loading && (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.5)',
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 'bold',
+          }}
+        >
+          🔄 Checking for updates…
         </span>
       )}
       <canvas

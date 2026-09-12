@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getNickname, setNickname, loadJoinedWorlds, loadSettings, saveSettings } from './storage';
+import { getNickname, setNickname, loadJoinedWorlds, saveJoinedWorlds, loadSettings, saveSettings } from './storage';
 import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } from './game/music';
+import { fetchWorld } from './api';
 import WorldCard from './game/WorldCard';
 import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
@@ -81,6 +82,9 @@ export default function StudentHome({ onSelectWorld }) {
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
   const [nickname, setNicknameState] = useState(getNickname());
+  // Id of whichever joined world is currently being re-checked against the
+  // server before play — see handleSelectWorld below.
+  const [refreshingId, setRefreshingId] = useState(null);
   const caseOfTheDay = pickCaseOfTheDay(joined);
 
   useEffect(() => {
@@ -88,6 +92,33 @@ export default function StudentHome({ onSelectWorld }) {
     setSfxOn(setSfxEnabled(settings.sfxOn));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A joined world is a one-time snapshot taken at join — vocab, duration,
+  // or music the teacher updates afterward would otherwise never reach a
+  // student who already joined, short of them manually re-entering the same
+  // code. Re-checking with the server right before play (falling back to
+  // whatever's already cached if the request fails, so a flaky connection
+  // never blocks play outright) fixes that without needing a manual rejoin.
+  async function handleSelectWorld(id) {
+    const world = joined.find((w) => w.id === id);
+    if (!world?.code) {
+      onSelectWorld(id);
+      return;
+    }
+    setRefreshingId(id);
+    try {
+      const fresh = await fetchWorld(world.code);
+      const updated = loadJoinedWorlds().map((w) => (w.id === id ? { ...fresh, id: w.id, isClassroom: true, code: w.code } : w));
+      saveJoinedWorlds(updated);
+      setJoined(updated);
+    } catch {
+      // Offline, or the server's briefly unreachable — play from whatever's
+      // already cached rather than blocking the student entirely.
+    } finally {
+      setRefreshingId(null);
+      onSelectWorld(id);
+    }
+  }
 
   function handleToggleMusic() {
     const next = toggleMusic();
@@ -160,16 +191,22 @@ export default function StudentHome({ onSelectWorld }) {
               <button
                 type="button"
                 style={{ ...panelButtonStyle, width: 'auto', background: '#c9932a', border: '2px solid #8a651c', color: '#1a1200' }}
-                onClick={() => onSelectWorld(caseOfTheDay.id)}
+                onClick={() => handleSelectWorld(caseOfTheDay.id)}
+                disabled={refreshingId === caseOfTheDay.id}
               >
-                Play Now ▶
+                {refreshingId === caseOfTheDay.id ? '🔄 Checking…' : 'Play Now ▶'}
               </button>
             </div>
           )}
           <p style={sectionHeaderStyle}>📚 Your Classes</p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
             {joined.map((world) => (
-              <WorldCard key={world.id} world={world} onSelect={onSelectWorld} />
+              <WorldCard
+                key={world.id}
+                world={world}
+                onSelect={handleSelectWorld}
+                loading={refreshingId === world.id}
+              />
             ))}
           </div>
         </div>
