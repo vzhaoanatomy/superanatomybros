@@ -8,6 +8,10 @@ import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
 import FieldNotes from './overlays/FieldNotes';
 
+// See handleSelectWorld below — caps how long a pre-play refresh check is
+// allowed to stall on a cold backend before falling back to the cached copy.
+const REFRESH_TIMEOUT_MS = 3000;
+
 const sectionHeaderStyle = {
   width: '100%',
   fontSize: 13,
@@ -99,6 +103,13 @@ export default function StudentHome({ onSelectWorld }) {
   // code. Re-checking with the server right before play (falling back to
   // whatever's already cached if the request fails, so a flaky connection
   // never blocks play outright) fixes that without needing a manual rejoin.
+  //
+  // The backend's free-tier host spins down after a stretch of inactivity —
+  // the first request after that can take 30+ seconds to cold-start, which
+  // would otherwise leave a student stuck on "Checking for updates…" for
+  // that whole time. REFRESH_TIMEOUT_MS caps how long this is willing to
+  // wait before giving up and playing from the cached copy instead —
+  // freshness is a nice-to-have here, not worth a long stall over.
   async function handleSelectWorld(id) {
     const world = joined.find((w) => w.id === id);
     if (!world?.code) {
@@ -107,13 +118,16 @@ export default function StudentHome({ onSelectWorld }) {
     }
     setRefreshingId(id);
     try {
-      const fresh = await fetchWorld(world.code);
+      const fresh = await Promise.race([
+        fetchWorld(world.code),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Refresh check timed out')), REFRESH_TIMEOUT_MS)),
+      ]);
       const updated = loadJoinedWorlds().map((w) => (w.id === id ? { ...fresh, id: w.id, isClassroom: true, code: w.code } : w));
       saveJoinedWorlds(updated);
       setJoined(updated);
     } catch {
-      // Offline, or the server's briefly unreachable — play from whatever's
-      // already cached rather than blocking the student entirely.
+      // Offline, timed out, or the server's briefly unreachable — play from
+      // whatever's already cached rather than blocking the student.
     } finally {
       setRefreshingId(null);
       onSelectWorld(id);
