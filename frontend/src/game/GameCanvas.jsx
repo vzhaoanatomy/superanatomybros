@@ -28,10 +28,7 @@ import {
   drawBoss,
   drawDinoMount,
   drawFireball,
-  drawPiranhaPlant,
-  drawSpikes,
   drawKoopa,
-  drawShell,
   drawTongueFlick,
   drawSolidEgg,
   drawScorePopup,
@@ -62,7 +59,6 @@ import {
   playStarPowerSound,
   playFireballSound,
   playStompSound,
-  playHurtSound,
   playCorrectChime,
   playLevelCompleteDings,
   playPerfectLevelFanfare,
@@ -76,7 +72,6 @@ import {
   setCustomTrack,
   clearCustomTrack,
 } from './music';
-import { updateHazards, fireballHitsHazard, scheduleKoopaThrow } from './hazards';
 import { createTermQueue } from './termQueue';
 import { recordLocalScore, getNickname, addFieldNote, getBestRunTrace, saveBestRunTrace } from '../storage';
 import { GENERAL_FACTS } from './facts';
@@ -338,9 +333,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
     if (world.musicUrl) {
       setCustomTrack(`${API_BASE}${world.musicUrl}`);
     }
-    if (level.koopa) {
-      level.koopa.nextThrowAt = scheduleKoopaThrow();
-    }
 
     // This world's single highest-scoring run, if any — loaded once per
     // mount (a fresh Play Again reuses it; it's only ever replaced at
@@ -402,7 +394,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       timeRemaining: durationSeconds,
       lastTimeBonus: 0,
       fireballs: [],
-      shells: [],
       solidEggs: [],
       scorePopups: [],
       poppedItems: [],
@@ -502,6 +493,17 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         const pausedMs = performance.now() - pauseStartedAt;
         player.starUntil += pausedMs;
         player.invulnerableUntil += pausedMs;
+        // A crumble platform's own countdown (triggerAt + CRUMBLE_DELAY_MS,
+        // see updatePhysics) runs on the same real wall-clock time this
+        // whole pause span was subtracted from above — without this, a
+        // student who steps onto one right as a quiz opens and takes a
+        // while to answer comes back to the platform vanishing out from
+        // under them the instant the quiz closes, with no warning at all.
+        for (const p of level.platforms) {
+          if (p.type === 'crumble' && p.triggered && !p.gone) {
+            p.triggerAt += pausedMs;
+          }
+        }
         pauseStartedAt = null;
       }
     }
@@ -554,7 +556,7 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // mount pops first (biggest shield), then big, then fire — reverting
       // the character to its normal size/state with a brief invulnerability
       // window, same "shield" convention for every damage source (quiz
-      // wrong answer, piranha chomp, koopa shell, pit, timeout).
+      // wrong answer, koopa touch, pit, timeout).
       if (player.mounted) {
         player.mounted = false;
         player.invulnerableUntil = performance.now() + INVULN_MS;
@@ -589,9 +591,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       // state.durationSeconds captured at mount. No explicit seed — same
       // as the initial mount, buildLevel rolls its own fresh random one.
       Object.assign(level, buildLevel({ world, durationMinutes }));
-      if (level.koopa) {
-        level.koopa.nextThrowAt = scheduleKoopaThrow();
-      }
       termQueue.assignAll(level);
 
       // A fresh run regenerates the door's position too, so any checkpoint
@@ -605,7 +604,6 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       player.hasFire = false;
       player.tongueUntil = 0;
       state.fireballs = [];
-      state.shells = [];
       state.solidEggs = [];
       state.scorePopups = [];
       state.poppedItems = [];
@@ -796,17 +794,15 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
       }
     }
 
-    // King Boo (the flying enemy) deliberately skips the quiz-gate every
-    // other enemy gets — the harder, non-vocab-based challenge the user
-    // asked for. Only three things put it down: a plain jump-stomp (any
-    // size, not just big/pounding/star like resolveEnemyTouch requires),
-    // a fireball (handled in the fireball loop below), or a big/pounding/
-    // star touch same as any other enemy. Anything else — walking into it
-    // sideways, getting bumped from below — costs a life immediately, same
-    // as a stationary hazard, with no chance to answer out of it.
+    // King Boo (the flying enemy) — a plain jump-stomp defeats it instantly
+    // (any size, not just big/pounding/star like resolveEnemyTouch requires
+    // for a non-stomp touch, since it's still the harder-to-land, purely
+    // jump-timed challenge), same as ground-pound/star/fireball. Any other
+    // touch used to be an automatic life loss with no chance to answer out
+    // of it; now opens a quiz instead, same as every other enemy.
     const FLYER_STOMP_BOUNCE = -9;
     function resolveFlyerTouch(flyer) {
-      if (!aabbOverlap(player, flyer)) return;
+      if (flyer.pending || !aabbOverlap(player, flyer)) return;
       const stomping = playerWasFalling && playerFallY + player.height - flyer.y < flyer.height * 0.5;
       if (stomping || player.pounding || performance.now() < player.starUntil) {
         flyer.alive = false;
@@ -819,8 +815,72 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
         burst(juice, flyer.x + flyer.width / 2, flyer.y + flyer.height / 2, '#ffd23f', 8);
         if (stomping && !player.pounding) player.vy = FLYER_STOMP_BOUNCE;
       } else if (performance.now() >= player.invulnerableUntil) {
-        playHurtSound();
-        loseLife();
+        flyer.pending = true;
+        const question = buildQuestion(vocab, flyer.termId, questionStyle);
+        openQuiz('enemy', question, (isCorrect) => {
+          flyer.pending = false;
+          if (isCorrect) {
+            flyer.alive = false;
+            flyer.deadAt = performance.now();
+            recordCorrect(flyer.termId);
+            const streakBonus = state.answerStreak > STREAK_BONUS_THRESHOLD;
+            const gained = ENEMY_CORRECT_SCORE * (streakBonus ? 2 : 1);
+            state.score += gained;
+            playStompSound();
+            popup(flyer.x + flyer.width / 2, flyer.y, streakBonus ? `+${gained} Streak x2!` : `+${gained}`, '#7de37b');
+            burst(juice, flyer.x + flyer.width / 2, flyer.y + flyer.height / 2, '#7de37b', 10);
+          } else {
+            recordWrong(flyer.termId);
+            loseLife();
+            popup(player.x + player.width / 2, player.y, '-1 Life', '#ff6b6b');
+          }
+        });
+      }
+    }
+
+    // Koopa Troopa — same shape as resolveFlyerTouch: a clean stomp (or
+    // ground pound, or fire — see the fireball loop below) still defeats it
+    // instantly, anything else opens a quiz instead of the automatic life
+    // loss it used to be.
+    const KOOPA_STOMP_BOUNCE = -9;
+    function resolveKoopaTouch(koopa) {
+      if (koopa.pending || !aabbOverlap(player, koopa)) return;
+      // The koopa isn't solid, so by the time this runs (after
+      // resolveVertical) a player falling onto it has already been snapped
+      // down onto the real ground beneath it — see the identical note on
+      // resolveEnemyTouch's bigStomping check above for why
+      // playerWasFalling/playerFallY (this frame's pre-resolution snapshot)
+      // are used here instead of the live player state.
+      const stomping = playerWasFalling && playerFallY + player.height - koopa.y < koopa.height * 0.5;
+      if (stomping || player.pounding || performance.now() < player.starUntil) {
+        koopa.alive = false;
+        state.score += INSTANT_KILL_SCORE;
+        playStompSound();
+        popup(koopa.x + koopa.width / 2, koopa.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+        shake(juice, 5);
+        hitPause(juice, 60);
+        burst(juice, koopa.x + koopa.width / 2, koopa.y + koopa.height / 2, '#ffd23f', 8);
+        if (stomping && !player.pounding) player.vy = KOOPA_STOMP_BOUNCE;
+      } else if (performance.now() >= player.invulnerableUntil) {
+        koopa.pending = true;
+        const question = buildQuestion(vocab, koopa.termId, questionStyle);
+        openQuiz('enemy', question, (isCorrect) => {
+          koopa.pending = false;
+          if (isCorrect) {
+            koopa.alive = false;
+            recordCorrect(koopa.termId);
+            const streakBonus = state.answerStreak > STREAK_BONUS_THRESHOLD;
+            const gained = ENEMY_CORRECT_SCORE * (streakBonus ? 2 : 1);
+            state.score += gained;
+            playStompSound();
+            popup(koopa.x + koopa.width / 2, koopa.y, streakBonus ? `+${gained} Streak x2!` : `+${gained}`, '#7de37b');
+            burst(juice, koopa.x + koopa.width / 2, koopa.y + koopa.height / 2, '#7de37b', 10);
+          } else {
+            recordWrong(koopa.termId);
+            loseLife();
+            popup(player.x + player.width / 2, player.y, '-1 Life', '#ff6b6b');
+          }
+        });
       }
     }
 
@@ -1397,8 +1457,8 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
 
       // Flyers patrol left-right like ground enemies but also bob up and
       // down on a sine wave, floating free of any platform — see
-      // resolveFlyerTouch above for why they get their own (harder,
-      // non-quiz) resolution instead of resolveEnemyTouch.
+      // resolveFlyerTouch above for its own copy of the stomp-vs-quiz split
+      // every other enemy type uses too.
       if (!pausedRef.current) {
         for (const flyer of level.flyers) {
           if (!flyer.alive) continue;
@@ -1410,6 +1470,18 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           flyer.y = flyer.baseY + Math.sin(performance.now() * flyer.bobSpeed + flyer.bobPhase) * flyer.bobAmplitude;
           resolveFlyerTouch(flyer);
         }
+      }
+
+      // Koopa: a single patrol enemy, same back-and-forth as a ground
+      // enemy — see resolveKoopaTouch above for the stomp-vs-quiz split.
+      if (!pausedRef.current && level.koopa && level.koopa.alive) {
+        const koopa = level.koopa;
+        koopa.x += koopa.vx;
+        if (koopa.x < koopa.minX || koopa.x + koopa.width > koopa.maxX) {
+          koopa.vx *= -1;
+          koopa.x = Math.max(koopa.minX, Math.min(koopa.x, koopa.maxX - koopa.width));
+        }
+        resolveKoopaTouch(koopa);
       }
 
       if (!pausedRef.current) {
@@ -1448,15 +1520,19 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
               }
             }
           }
-          if (fireball.alive) fireballHitsHazard(fireball, level, state);
+          if (fireball.alive && level.koopa && level.koopa.alive && aabbOverlap(fireball, level.koopa)) {
+            const koopa = level.koopa;
+            koopa.alive = false;
+            fireball.alive = false;
+            state.score += INSTANT_KILL_SCORE;
+            playStompSound();
+            popup(koopa.x + koopa.width / 2, koopa.y, `+${INSTANT_KILL_SCORE}`, '#7de37b');
+            burst(juice, koopa.x + koopa.width / 2, koopa.y + koopa.height / 2, '#ff8a5c', 8);
+          }
         }
         if (state.fireballs.length > 20) {
           state.fireballs = state.fireballs.filter((f) => f.alive);
         }
-      }
-
-      if (!pausedRef.current) {
-        updateHazards(level, player, state, loseLife, playerWasFalling, playerFallY);
       }
 
       if (!pausedRef.current) {
@@ -1573,14 +1649,9 @@ export default function GameCanvas({ characterId, worldId, onQuit }) {
           drawBoss(ctx, level.boss);
           if (level.boss.alive) drawPathogenLabel(ctx, level.boss.x, level.boss.y - 22, level.boss.width, level.boss.name);
         }
-        if (level.piranha) drawPiranhaPlant(ctx, level.piranha);
-        for (const patch of level.spikes) drawSpikes(ctx, patch);
         if (level.koopa && level.koopa.alive) drawKoopa(ctx, level.koopa);
         drawDoor(ctx, level.door);
         drawFlag(ctx, level.flag);
-        for (const shell of state.shells) {
-          if (shell.alive) drawShell(ctx, shell);
-        }
         for (const fireball of state.fireballs) {
           if (fireball.alive) drawFireball(ctx, fireball);
         }

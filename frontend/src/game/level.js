@@ -96,6 +96,37 @@ function clearCoinOfPlatforms(cx, cy, blockPlatforms) {
   return Math.max(40, y);
 }
 
+// Nudges a target x so the item's *entire* width sits on one solid ground
+// segment, not just its left edge — a coin (or anything else touch-to-
+// collect) hovering above open air, even partially, is exactly the kind of
+// "student jumps to grab it, the quiz pauses the game, and resolving the
+// quiz drops them straight into the pit below with no chance to react" trap
+// reported from real classroom play. Snapping only the left edge onto a
+// segment boundary still leaves the rest of the item's width hanging over
+// the gap on the other side — width has to be part of the fit, not just
+// the anchor point.
+function nearestSolidX(x, itemWidth, segments) {
+  for (const [s1, s2] of segments) {
+    if (x >= s1 && x + itemWidth <= s2) return x;
+  }
+  let best = x;
+  let bestDist = Infinity;
+  for (const [s1, s2] of segments) {
+    if (s2 - s1 < itemWidth) continue; // too narrow to ever fully hold this item
+    // Snapping into the gap *before* this segment lands on its left edge
+    // (item extends rightward, into solid ground); snapping into the gap
+    // *after* it has to land `itemWidth` short of its right edge instead,
+    // or the item's own body would hang off the far side of that edge.
+    const candidate = x < s1 ? s1 : s2 - itemWidth;
+    const dist = Math.abs(candidate - x);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
 // Mystery boxes take the place of an occasional climbing step (see the
 // tower-climb loop in buildLevel) — coin bonuses are the common case,
 // power-ups less so, and the +50 "jackpot" coin is rarest.
@@ -460,7 +491,11 @@ export function buildLevel({ world, durationMinutes, seed }) {
   const coinCount = Math.max(4, Math.round(width / 1000), vocab.length);
   const coinSpots = [];
   for (let i = 0; i < coinCount; i++) {
-    const cx = 200 + (i / coinCount) * (width - 400) + rng() * 80;
+    // Snapped onto solid ground before anything else — these coins (unlike
+    // the staircase/crumble ones below, already tied to a specific known-
+    // safe platform) are otherwise placed with no regard for what's
+    // underneath them at all.
+    const cx = nearestSolidX(200 + (i / coinCount) * (width - 400) + rng() * 80, 24, groundSegments);
     const cy = clearCoinOfPlatforms(cx, 200 + rng() * 190, allBlockPlatforms);
     coinSpots.push({ x: cx, y: cy });
   }
@@ -579,18 +614,30 @@ export function buildLevel({ world, durationMinutes, seed }) {
   // Flyers (King Boo): hover free of any platform, patrolling horizontally
   // while bobbing on a sine wave (see GameCanvas.jsx's flyer update loop) —
   // the only enemy reachable purely from a well-timed jump rather than a
-  // walk-up, and deliberately NOT quiz-gated (see resolveFlyerTouch in
-  // GameCanvas.jsx) — no termId/pending needed since it never opens a
-  // quiz. Spread across evenly-sized zones like the tower slots above so
-  // they don't cluster.
+  // walk-up. A clean stomp still defeats it instantly, same shortcut every
+  // other enemy gets; any other touch opens a quiz instead of an automatic
+  // life loss (see resolveFlyerTouch in GameCanvas.jsx). Spread across
+  // evenly-sized zones like the tower slots above so they don't cluster.
   const FLYER_COUNT = Math.max(1, Math.round(1 + difficulty * 0.4));
   const flyers = [];
   for (let i = 0; i < FLYER_COUNT; i++) {
     const zoneWidth = width / (FLYER_COUNT + 1);
     const zoneCenter = zoneWidth * (i + 1) + rng() * 200 - 100;
     const rangeW = 160 + rng() * 100;
-    const minX = Math.max(300, zoneCenter - rangeW / 2);
-    const maxX = Math.min(width - 300, zoneCenter + rangeW / 2);
+    let minX = Math.max(300, zoneCenter - rangeW / 2);
+    let maxX = Math.min(width - 300, zoneCenter + rangeW / 2);
+    // Flyers already fly free of any platform (that's the point — the only
+    // enemy you reach by a well-timed jump, not a walk-up), but with no
+    // constraint at all a patrol can sit directly over a ground gap. Same
+    // "pause a quiz there, resume, drop straight into the pit" trap as an
+    // unconstrained coin — clamp the patrol span to whichever solid ground
+    // segment overlaps it most, so there's always real ground underneath.
+    const overlap = groundSegments
+      .map(([s1, s2]) => [Math.max(minX, s1), Math.min(maxX, s2)])
+      .filter(([lo, hi]) => hi > lo)
+      .reduce((best, span) => (!best || span[1] - span[0] > best[1] - best[0] ? span : best), null);
+    if (!overlap) continue;
+    [minX, maxX] = overlap;
     if (maxX - minX < 80) continue;
     const flyerWidth = 38;
     const flyerHeight = 30;
@@ -608,6 +655,8 @@ export function buildLevel({ world, durationMinutes, seed }) {
       bobSpeed: 0.0016 + rng() * 0.0012,
       bobPhase: rng() * Math.PI * 2,
       alive: true,
+      pending: false,
+      termId: null,
       variant: Math.floor(rng() * PATHOGEN_VARIANT_COUNT),
       name: VIRUS_NAMES[Math.floor(rng() * VIRUS_NAMES.length)],
     });
@@ -631,7 +680,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
   // of questions for a bonus coin room (see GameCanvas.jsx's
   // findPipeUnderPlayer/openPipeQuestion). Placed on a wide-enough stretch
   // of solid ground, clear of spawn, the checkpoint door, and the end-of-
-  // level boss/piranha cluster so it never reads as blocking the main path.
+  // level boss cluster so it never reads as blocking the main path.
   const PIPE_WIDTH = 52;
   const PIPE_HEIGHT = 74;
   const pipeCandidates = groundSegments.filter(([gx1, gx2]) => {
@@ -736,54 +785,18 @@ export function buildLevel({ world, durationMinutes, seed }) {
     name: BOSS_NAMES[Math.floor(rng() * BOSS_NAMES.length)],
   };
 
-  // Spikes: stationary ground hazards earlier in the level (the piranha
-  // plant already owns the end-game slot) — no HP, can't be defeated,
-  // jump over them or eat them. Placed on wide-enough solid stretches clear
-  // of spawn and the checkpoint door so they never read as an unfair
-  // ambush. Two patches (one per level half) instead of one — a single
-  // hazard sitting somewhere across a level thousands of pixels wide was
-  // easy to walk an entire playthrough without ever crossing.
-  const SPIKE_HEIGHT = 26;
-  const SPIKE_WIDTH = 56;
-  const spikeCandidates = solidSegments.filter(
-    ([sx1, sx2]) => sx2 - sx1 > 220 && sx1 > 500 && (sx1 < doorX - 200 || sx1 > doorX + 200)
-  );
-  const spikes = [];
-  const usedSpikeSegments = new Set();
-  const SPIKE_PATCH_COUNT = 2;
-  for (let i = 0; i < SPIKE_PATCH_COUNT; i++) {
-    // Alternate halves so two patches don't both land close together.
-    const remaining = spikeCandidates.filter((seg) => !usedSpikeSegments.has(seg));
-    const half = remaining.filter(([sx1]) => (i === 0 ? sx1 < width * 0.55 : sx1 >= width * 0.3));
-    const pool = half.length ? half : remaining;
-    if (!pool.length) break;
-    const picked = pool[Math.floor(rng() * pool.length)];
-    usedSpikeSegments.add(picked);
-    const [spx1, spx2] = picked;
-    const spikeX = Math.max(spx1 + 20, Math.min(spx2 - SPIKE_WIDTH - 20, spx1 + (spx2 - spx1) / 2 - SPIKE_WIDTH / 2));
-    spikes.push({ x: spikeX, y: GROUND_Y - SPIKE_HEIGHT, width: SPIKE_WIDTH, height: SPIKE_HEIGHT });
-  }
-
-  // Piranha plant: a stationary hazard near the end of the level (before
-  // the boss/flag, not blocking the path — it's a threat you have to
-  // navigate around or burn a fireball on, not a gate). Only fire defeats
-  // it; touching it costs a life automatically (see loseLife in
-  // GameCanvas.jsx for how power-ups absorb that hit first).
-  const PIRANHA_HEIGHT = 70;
-  const piranhaX = Math.max(width * 0.6, boss ? boss.x - 220 : Math.min(width - 260, flag.x - 220));
-  const piranha = {
-    x: piranhaX,
-    y: GROUND_Y - PIRANHA_HEIGHT,
-    width: 44,
-    height: PIRANHA_HEIGHT,
-    alive: true,
-  };
-
-  // Koopa Troopa: patrols like a normal ground enemy but isn't quiz-gated —
-  // it's a skill enemy, defeated only by stomping its head or a fireball,
-  // and periodically lobs a shell at the player (GameCanvas owns the actual
-  // throw timer since it needs a runtime clock, not level-gen-time data).
-  const koopaCandidates = solidSegments.filter(([x1]) => x1 > width * 0.4 && x1 < piranhaX - 300);
+  // Koopa Troopa: patrols like a normal ground enemy. A clean stomp (or
+  // ground pound, or fire) still defeats it instantly, same shortcut every
+  // other enemy gets — anything else opens a quiz instead of an automatic
+  // life loss (see resolveKoopaTouch in GameCanvas.jsx). Used to also lob
+  // shells at the player and cost a life on any non-stomp touch; both
+  // removed after classroom feedback that it amounted to unavoidable
+  // damage for anyone without a fire flower already in hand, or without
+  // the platforming skill to land a clean stomp every time.
+  // Kept clear of the end-game boss cluster the same way the level's old
+  // piranha plant used to be, so it never overlaps that fight.
+  const endgameZoneX = Math.max(width * 0.6, boss ? boss.x - 220 : Math.min(width - 260, flag.x - 220));
+  const koopaCandidates = solidSegments.filter(([x1]) => x1 > width * 0.4 && x1 < endgameZoneX - 300);
   const koopaSegments = koopaCandidates.length ? koopaCandidates : solidSegments;
   const [ksx1, ksx2] = koopaSegments[Math.floor(koopaSegments.length / 2)];
   const koopaSegWidth = ksx2 - ksx1;
@@ -802,7 +815,8 @@ export function buildLevel({ world, durationMinutes, seed }) {
     height: 46,
     vx: (rng() < 0.5 ? -1 : 1) * (baseSpeed * 0.8 + 0.4),
     alive: true,
-    nextThrowAt: 0,
+    pending: false,
+    termId: null,
   };
 
   // A third case file lives in the main level itself, not a bonus room —
@@ -845,9 +859,7 @@ export function buildLevel({ world, durationMinutes, seed }) {
     powerUps,
     boss,
     flag,
-    piranha,
     koopa,
-    spikes,
     flyers,
     loreCards,
   };

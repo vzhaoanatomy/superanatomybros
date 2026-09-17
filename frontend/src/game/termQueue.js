@@ -24,14 +24,16 @@ export function createTermQueue(vocab) {
   }
 
   // Reshuffles fresh (so a Play Again doesn't repeat the same order) and
-  // assigns every coin/enemy/door a termId drawn from the queue. Boss
-  // questions draw from the same queue via `next()` directly, so the whole
-  // level shares one no-repeat sequence.
+  // assigns every coin/enemy/door/koopa/flyer a termId drawn from the
+  // queue. Boss questions draw from the same queue via `next()` directly,
+  // so the whole level shares one no-repeat sequence.
   function assignAll(level) {
     refill();
     for (const coin of level.coins) coin.termId = next();
     for (const enemy of level.enemies) enemy.termId = next();
     level.door.termId = next();
+    if (level.koopa) level.koopa.termId = next();
+    for (const flyer of level.flyers) flyer.termId = next();
   }
 
   return { next, assignAll };
