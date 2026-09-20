@@ -11,6 +11,7 @@ import WorldBuilderForm from './WorldBuilderForm';
 import MissedTermsPanel from './MissedTermsPanel';
 import StudentAttemptsPanel from './StudentAttemptsPanel';
 import QuickStartBanner from './QuickStartBanner';
+import ClassLeaderboardModal from '../classroom/ClassLeaderboardModal';
 import * as t from './teacherStyles';
 
 export default function TeacherMode({ onExit }) {
@@ -21,6 +22,7 @@ export default function TeacherMode({ onExit }) {
   const [publishError, setPublishError] = useState(null); // { id, message }
   const [statsForId, setStatsForId] = useState(null);
   const [attemptsForId, setAttemptsForId] = useState(null);
+  const [leaderboardForId, setLeaderboardForId] = useState(null);
   const [uploadingId, setUploadingId] = useState(null);
   const [uploadMessage, setUploadMessage] = useState(null); // { id, text, isError }
   const fileInputRef = useRef(null);
@@ -205,6 +207,13 @@ export default function TeacherMode({ onExit }) {
             <button
               type="button"
               style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
+              onClick={() => setLeaderboardForId(world.id)}
+            >
+              🏆 Leaderboard
+            </button>
+            <button
+              type="button"
+              style={{ ...t.button, padding: '6px 10px', fontSize: 12 }}
               onClick={() => setAttemptsForId(attemptsForId === world.id ? null : world.id)}
             >
               🧑‍🎓 Student Attempts
@@ -218,6 +227,13 @@ export default function TeacherMode({ onExit }) {
               {uploadingId === world.id ? 'Uploading…' : '🎵 Upload Music'}
             </button>
           </div>
+        )}
+        {leaderboardForId === world.id && world.classroomCode && (
+          <ClassLeaderboardModal
+            code={world.classroomCode}
+            worldName={world.name}
+            onClose={() => setLeaderboardForId(null)}
+          />
         )}
         {statsForId === world.id && world.classroomCode && (
           <MissedTermsPanel code={world.classroomCode} vocab={world.vocab} onClose={() => setStatsForId(null)} />

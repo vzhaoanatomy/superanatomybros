@@ -9,7 +9,7 @@ const PREVIEW_H = 96;
 // Shared between the teacher's WorldSelect grid and the student's
 // StudentHome library — same canvas preview, same card chrome, so a joined
 // world looks exactly like the one the teacher published.
-export default function WorldCard({ world, onSelect, loading = false }) {
+export default function WorldCard({ world, onSelect, loading = false, onLeaderboard }) {
   const canvasRef = useRef(null);
   // Joined classroom worlds (student library) never carry a numeric index —
   // that numbering only exists for the teacher's own built-in/custom list —
@@ -35,7 +35,7 @@ export default function WorldCard({ world, onSelect, loading = false }) {
     );
   }, [world.id, heroId]);
 
-  return (
+  const card = (
     <button
       type="button"
       onClick={() => onSelect(world.id)}
@@ -90,5 +90,28 @@ export default function WorldCard({ world, onSelect, loading = false }) {
       {bestScore != null && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Best: {bestScore}</span>}
       {world.isClassroom && <span style={{ fontSize: 11, color: '#9fb0d0' }}>Code: {world.code}</span>}
     </button>
+  );
+
+  if (!onLeaderboard) return card;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 190 }}>
+      {card}
+      <button
+        type="button"
+        onClick={onLeaderboard}
+        style={{
+          padding: '7px 10px',
+          background: '#22304f',
+          border: '2px solid #3a4a6c',
+          borderRadius: 6,
+          color: '#fff',
+          fontSize: 12.5,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+        }}
+      >
+        🏆 Leaderboard
+      </button>
+    </div>
   );
 }

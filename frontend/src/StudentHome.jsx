@@ -6,6 +6,7 @@ import WorldCard from './game/WorldCard';
 import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
 import LocalLeaderboard from './classroom/LocalLeaderboard';
+import ClassLeaderboardModal from './classroom/ClassLeaderboardModal';
 import FieldNotes from './overlays/FieldNotes';
 
 // See handleSelectWorld below — caps how long a pre-play refresh check is
@@ -82,6 +83,7 @@ export default function StudentHome({ onSelectWorld }) {
   const [showJoin, setShowJoin] = useState(joined.length === 0);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardWorld, setLeaderboardWorld] = useState(null);
   const [showFieldNotes, setShowFieldNotes] = useState(false);
   const [musicOn, setMusicOn] = useState(isMusicPlaying());
   const [sfxOn, setSfxOn] = useState(isSfxEnabled());
@@ -220,6 +222,7 @@ export default function StudentHome({ onSelectWorld }) {
                 world={world}
                 onSelect={handleSelectWorld}
                 loading={refreshingId === world.id}
+                onLeaderboard={world.code ? () => setLeaderboardWorld(world) : undefined}
               />
             ))}
           </div>
@@ -288,6 +291,13 @@ export default function StudentHome({ onSelectWorld }) {
       </div>
       {showHowToPlay && <HowToPlay onClose={() => setShowHowToPlay(false)} />}
       {showLeaderboard && <LocalLeaderboard onClose={() => setShowLeaderboard(false)} />}
+      {leaderboardWorld && (
+        <ClassLeaderboardModal
+          code={leaderboardWorld.code}
+          worldName={leaderboardWorld.name}
+          onClose={() => setLeaderboardWorld(null)}
+        />
+      )}
       {showFieldNotes && <FieldNotes onClose={() => setShowFieldNotes(false)} />}
     </div>
   );
