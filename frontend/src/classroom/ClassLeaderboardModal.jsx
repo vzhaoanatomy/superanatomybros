@@ -8,14 +8,17 @@ import LeaderboardList from './LeaderboardList';
 export default function ClassLeaderboardModal({ code, worldName, onClose }) {
   const [entries, setEntries] = useState(null);
   const [error, setError] = useState(null);
+  const [slow, setSlow] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const slowTimer = setTimeout(() => setSlow(true), 3000);
     fetchLeaderboard(code)
       .then((rows) => !cancelled && setEntries(rows))
       .catch((err) => !cancelled && setError(err.message));
     return () => {
       cancelled = true;
+      clearTimeout(slowTimer);
     };
   }, [code]);
 
@@ -27,7 +30,9 @@ export default function ClassLeaderboardModal({ code, worldName, onClose }) {
           {worldName} · {code}
         </p>
         {error && <p style={{ color: '#ff8a5c', fontSize: 13 }}>{error}</p>}
-        {!error && entries === null && <p style={{ color: '#9fb0d0', fontSize: 13 }}>Loading…</p>}
+        {!error && entries === null && <p style={{ color: '#9fb0d0', fontSize: 13 }}>
+            {slow ? 'Waking up the server — this can take up to a minute the first time…' : 'Loading…'}
+          </p>}
         {entries && (
           <LeaderboardList
             entries={entries}

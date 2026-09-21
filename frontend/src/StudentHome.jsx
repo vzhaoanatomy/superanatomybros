@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getNickname, setNickname, loadJoinedWorlds, saveJoinedWorlds, loadSettings, saveSettings } from './storage';
 import { toggleMusic, isMusicPlaying, toggleSfx, isSfxEnabled, setSfxEnabled } from './game/music';
-import { fetchWorld } from './api';
+import { fetchWorld, warmBackend } from './api';
 import WorldCard from './game/WorldCard';
 import JoinClassroom from './classroom/JoinClassroom';
 import HowToPlay from './overlays/HowToPlay';
@@ -94,6 +94,7 @@ export default function StudentHome({ onSelectWorld }) {
   const caseOfTheDay = pickCaseOfTheDay(joined);
 
   useEffect(() => {
+    warmBackend();
     const settings = loadSettings();
     setSfxOn(setSfxEnabled(settings.sfxOn));
     // eslint-disable-next-line react-hooks/exhaustive-deps

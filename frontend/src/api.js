@@ -20,6 +20,12 @@ async function request(path, options) {
   return res.json();
 }
 
+// Fire-and-forget: wakes the free-tier backend while the user is still
+// choosing what to do, so a later request doesn't eat the cold start.
+export function warmBackend() {
+  fetch(`${API_BASE}/api/health`).catch(() => {});
+}
+
 function toWorldPayload(world) {
   return {
     name: world.name,
